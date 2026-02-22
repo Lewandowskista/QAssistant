@@ -24,7 +24,11 @@
                    FontSize="10" FontWeight="SemiBold"
                    CharacterSpacing="150"/>
                     <Grid>
-                        <StackPanel Spacing="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,16,0">
                             <TextBlock Text="Minimize to System Tray"
                            Foreground="#E2E8F0" FontSize="14"/>
                             <TextBlock Text="When enabled, closing the window sends it to the system tray instead of exiting"
@@ -32,7 +36,7 @@
                            TextWrapping="Wrap"/>
                         </StackPanel>
                         <ToggleSwitch x:Name="MinimizeToTrayToggle"
-                          HorizontalAlignment="Right"
+                          Grid.Column="1"
                           VerticalAlignment="Center"
                           Toggled="MinimizeToTrayToggle_Toggled"
                           OnContent="" OffContent=""/>
