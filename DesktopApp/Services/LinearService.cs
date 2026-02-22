@@ -16,8 +16,7 @@ namespace DesktopApp.Services
 
         public LinearService(string apiKey)
         {
-            _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", apiKey);
+            _client.DefaultRequestHeaders.Add("Authorization", apiKey);
             _client.DefaultRequestHeaders.Accept
                 .Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
@@ -25,45 +24,57 @@ namespace DesktopApp.Services
         public async Task<List<ProjectTask>> GetIssuesAsync(string teamId)
         {
             var query = @"
-            {
-                issues(filter: { team: { id: { eq: """ + teamId + @""" } } }) {
-                    nodes {
-                        id
-                        title
-                        description
-                        priority
-                        state { name }
-                        assignee { name }
-                        dueDate
-                        url
-                    }
-                }
-            }";
+    {
+        issues(first: 50) {
+            nodes {
+                id
+                title
+                description
+                priority
+                state { name }
+                assignee { name }
+                dueDate
+                url
+            }
+        }
+    }";
 
             var response = await PostQueryAsync(query);
             var tasks = new List<ProjectTask>();
 
-            using var doc = JsonDocument.Parse(response);
-            var nodes = doc.RootElement
-                .GetProperty("data")
-                .GetProperty("issues")
-                .GetProperty("nodes");
-
-            foreach (var node in nodes.EnumerateArray())
+            try
             {
-                var stateName = node.GetProperty("state").GetProperty("name").GetString() ?? "";
-                var task = new ProjectTask
+                using var doc = JsonDocument.Parse(response);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("errors", out var errors))
+                    throw new Exception(errors[0].GetProperty("message").GetString());
+
+                if (!root.TryGetProperty("data", out var data))
+                    throw new Exception($"Unexpected response: {response}");
+
+                var nodes = data.GetProperty("issues").GetProperty("nodes");
+
+                foreach (var node in nodes.EnumerateArray())
                 {
-                    Id = Guid.NewGuid(),
-                    Title = node.GetProperty("title").GetString() ?? "",
-                    Description = node.GetProperty("description").GetString() ?? "",
-                    Status = MapLinearStatus(stateName),
-                    Priority = MapLinearPriority(node.GetProperty("priority").GetInt32()),
-                    TicketUrl = node.GetProperty("url").GetString() ?? "",
-                    ExternalId = node.GetProperty("id").GetString() ?? "",
-                    Source = TaskSource.Linear
-                };
-                tasks.Add(task);
+                    var stateName = node.GetProperty("state").GetProperty("name").GetString() ?? "";
+                    var task = new ProjectTask
+                    {
+                        Id = Guid.NewGuid(),
+                        Title = node.GetProperty("title").GetString() ?? "",
+                        Description = node.GetProperty("description").GetString() ?? "",
+                        Status = MapLinearStatus(stateName),
+                        Priority = MapLinearPriority(node.GetProperty("priority").GetInt32()),
+                        TicketUrl = node.GetProperty("url").GetString() ?? "",
+                        ExternalId = node.GetProperty("id").GetString() ?? "",
+                        Source = TaskSource.Linear
+                    };
+                    tasks.Add(task);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Parse error: {ex.Message} | Raw: {response}");
             }
 
             return tasks;
@@ -75,19 +86,34 @@ namespace DesktopApp.Services
             var response = await PostQueryAsync(query);
             var teams = new List<LinearTeam>();
 
-            using var doc = JsonDocument.Parse(response);
-            var nodes = doc.RootElement
-                .GetProperty("data")
-                .GetProperty("teams")
-                .GetProperty("nodes");
-
-            foreach (var node in nodes.EnumerateArray())
+            try
             {
-                teams.Add(new LinearTeam
+                using var doc = JsonDocument.Parse(response);
+                var root = doc.RootElement;
+
+                // Check for errors in the response
+                if (root.TryGetProperty("errors", out var errors))
+                    throw new Exception(errors[0].GetProperty("message").GetString());
+
+                if (!root.TryGetProperty("data", out var data))
+                    throw new Exception($"Unexpected response: {response}");
+
+                if (!data.TryGetProperty("teams", out var teamsEl))
+                    throw new Exception($"No teams in response: {response}");
+
+                var nodes = teamsEl.GetProperty("nodes");
+                foreach (var node in nodes.EnumerateArray())
                 {
-                    Id = node.GetProperty("id").GetString() ?? "",
-                    Name = node.GetProperty("name").GetString() ?? ""
-                });
+                    teams.Add(new LinearTeam
+                    {
+                        Id = node.GetProperty("id").GetString() ?? "",
+                        Name = node.GetProperty("name").GetString() ?? ""
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Parse error: {ex.Message} | Raw: {response}");
             }
 
             return teams;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using DesktopApp.Models;
 using DesktopApp.ViewModels;
@@ -39,35 +40,66 @@ namespace DesktopApp
 
             if (_appWindow == null) return;
 
-            // Size and position
             _appWindow.Resize(new Windows.Graphics.SizeInt32(1200, 780));
             _appWindow.Move(new Windows.Graphics.PointInt32(100, 100));
 
-            // Custom titlebar
+            // Use compact overlay presenter to hide all default buttons
+            var presenter = OverlappedPresenter.Create();
+            presenter.SetBorderAndTitleBar(true, false);
+            presenter.IsResizable = true;
+            _appWindow.SetPresenter(presenter);
+
             if (AppWindowTitleBar.IsCustomizationSupported())
             {
                 var titleBar = _appWindow.TitleBar;
                 titleBar.ExtendsContentIntoTitleBar = true;
                 titleBar.ButtonBackgroundColor = Colors.Transparent;
                 titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-                titleBar.ButtonForegroundColor = Colors.White;
+                titleBar.ButtonForegroundColor = Colors.Transparent;
+                titleBar.ButtonInactiveForegroundColor = Colors.Transparent;
+                titleBar.ButtonHoverBackgroundColor = Colors.Transparent;
+                titleBar.ButtonHoverForegroundColor = Colors.Transparent;
+                titleBar.ButtonPressedBackgroundColor = Colors.Transparent;
+                titleBar.ButtonPressedForegroundColor = Colors.Transparent;
             }
 
-            // Set always on top and drag region after window is activated
             this.Activated += OnFirstActivated;
         }
 
         private void OnFirstActivated(object sender, WindowActivatedEventArgs e)
         {
-            this.Activated -= OnFirstActivated; // run once only
+            this.Activated -= OnFirstActivated;
             SetAlwaysOnTop(true);
             SetDragRegion();
         }
 
-        // ── Events ──────────────────────────────────────────────────
-        private void PinToggle_Toggled(object sender, RoutedEventArgs e)
+        private void SetAlwaysOnTop(bool onTop)
         {
-            SetAlwaysOnTop(PinToggle.IsOn);
+            if (_appWindow?.Presenter is OverlappedPresenter presenter)
+                presenter.IsAlwaysOnTop = onTop;
+        }
+
+        private void SetDragRegion()
+        {
+            if (_appWindow == null) return;
+            if (!AppWindowTitleBar.IsCustomizationSupported()) return;
+
+            _appWindow.TitleBar.SetDragRectangles(new[]
+            {
+                new Windows.Graphics.RectInt32(220, 0,
+                    (int)(_appWindow.Size.Width - 300), 48)
+            });
+        }
+
+        // ── Events ──────────────────────────────────────────────────
+        private void PinToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            SetAlwaysOnTop(true);
+        }
+
+        private void PinToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SetAlwaysOnTop(false);
         }
 
         private void ProjectList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -79,10 +111,61 @@ namespace DesktopApp
             }
         }
 
-        private void AddProject_Click(object sender, RoutedEventArgs e)
+        private async void ProjectList_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
         {
-            ViewModel.AddProjectCommand.Execute(null);
-            RefreshProjectList();
+            if (ViewModel.SelectedProject == null) return;
+
+            var nameBox = new TextBox
+            {
+                Text = ViewModel.SelectedProject.Name,
+                PlaceholderText = "Project name..."
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = "Rename Project",
+                Content = nameBox,
+                PrimaryButtonText = "Save",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = ContentFrame.XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(nameBox.Text))
+            {
+                ViewModel.SelectedProject.Name = nameBox.Text.Trim();
+                await ViewModel.SaveAsync();
+                RefreshProjectList();
+            }
+        }
+
+        private async void AddProject_Click(object sender, RoutedEventArgs e)
+        {
+            var nameBox = new TextBox
+            {
+                PlaceholderText = "Project name..."
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = "New Project",
+                Content = nameBox,
+                PrimaryButtonText = "Create",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = ContentFrame.XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(nameBox.Text))
+            {
+                var p = new Project { Name = nameBox.Text.Trim() };
+                ViewModel.Projects.Add(p);
+                ViewModel.SelectedProject = p;
+                await ViewModel.SaveAsync();
+                RefreshProjectList();
+            }
         }
 
         private void Tab_Click(object sender, RoutedEventArgs e)
@@ -132,6 +215,28 @@ namespace DesktopApp
             }
         }
 
+        private void MinimizeBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_appWindow?.Presenter is OverlappedPresenter presenter)
+                presenter.Minimize();
+        }
+
+        private void MaximizeBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_appWindow?.Presenter is OverlappedPresenter presenter)
+            {
+                if (presenter.State == OverlappedPresenterState.Maximized)
+                    presenter.Restore();
+                else
+                    presenter.Maximize();
+            }
+        }
+
+        private void CloseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
+        }
+
         private void RefreshProjectList()
         {
             ProjectList.ItemsSource = null;
@@ -140,25 +245,5 @@ namespace DesktopApp
                 ProjectList.SelectedItem = ViewModel.SelectedProject;
             NavigateToCurrentTab();
         }
-
-        private void SetAlwaysOnTop(bool onTop)
-        {
-            if (_appWindow?.Presenter is OverlappedPresenter presenter)
-                presenter.IsAlwaysOnTop = onTop;
-        }
-
-        private void SetDragRegion()
-        {
-            if (_appWindow == null) return;
-            if (!AppWindowTitleBar.IsCustomizationSupported()) return;
-
-            _appWindow.TitleBar.SetDragRectangles(new[]
-            {
-        new Windows.Graphics.RectInt32(220, 0,
-            (int)(_appWindow.Size.Width - 300), 48)
-    });
-        }
-
-       
-        }
     }
+}

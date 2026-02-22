@@ -3,9 +3,7 @@
     x:Class="DesktopApp.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:DesktopApp"
-    xmlns:vm="using:DesktopApp.ViewModels"
-    xmlns:models="using:DesktopApp.Models">
+    xmlns:local="using:DesktopApp">
 
     <Grid Background="#0F0F13">
         <Grid.RowDefinitions>
@@ -17,12 +15,10 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- ═══════════════════════════════════════ -->
-        <!-- TITLEBAR / TOPBAR                       -->
-        <!-- ═══════════════════════════════════════ -->
+        <!-- TITLEBAR -->
         <Border Grid.Row="0" Grid.ColumnSpan="2"
-                Background="#13131A"
-                BorderBrush="#2A2A3A" BorderThickness="0,0,0,1">
+        Background="#13131A"
+        BorderBrush="#2A2A3A" BorderThickness="0,0,0,1">
             <Grid Padding="16,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -32,33 +28,65 @@
 
                 <!-- App name -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="⬡" FontSize="18" Foreground="#A78BFA"
-                               VerticalAlignment="Center"/>
+                    VerticalAlignment="Center">
                     <TextBlock Text="DesktopApp" FontSize="14" FontWeight="SemiBold"
-                               Foreground="#E2E8F0" VerticalAlignment="Center"/>
+                       Foreground="#A78BFA" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Drag region -->
-                <Border Grid.Column="1" Background="Transparent"
-                        x:Name="DragRegion"/>
+                <Border Grid.Column="1" Background="Transparent" x:Name="DragRegion"/>
 
-                <!-- Always on top toggle -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="Pin" Foreground="#6B7280" FontSize="12"
-                               VerticalAlignment="Center"/>
-                    <ToggleSwitch x:Name="PinToggle" IsOn="True"
-                                  Toggled="PinToggle_Toggled"
-                                  OnContent="" OffContent=""
-                                  MinWidth="0"/>
+                <!-- Right controls -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4"
+                    VerticalAlignment="Center">
+
+                    <!-- Pin toggle -->
+                    <CheckBox x:Name="PinToggle"
+                      IsChecked="True"
+                      Content="Pin"
+                      Foreground="#6B7280"
+                      FontSize="12"
+                      Checked="PinToggle_Checked"
+                      Unchecked="PinToggle_Unchecked"
+                      Margin="0,0,8,0"/>
+
+                    <!-- Minimize -->
+                    <Button x:Name="MinimizeBtn"
+                    Content="&#x2212;"
+                    Click="MinimizeBtn_Click"
+                    Width="32" Height="32"
+                    Background="Transparent"
+                    Foreground="#6B7280"
+                    CornerRadius="6"
+                    Padding="0"
+                    FontSize="14"/>
+
+                    <!-- Maximize -->
+                    <Button x:Name="MaximizeBtn"
+                    Content="&#x25A1;"
+                    Click="MaximizeBtn_Click"
+                    Width="32" Height="32"
+                    Background="Transparent"
+                    Foreground="#6B7280"
+                    CornerRadius="6"
+                    Padding="0"
+                    FontSize="14"/>
+
+                    <!-- Close -->
+                    <Button x:Name="CloseBtn"
+                    Content="&#x2715;"
+                    Click="CloseBtn_Click"
+                    Width="32" Height="32"
+                    Background="Transparent"
+                    Foreground="#6B7280"
+                    CornerRadius="6"
+                    Padding="0"
+                    FontSize="14"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- ═══════════════════════════════════════ -->
-        <!-- SIDEBAR                                 -->
-        <!-- ═══════════════════════════════════════ -->
+        <!-- SIDEBAR -->
         <Border Grid.Row="1" Grid.Column="0"
                 Background="#1A1A24"
                 BorderBrush="#2A2A3A" BorderThickness="0,0,1,0">
@@ -69,15 +97,14 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Section label -->
                 <TextBlock Grid.Row="0" Text="PROJECTS"
                            Foreground="#6B7280" FontSize="10" FontWeight="SemiBold"
                            Margin="16,16,16,8" CharacterSpacing="150"/>
 
-                <!-- Project list -->
                 <ListView Grid.Row="1"
                           x:Name="ProjectList"
                           SelectionChanged="ProjectList_SelectionChanged"
+                          DoubleTapped="ProjectList_DoubleTapped"
                           Background="Transparent"
                           SelectionMode="Single">
                     <ListView.ItemContainerStyle>
@@ -89,11 +116,11 @@
                         </Style>
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="models:Project">
+                        <DataTemplate>
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <Border Width="4" Height="20" CornerRadius="2"
-                                        Background="{x:Bind Color}"/>
-                                <TextBlock Text="{x:Bind Name}"
+                                        Background="{Binding Color}"/>
+                                <TextBlock Text="{Binding Name}"
                                            Foreground="#E2E8F0" FontSize="13"
                                            VerticalAlignment="Center"/>
                             </StackPanel>
@@ -101,9 +128,8 @@
                     </ListView.ItemTemplate>
                 </ListView>
 
-                <!-- Add project button -->
                 <Button Grid.Row="2"
-                        Content="＋ New Project"
+                        Content="+ New Project"
                         Click="AddProject_Click"
                         HorizontalAlignment="Stretch"
                         Margin="12,8,12,16"
@@ -114,9 +140,7 @@
             </Grid>
         </Border>
 
-        <!-- ═══════════════════════════════════════ -->
-        <!-- MAIN CONTENT AREA                       -->
-        <!-- ═══════════════════════════════════════ -->
+        <!-- MAIN CONTENT AREA -->
         <Grid Grid.Row="1" Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -128,19 +152,19 @@
                     BorderBrush="#2A2A3A" BorderThickness="0,0,0,1"
                     Padding="12,0">
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                    <Button x:Name="TabLinks" Content="🔗  Links"
+                    <Button x:Name="TabLinks" Content="Links"
                             Click="Tab_Click" Tag="Links"
                             Background="#2D2D3F" Foreground="#E2E8F0"
                             CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                    <Button x:Name="TabNotes" Content="📝  Notes"
+                    <Button x:Name="TabNotes" Content="Notes"
                             Click="Tab_Click" Tag="Notes"
                             Background="Transparent" Foreground="#6B7280"
                             CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                    <Button x:Name="TabTasks" Content="✅  Tasks"
+                    <Button x:Name="TabTasks" Content="Tasks"
                             Click="Tab_Click" Tag="Tasks"
                             Background="Transparent" Foreground="#6B7280"
                             CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                    <Button x:Name="TabSettings" Content="⚙  Settings"
+                    <Button x:Name="TabSettings" Content="Settings"
                             Click="Tab_Click" Tag="Settings"
                             Background="Transparent" Foreground="#6B7280"
                             CornerRadius="8" Padding="14,8" Margin="0,6"/>
@@ -148,8 +172,7 @@
             </Border>
 
             <!-- Content frame -->
-            <Frame Grid.Row="1" x:Name="ContentFrame"
-                   Background="#0F0F13"/>
+            <Frame Grid.Row="1" x:Name="ContentFrame" Background="#0F0F13"/>
         </Grid>
     </Grid>
 </Window>
