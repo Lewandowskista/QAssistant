@@ -10,6 +10,7 @@ namespace DesktopApp
     {
         public static IntPtr MainWindowHandle { get; private set; }
         public static MainWindow? MainWindowInstance { get; private set; }
+        public static bool MinimizeToTray { get; set; } = false;
 
         // Win32 tray constants
         private const int WM_APP = 0x8000;
@@ -104,6 +105,8 @@ namespace DesktopApp
         private void OnWindowFirstActivated(object sender, WindowActivatedEventArgs e)
         {
             MainWindowInstance!.Activated -= OnWindowFirstActivated;
+            var trayEnabled = DesktopApp.Services.CredentialService.LoadCredential("MinimizeToTray");
+            MinimizeToTray = trayEnabled != "true";
             SetupTrayIcon();
         }
 
@@ -201,6 +204,13 @@ namespace DesktopApp
         public void RemoveTrayIcon()
         {
             Shell_NotifyIcon(NIM_DELETE, ref _nid);
+        }
+
+        public static void ExitApp()
+        {
+            if (MainWindowInstance != null)
+                ((App)Application.Current).RemoveTrayIcon();
+            System.Diagnostics.Process.GetCurrentProcess().Kill();
         }
 
         private Window? m_window;

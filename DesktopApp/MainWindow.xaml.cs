@@ -25,11 +25,13 @@ namespace DesktopApp
             LoadDataAsync();
             this.Closed += (s, e) =>
             {
-                e.Handled = true;
-                App.HideMainWindow();
+                if (App.MinimizeToTray)
+                {
+                    e.Handled = true;
+                    App.HideMainWindow();
+                }
             };
         }
-
         private async void LoadDataAsync()
         {
             await ViewModel.InitializeAsync();
@@ -125,7 +127,10 @@ namespace DesktopApp
 
         private void CloseBtn_Click(object sender, RoutedEventArgs e)
         {
-            App.HideMainWindow();
+            if (App.MinimizeToTray)
+                App.HideMainWindow();
+            else
+                App.ExitApp();
         }
 
         private void ProjectList_SelectionChanged(object sender, SelectionChangedEventArgs e)

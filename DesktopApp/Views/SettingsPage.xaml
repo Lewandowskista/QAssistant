@@ -15,6 +15,31 @@
                            Foreground="#6B7280" FontSize="13"/>
             </StackPanel>
 
+            <!-- General Settings -->
+            <Border Background="#1A1A24" CornerRadius="12"
+        Padding="20" BorderBrush="#2A2A3A" BorderThickness="1"
+        Margin="0,0,0,16">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="GENERAL" Foreground="#6B7280"
+                   FontSize="10" FontWeight="SemiBold"
+                   CharacterSpacing="150"/>
+                    <Grid>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Minimize to System Tray"
+                           Foreground="#E2E8F0" FontSize="14"/>
+                            <TextBlock Text="When enabled, closing the window sends it to the system tray instead of exiting"
+                           Foreground="#6B7280" FontSize="12"
+                           TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Name="MinimizeToTrayToggle"
+                          HorizontalAlignment="Right"
+                          VerticalAlignment="Center"
+                          Toggled="MinimizeToTrayToggle_Toggled"
+                          OnContent="" OffContent=""/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- Linear Section -->
             <Border Background="#1A1A24" CornerRadius="12"
                     BorderBrush="#2A2A3A" BorderThickness="1" Padding="24">

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
 using DesktopApp.Services;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -10,6 +9,8 @@ namespace DesktopApp.Views
 {
     public sealed partial class SettingsPage : Page
     {
+        private bool _isLoading = true;
+
         public SettingsPage()
         {
             this.InitializeComponent();
@@ -41,6 +42,29 @@ namespace DesktopApp.Views
             var jiraProject = CredentialService.LoadCredential("JiraProjectKey");
             if (!string.IsNullOrEmpty(jiraProject))
                 JiraProjectKeyBox.Text = jiraProject;
+
+            // Load tray setting — default to true on first run
+            var trayEnabled = CredentialService.LoadCredential("MinimizeToTray");
+            if (string.IsNullOrEmpty(trayEnabled))
+            {
+                CredentialService.SaveCredential("MinimizeToTray", "true");
+                MinimizeToTrayToggle.IsOn = true;
+            }
+            else
+            {
+                MinimizeToTrayToggle.IsOn = trayEnabled != "false";
+            }
+
+            _isLoading = false;
+        }
+
+        // ── General Settings ─────────────────────────────────────────
+        private void MinimizeToTrayToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            var enabled = MinimizeToTrayToggle.IsOn;
+            CredentialService.SaveCredential("MinimizeToTray", enabled ? "true" : "false");
+            App.MinimizeToTray = enabled;
         }
 
         // ── Linear ───────────────────────────────────────────────────
