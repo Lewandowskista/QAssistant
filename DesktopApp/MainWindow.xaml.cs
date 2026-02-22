@@ -147,22 +147,117 @@ namespace DesktopApp
                 PlaceholderText = "Project name..."
             };
 
+            // Color options
+            var colors = new[]
+            {
+        ("#A78BFA", "Purple"),
+        ("#60A5FA", "Blue"),
+        ("#34D399", "Green"),
+        ("#F87171", "Red"),
+        ("#FBBF24", "Yellow"),
+        ("#F472B6", "Pink"),
+        ("#94A3B8", "Gray"),
+        ("#FB923C", "Orange")
+    };
+
+            var colorPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                Margin = new Thickness(0, 12, 0, 0)
+            };
+
+            Button? selectedColorBtn = null;
+            string selectedColor = ViewModel.SelectedProject.Color;
+
+            foreach (var (hex, name) in colors)
+            {
+                var btn = new Button
+                {
+                    Width = 28,
+                    Height = 28,
+                    CornerRadius = new CornerRadius(14),
+                    Background = new SolidColorBrush(
+                        Windows.UI.Color.FromArgb(255,
+                            Convert.ToByte(hex[1..3], 16),
+                            Convert.ToByte(hex[3..5], 16),
+                            Convert.ToByte(hex[5..7], 16))),
+                    Padding = new Thickness(0),
+                    BorderThickness = new Thickness(hex == selectedColor ? 2 : 0),
+                    BorderBrush = new SolidColorBrush(Colors.White),
+                    Tag = hex
+                };
+
+                btn.Click += (s, args) =>
+                {
+                    selectedColor = (string)((Button)s).Tag;
+                    // Reset all borders
+                    foreach (var child in colorPanel.Children)
+                        if (child is Button b)
+                            b.BorderThickness = new Thickness(
+                                (string)b.Tag == selectedColor ? 2 : 0);
+                };
+
+                colorPanel.Children.Add(btn);
+            }
+
+            var panel = new StackPanel { Spacing = 4 };
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Project Name",
+                Foreground = new SolidColorBrush(Colors.White),
+                FontSize = 12
+            });
+            panel.Children.Add(nameBox);
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Color",
+                Foreground = new SolidColorBrush(Colors.White),
+                FontSize = 12,
+                Margin = new Thickness(0, 8, 0, 0)
+            });
+            panel.Children.Add(colorPanel);
+
             var dialog = new ContentDialog
             {
-                Title = "Rename Project",
-                Content = nameBox,
+                Title = "Edit Project",
+                Content = panel,
                 PrimaryButtonText = "Save",
+                SecondaryButtonText = "Delete",
                 CloseButtonText = "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = ContentFrame.XamlRoot
             };
 
             var result = await dialog.ShowAsync();
+
             if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(nameBox.Text))
             {
                 ViewModel.SelectedProject.Name = nameBox.Text.Trim();
+                ViewModel.SelectedProject.Color = selectedColor;
                 await ViewModel.SaveAsync();
                 RefreshProjectList();
+            }
+            else if (result == ContentDialogResult.Secondary)
+            {
+                var confirmDialog = new ContentDialog
+                {
+                    Title = "Delete Project",
+                    Content = $"Are you sure you want to delete '{ViewModel.SelectedProject.Name}'? This will delete all notes, tasks and files in this project.",
+                    PrimaryButtonText = "Delete",
+                    CloseButtonText = "Cancel",
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = ContentFrame.XamlRoot
+                };
+
+                var confirmResult = await confirmDialog.ShowAsync();
+                if (confirmResult == ContentDialogResult.Primary)
+                {
+                    ViewModel.Projects.Remove(ViewModel.SelectedProject);
+                    ViewModel.SelectedProject = ViewModel.Projects.FirstOrDefault();
+                    await ViewModel.SaveAsync();
+                    RefreshProjectList();
+                }
             }
         }
 
