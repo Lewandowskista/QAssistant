@@ -59,8 +59,9 @@
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="#252535" CornerRadius="8"
-                    Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
+            Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
                                         <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                             <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
                                             <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
                                             <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
@@ -93,8 +94,9 @@
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="#252535" CornerRadius="8"
-                    Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
+            Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
                                         <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                             <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
                                             <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
                                             <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
@@ -127,8 +129,9 @@
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="#252535" CornerRadius="8"
-                    Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
+            Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
                                         <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                             <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
                                             <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
                                             <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
@@ -161,8 +164,9 @@
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="#252535" CornerRadius="8"
-                    Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
+            Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
                                         <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                             <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
                                             <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
                                             <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
@@ -195,8 +199,9 @@
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="#252535" CornerRadius="8"
-                    Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
+            Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
                                         <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                             <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
                                             <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
                                             <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>

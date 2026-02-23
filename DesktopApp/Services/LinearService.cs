@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DesktopApp.Models;
 
@@ -28,6 +29,7 @@ namespace DesktopApp.Services
         issues(first: 50) {
             nodes {
                 id
+                identifier
                 title
                 description
                 priority
@@ -35,6 +37,7 @@ namespace DesktopApp.Services
                 assignee { name }
                 dueDate
                 url
+                labels { nodes { name } }
             }
         }
     }";
@@ -58,15 +61,46 @@ namespace DesktopApp.Services
                 foreach (var node in nodes.EnumerateArray())
                 {
                     var stateName = node.GetProperty("state").GetProperty("name").GetString() ?? "";
+
+                    // Parse assignee
+                    string assignee = "";
+                    if (node.TryGetProperty("assignee", out var assigneeEl) &&
+                        assigneeEl.ValueKind != JsonValueKind.Null)
+                        assignee = assigneeEl.GetProperty("name").GetString() ?? "";
+
+                    // Parse due date
+                    DateTime? dueDate = null;
+                    if (node.TryGetProperty("dueDate", out var dueDateEl) &&
+                        dueDateEl.ValueKind != JsonValueKind.Null &&
+                        DateTime.TryParse(dueDateEl.GetString(), out var parsedDate))
+                        dueDate = parsedDate;
+
+                    // Parse labels
+                    string labels = "";
+                    if (node.TryGetProperty("labels", out var labelsEl) &&
+                        labelsEl.ValueKind != JsonValueKind.Null &&
+                        labelsEl.TryGetProperty("nodes", out var labelNodes))
+                    {
+                        var labelList = new List<string>();
+                        foreach (var label in labelNodes.EnumerateArray())
+                            labelList.Add(label.GetProperty("name").GetString() ?? "");
+                        labels = string.Join(", ", labelList);
+                    }
+
                     var task = new ProjectTask
                     {
                         Id = Guid.NewGuid(),
+                        ExternalId = node.GetProperty("id").GetString() ?? "",
+                        IssueIdentifier = node.TryGetProperty("identifier", out var identifier)
+                            ? identifier.GetString() ?? "" : "",
                         Title = node.GetProperty("title").GetString() ?? "",
-                        Description = node.GetProperty("description").GetString() ?? "",
+                        Description = CleanDescription(node.GetProperty("description").GetString()),
                         Status = MapLinearStatus(stateName),
                         Priority = MapLinearPriority(node.GetProperty("priority").GetInt32()),
                         TicketUrl = node.GetProperty("url").GetString() ?? "",
-                        ExternalId = node.GetProperty("id").GetString() ?? "",
+                        Assignee = assignee,
+                        Labels = labels,
+                        DueDate = dueDate,
                         Source = TaskSource.Linear
                     };
                     tasks.Add(task);
@@ -91,7 +125,6 @@ namespace DesktopApp.Services
                 using var doc = JsonDocument.Parse(response);
                 var root = doc.RootElement;
 
-                // Check for errors in the response
                 if (root.TryGetProperty("errors", out var errors))
                     throw new Exception(errors[0].GetProperty("message").GetString());
 
@@ -147,6 +180,29 @@ namespace DesktopApp.Services
             var content = new StringContent(payload, Encoding.UTF8, "application/json");
             var response = await _client.PostAsync(Endpoint, content);
             return await response.Content.ReadAsStringAsync();
+        }
+
+        private static string CleanDescription(string? raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return string.Empty;
+
+            // Remove markdown images ![alt](url)
+            raw = Regex.Replace(raw, @"!\[.*?\]\(.*?\)", "[image]");
+            // Remove markdown links [text](url) -> text
+            raw = Regex.Replace(raw, @"\[([^\]]+)\]\([^\)]+\)", "$1");
+            // Remove HTML tags
+            raw = Regex.Replace(raw, @"<[^>]+>", "");
+            // Remove markdown headers
+            raw = Regex.Replace(raw, @"#{1,6}\s", "");
+            // Remove bold/italic
+            raw = Regex.Replace(raw, @"\*{1,3}([^\*]+)\*{1,3}", "$1");
+            // Remove code blocks
+            raw = Regex.Replace(raw, @"```[\s\S]*?```", "[code block]");
+            raw = Regex.Replace(raw, @"`([^`]+)`", "$1");
+            // Trim excess whitespace
+            raw = Regex.Replace(raw, @"\n{3,}", "\n\n").Trim();
+
+            return raw;
         }
 
         private static Models.TaskStatus MapLinearStatus(string state) => state.ToLower() switch
