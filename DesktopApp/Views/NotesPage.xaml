@@ -25,18 +25,32 @@
                            Margin="16,16,16,8" CharacterSpacing="150"/>
 
                 <ListView Grid.Row="1" x:Name="NotesList"
-                          CanReorderItems="True"
-                          CanDragItems="True"
-                          AllowDrop="True"
-                          DragItemsCompleted="NotesList_DragItemsCompleted"
                           Background="Transparent" SelectionMode="Single"
-                          SelectionChanged="NotesList_SelectionChanged">
+                          SelectionChanged="NotesList_SelectionChanged"
+                          CanReorderItems="True" CanDragItems="True"
+                          AllowDrop="True"
+                          DragItemsCompleted="NotesList_DragItemsCompleted">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Padding" Value="12,8"/>
                             <Setter Property="Margin" Value="6,2"/>
                             <Setter Property="CornerRadius" Value="8"/>
                             <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <ListViewItemPresenter
+                                            SelectedBackground="#2D2D3F"
+                                            SelectedForeground="#E2E8F0"
+                                            SelectedPressedBackground="#3D3D5F"
+                                            SelectedPointerOverBackground="#353550"
+                                            PointerOverBackground="#252535"
+                                            PressedBackground="#1A1A2E"
+                                            CornerRadius="8"
+                                            ContentMargin="12,8"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
