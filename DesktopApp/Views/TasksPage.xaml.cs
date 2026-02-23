@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using DesktopApp.Models;
@@ -7,6 +7,7 @@ using DesktopApp.ViewModels;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 
@@ -17,6 +18,7 @@ namespace DesktopApp.Views
         private MainViewModel? _vm;
         private bool _isLinearMode = false;
         private List<ProjectTask> _linearTasks = new();
+        private ProjectTask? _selectedTask;
 
         public TasksPage()
         {
@@ -89,7 +91,7 @@ namespace DesktopApp.Views
                 else
                 {
                     RefreshBoard(_linearTasks);
-                    StatusText.Text = $"Synced {_linearTasks.Count} issues � {DateTime.Now:h:mm tt}";
+                    StatusText.Text = $"Synced {_linearTasks.Count} issues · {DateTime.Now:h:mm tt}";
                 }
             }
             catch (Exception ex)
@@ -108,6 +110,7 @@ namespace DesktopApp.Views
             AddTaskBtn.Visibility = Visibility.Visible;
             RefreshBtn.Visibility = Visibility.Collapsed;
             StatusText.Visibility = Visibility.Collapsed;
+            CloseDetailPanel();
             RefreshBoard(_vm?.SelectedProject?.Tasks ?? new List<ProjectTask>());
         }
 
@@ -121,6 +124,7 @@ namespace DesktopApp.Views
             AddTaskBtn.Visibility = Visibility.Collapsed;
             RefreshBtn.Visibility = Visibility.Visible;
             StatusText.Visibility = Visibility.Visible;
+            CloseDetailPanel();
 
             var key = CredentialService.LoadCredential("LinearApiKey");
             if (string.IsNullOrEmpty(key))
@@ -137,191 +141,277 @@ namespace DesktopApp.Views
             await FetchLinearIssuesAsync();
         }
 
-        private async void Task_Click(object sender, ItemClickEventArgs e)
+        private void Task_Click(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is not ProjectTask task) return;
-
-            if (_isLinearMode)
-                await ShowLinearTaskDetailAsync(task);
-            else
-                await ShowManualTaskDetailAsync(task);
+            _selectedTask = task;
+            ShowDetailPanel(task);
         }
 
-        private async System.Threading.Tasks.Task ShowLinearTaskDetailAsync(ProjectTask task)
+        private void ShowDetailPanel(ProjectTask task)
         {
-            var commentBox = new TextBox
-            {
-                PlaceholderText = "Add a comment...",
-                AcceptsReturn = true,
-                Height = 80,
-                TextWrapping = TextWrapping.Wrap
-            };
+            // Set width of detail panel
+            DetailPanelColumn.Width = new GridLength(340);
 
-            var panel = new StackPanel { Spacing = 10 };
-            panel.Children.Add(new TextBlock
-            {
-                Text = task.Title,
-                Foreground = new SolidColorBrush(Colors.White),
-                FontSize = 16,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                TextWrapping = TextWrapping.Wrap
-            });
-            panel.Children.Add(new TextBlock
-            {
-                Text = task.Description,
-                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175)),
-                TextWrapping = TextWrapping.Wrap
-            });
-            panel.Children.Add(new TextBlock
-            {
-                Text = $"Priority: {task.Priority}",
-                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 245, 158, 11)),
-                FontSize = 12
-            });
+            // Header
+            DetailIdentifier.Text = task.IssueIdentifier;
+            DetailTitle.Text = task.Title;
 
+            // Status badge
+            var (statusColor, statusText) = GetStatusStyle(task.Status);
+            DetailStatus.Text = statusText;
+            DetailStatusBadge.Background = new SolidColorBrush(statusColor);
+            DetailStatus.Foreground = new SolidColorBrush(Colors.White);
+
+            // Priority badge
+            DetailPriority.Text = task.Priority.ToString();
+
+            // Meta
             if (!string.IsNullOrEmpty(task.Assignee))
-                panel.Children.Add(new TextBlock
-                {
-                    Text = $"Assignee: {task.Assignee}",
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                    FontSize = 12
-                });
+            {
+                DetailAssignee.Text = task.Assignee;
+                DetailAssigneePanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                DetailAssigneePanel.Visibility = Visibility.Collapsed;
+            }
+
+            if (task.DueDate.HasValue)
+            {
+                DetailDueDate.Text = task.DueDate.Value.ToString("MMM d, yyyy");
+                DetailDueDatePanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                DetailDueDatePanel.Visibility = Visibility.Collapsed;
+            }
 
             if (!string.IsNullOrEmpty(task.Labels))
-                panel.Children.Add(new TextBlock
-                {
-                    Text = $"Labels: {task.Labels}",
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
-                    FontSize = 12
-                });
-
-            if (task.DueDate.HasValue)
-                panel.Children.Add(new TextBlock
-                {
-                    Text = $"Due: {task.DueDate:MMM d, yyyy}",
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                    FontSize = 12
-                });
-
-            panel.Children.Add(new TextBlock { Text = "Add Comment", Foreground = new SolidColorBrush(Colors.White) });
-            panel.Children.Add(commentBox);
-
-            var dialog = new ContentDialog
             {
-                Title = task.IssueType ?? "Linear Issue",
-                Content = panel,
-                PrimaryButtonText = "Post Comment",
-                SecondaryButtonText = "Open in Linear",
-                CloseButtonText = "Close",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = this.XamlRoot
-            };
-
-            var result = await dialog.ShowAsync();
-
-            if (result == ContentDialogResult.Primary
-                && !string.IsNullOrWhiteSpace(commentBox.Text)
-                && !string.IsNullOrEmpty(task.ExternalId))
-            {
-                var key = CredentialService.LoadCredential("LinearApiKey");
-                if (!string.IsNullOrEmpty(key))
-                {
-                    var service = new LinearService(key);
-                    await service.AddCommentAsync(task.ExternalId, commentBox.Text.Trim());
-                    StatusText.Visibility = Visibility.Visible;
-                    StatusText.Text = "Comment posted successfully.";
-                }
+                DetailLabels.Text = task.Labels;
+                DetailLabelsPanel.Visibility = Visibility.Visible;
             }
-            else if (result == ContentDialogResult.Secondary && !string.IsNullOrEmpty(task.TicketUrl))
+            else
             {
-                await Windows.System.Launcher.LaunchUriAsync(new Uri(task.TicketUrl));
+                DetailLabelsPanel.Visibility = Visibility.Collapsed;
+            }
+
+            // Description with basic markdown rendering
+            RenderDescription(task.Description);
+
+            if (_isLinearMode)
+            {
+                ManualTaskFields.Visibility = Visibility.Collapsed;
+                ManualActions.Visibility = Visibility.Collapsed;
+                LinearCommentFields.Visibility = Visibility.Visible;
+                LinearActions.Visibility = Visibility.Visible;
+                DetailCommentBox.Text = string.Empty;
+            }
+            else
+            {
+                LinearCommentFields.Visibility = Visibility.Collapsed;
+                LinearActions.Visibility = Visibility.Collapsed;
+                ManualTaskFields.Visibility = Visibility.Visible;
+                ManualActions.Visibility = Visibility.Visible;
+
+                DetailStatusPicker.ItemsSource = Enum.GetValues(typeof(Models.TaskStatus));
+                DetailStatusPicker.SelectedItem = task.Status;
+                DetailPriorityPicker.ItemsSource = Enum.GetValues(typeof(TaskPriority));
+                DetailPriorityPicker.SelectedItem = task.Priority;
+
+                if (task.DueDate.HasValue)
+                {
+                    DetailSetDueDate.IsChecked = true;
+                    DetailDueDatePicker.Date = new DateTimeOffset(task.DueDate.Value);
+                    DetailDueDatePicker.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    DetailSetDueDate.IsChecked = false;
+                    DetailDueDatePicker.Visibility = Visibility.Collapsed;
+                }
             }
         }
 
-        private async System.Threading.Tasks.Task ShowManualTaskDetailAsync(ProjectTask task)
+        private void RenderDescription(string? description)
         {
-            if (_vm?.SelectedProject == null) return;
+            DetailDescription.Blocks.Clear();
 
-            var statusPicker = new ComboBox
+            if (string.IsNullOrEmpty(description))
             {
-                ItemsSource = Enum.GetValues(typeof(Models.TaskStatus)),
-                SelectedItem = task.Status,
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            var priorityPicker = new ComboBox
-            {
-                ItemsSource = Enum.GetValues(typeof(TaskPriority)),
-                SelectedItem = task.Priority,
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            var dueDatePicker = new DatePicker
-            {
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            if (task.DueDate.HasValue)
-                dueDatePicker.Date = new DateTimeOffset(task.DueDate.Value);
+                var para = new Paragraph();
+                para.Inlines.Add(new Run
+                {
+                    Text = "No description provided.",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+                });
+                DetailDescription.Blocks.Add(para);
+                return;
+            }
 
-            var clearDueDate = new CheckBox
+            var lines = description.Split('\n');
+            foreach (var line in lines)
             {
-                Content = "No due date",
-                IsChecked = !task.DueDate.HasValue,
-                Foreground = new SolidColorBrush(Colors.White)
-            };
-            clearDueDate.Checked += (s, e) => dueDatePicker.Visibility = Visibility.Collapsed;
-            clearDueDate.Unchecked += (s, e) => dueDatePicker.Visibility = Visibility.Visible;
-            dueDatePicker.Visibility = task.DueDate.HasValue ? Visibility.Visible : Visibility.Collapsed;
+                var para = new Paragraph { LineHeight = 22 };
 
-            var panel = new StackPanel { Spacing = 10 };
-            panel.Children.Add(new TextBlock
-            {
-                Text = task.Title,
-                Foreground = new SolidColorBrush(Colors.White),
-                FontSize = 16,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                TextWrapping = TextWrapping.Wrap
-            });
-            panel.Children.Add(new TextBlock
-            {
-                Text = task.Description,
-                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175)),
-                TextWrapping = TextWrapping.Wrap
-            });
-            panel.Children.Add(new TextBlock { Text = "Status", Foreground = new SolidColorBrush(Colors.White) });
-            panel.Children.Add(statusPicker);
-            panel.Children.Add(new TextBlock { Text = "Priority", Foreground = new SolidColorBrush(Colors.White) });
-            panel.Children.Add(priorityPicker);
-            panel.Children.Add(new TextBlock { Text = "Due Date", Foreground = new SolidColorBrush(Colors.White) });
-            panel.Children.Add(clearDueDate);
-            panel.Children.Add(dueDatePicker);
+                if (line.StartsWith("# "))
+                {
+                    para.Inlines.Add(new Run
+                    {
+                        Text = line[2..],
+                        FontSize = 16,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+                    });
+                }
+                else if (line.StartsWith("## "))
+                {
+                    para.Inlines.Add(new Run
+                    {
+                        Text = line[3..],
+                        FontSize = 14,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+                    });
+                }
+                else if (line.StartsWith("- ") || line.StartsWith("* "))
+                {
+                    para.Inlines.Add(new Run
+                    {
+                        Text = "• " + line[2..],
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+                    });
+                }
+                else if (line.StartsWith("[image]"))
+                {
+                    para.Inlines.Add(new Run
+                    {
+                        Text = "🖼 [image]",
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+                    });
+                }
+                else if (line.StartsWith("[code block]"))
+                {
+                    para.Inlines.Add(new Run
+                    {
+                        Text = "{ code block }",
+                        FontFamily = new FontFamily("Consolas"),
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
+                    });
+                }
+                else if (string.IsNullOrWhiteSpace(line))
+                {
+                    DetailDescription.Blocks.Add(para);
+                    continue;
+                }
+                else
+                {
+                    para.Inlines.Add(new Run
+                    {
+                        Text = line,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+                    });
+                }
+
+                DetailDescription.Blocks.Add(para);
+            }
+        }
+
+        private void CloseDetailPanel()
+        {
+            DetailPanelColumn.Width = new GridLength(0);
+            _selectedTask = null;
+        }
+
+        private void CloseDetail_Click(object sender, RoutedEventArgs e)
+        {
+            CloseDetailPanel();
+        }
+
+        private (Windows.UI.Color color, string text) GetStatusStyle(Models.TaskStatus status) => status switch
+        {
+            Models.TaskStatus.Todo => (Windows.UI.Color.FromArgb(255, 55, 65, 81), "Todo"),
+            Models.TaskStatus.InProgress => (Windows.UI.Color.FromArgb(255, 30, 58, 138), "In Progress"),
+            Models.TaskStatus.InReview => (Windows.UI.Color.FromArgb(255, 76, 29, 149), "In Review"),
+            Models.TaskStatus.Done => (Windows.UI.Color.FromArgb(255, 6, 78, 59), "Done"),
+            Models.TaskStatus.Blocked => (Windows.UI.Color.FromArgb(255, 127, 29, 29), "Blocked"),
+            _ => (Windows.UI.Color.FromArgb(255, 55, 65, 81), status.ToString())
+        };
+
+        private void DetailSetDueDate_Checked(object sender, RoutedEventArgs e)
+        {
+            DetailDueDatePicker.Visibility = Visibility.Visible;
+        }
+
+        private void DetailSetDueDate_Unchecked(object sender, RoutedEventArgs e)
+        {
+            DetailDueDatePicker.Visibility = Visibility.Collapsed;
+        }
+
+        private async void SaveTaskChanges_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedTask == null || _vm?.SelectedProject == null) return;
+
+            _selectedTask.Status = (Models.TaskStatus)DetailStatusPicker.SelectedItem!;
+            _selectedTask.Priority = (TaskPriority)DetailPriorityPicker.SelectedItem!;
+            _selectedTask.DueDate = DetailSetDueDate.IsChecked == true
+                ? DetailDueDatePicker.Date.DateTime : null;
+
+            await _vm.SaveAsync();
+            RefreshBoard(_vm.SelectedProject.Tasks);
+            CloseDetailPanel();
+        }
+
+        private async void DeleteTask_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedTask == null || _vm?.SelectedProject == null) return;
 
             var dialog = new ContentDialog
             {
-                Title = "Edit Task",
-                Content = panel,
-                PrimaryButtonText = "Save",
-                SecondaryButtonText = "Delete",
+                Title = "Delete Task",
+                Content = $"Are you sure you want to delete '{_selectedTask.Title}'?",
+                PrimaryButtonText = "Delete",
                 CloseButtonText = "Cancel",
-                DefaultButton = ContentDialogButton.Primary,
+                DefaultButton = ContentDialogButton.Close,
                 XamlRoot = this.XamlRoot
             };
 
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary)
             {
-                task.Status = (Models.TaskStatus)statusPicker.SelectedItem!;
-                task.Priority = (TaskPriority)priorityPicker.SelectedItem!;
-                task.DueDate = clearDueDate.IsChecked == true
-                    ? null
-                    : dueDatePicker.Date.DateTime;
+                _vm.SelectedProject.Tasks.Remove(_selectedTask);
                 await _vm.SaveAsync();
                 RefreshBoard(_vm.SelectedProject.Tasks);
+                CloseDetailPanel();
             }
-            else if (result == ContentDialogResult.Secondary)
+        }
+
+        private async void PostComment_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedTask == null || string.IsNullOrWhiteSpace(DetailCommentBox.Text)) return;
+
+            var key = CredentialService.LoadCredential("LinearApiKey");
+            if (string.IsNullOrEmpty(key)) return;
+
+            try
             {
-                _vm.SelectedProject.Tasks.Remove(task);
-                await _vm.SaveAsync();
-                RefreshBoard(_vm.SelectedProject.Tasks);
+                var service = new LinearService(key);
+                await service.AddCommentAsync(_selectedTask.ExternalId, DetailCommentBox.Text.Trim());
+                DetailCommentBox.Text = string.Empty;
+                StatusText.Visibility = Visibility.Visible;
+                StatusText.Text = "Comment posted successfully.";
             }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Error posting comment: {ex.Message}";
+            }
+        }
+
+        private async void OpenInLinear_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedTask == null || string.IsNullOrEmpty(_selectedTask.TicketUrl)) return;
+            await Windows.System.Launcher.LaunchUriAsync(new Uri(_selectedTask.TicketUrl));
         }
 
         private async void AddTask_Click(object sender, RoutedEventArgs e)
@@ -349,7 +439,6 @@ namespace DesktopApp.Views
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
             var ticketBox = new TextBox { PlaceholderText = "Ticket URL (optional)" };
-
             var dueDatePicker = new DatePicker
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
