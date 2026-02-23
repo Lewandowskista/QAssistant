@@ -57,6 +57,11 @@ namespace DesktopApp
             var wndId = Win32Interop.GetWindowIdFromWindow(hwnd);
             _appWindow = AppWindow.GetFromWindowId(wndId);
 
+            // Set taskbar icon
+            _appWindow.SetIcon(System.IO.Path.Combine(
+                Windows.ApplicationModel.Package.Current.InstalledLocation.Path,
+                "Assets", "AppIcon.png"));
+
             if (_appWindow == null) return;
 
             _appWindow.Resize(new Windows.Graphics.SizeInt32(1200, 780));

@@ -80,6 +80,12 @@ namespace DesktopApp
         [DllImport("user32.dll")]
         private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr LoadImage(IntPtr hInstance, string lpszName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr ExtractIcon(IntPtr hInst, string pszExeFileName, int nIconIndex);
+
         private const uint MF_STRING = 0x00000000;
         private const uint MF_SEPARATOR = 0x00000800;
         private const uint TPM_RETURNCMD = 0x0100;
@@ -119,7 +125,12 @@ namespace DesktopApp
                 _oldWndProc = SetWindowLongPtr(MainWindowHandle, GWLP_WNDPROC, _wndProcDelegate);
 
                 // Load default app icon
-                var hIcon = LoadIcon(IntPtr.Zero, new IntPtr(32512)); // IDI_APPLICATION
+                var icoPath = System.IO.Path.Combine(
+    Windows.ApplicationModel.Package.Current.InstalledLocation.Path,
+    "Assets", "AppIcon.ico");
+                var hIcon = LoadImage(IntPtr.Zero, icoPath, 1u, 32, 32, 0x0010u);
+                if (hIcon == IntPtr.Zero)
+                    hIcon = LoadIcon(IntPtr.Zero, new IntPtr(32512));
 
                 _nid = new NOTIFYICONDATA
                 {
