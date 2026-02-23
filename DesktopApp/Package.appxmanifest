@@ -9,7 +9,7 @@
 
   <Identity
     Name="0289387c-407e-4d92-ba78-80a498a96a9c"
-    Publisher="CN=Stefan"
+    Publisher="CN=QAssistant, O=QAssistant, C=US"
     Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="0289387c-407e-4d92-ba78-80a498a96a9c" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
