@@ -65,6 +65,49 @@ namespace DesktopApp.Views
             LinksList.ItemsSource = _vm.SelectedProject.Links;
         }
 
+        private async void LinksList_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+        {
+            if (LinksList.SelectedItem is not EmbedLink link) return;
+
+            var titleBox = new TextBox { Text = link.Title, PlaceholderText = "Title..." };
+            var urlBox = new TextBox { Text = link.Url, PlaceholderText = "https://..." };
+
+            var panel = new StackPanel { Spacing = 12 };
+            panel.Children.Add(new TextBlock { Text = "Title", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(titleBox);
+            panel.Children.Add(new TextBlock { Text = "URL", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(urlBox);
+
+            var dialog = new ContentDialog
+            {
+                Title = "Edit Link",
+                Content = panel,
+                PrimaryButtonText = "Save",
+                SecondaryButtonText = "Delete",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+
+            if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(titleBox.Text))
+            {
+                link.Title = titleBox.Text.Trim();
+                link.Url = urlBox.Text.Trim();
+                await _vm!.SaveAsync();
+                RefreshLinks();
+            }
+            else if (result == ContentDialogResult.Secondary)
+            {
+                _vm?.SelectedProject?.Links.Remove(link);
+                await _vm!.SaveAsync();
+                RefreshLinks();
+                EmptyState.Visibility = Visibility.Visible;
+                WebViewContainer.Visibility = Visibility.Collapsed;
+            }
+        }
+
         private async Task InitializeWebViewAsync()
         {
             if (_webViewInitialized) return;

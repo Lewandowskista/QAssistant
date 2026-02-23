@@ -26,11 +26,12 @@
                            Margin="16,16,16,8" CharacterSpacing="150"/>
 
                 <ListView Grid.Row="1" x:Name="LinksList"
-                          Background="Transparent" SelectionMode="Single"
-                          SelectionChanged="LinksList_SelectionChanged"
-                          CanReorderItems="True" CanDragItems="True"
-                          AllowDrop="True"
-                          DragItemsCompleted="LinksList_DragItemsCompleted">
+          Background="Transparent" SelectionMode="Single"
+          SelectionChanged="LinksList_SelectionChanged"
+          DoubleTapped="LinksList_DoubleTapped"
+          CanReorderItems="True" CanDragItems="True"
+          AllowDrop="True"
+          DragItemsCompleted="LinksList_DragItemsCompleted">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Padding" Value="12,8"/>

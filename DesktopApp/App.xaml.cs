@@ -97,6 +97,9 @@ namespace DesktopApp
         public App()
         {
             this.InitializeComponent();
+            // Load tray setting immediately so it's ready before window activates
+            var trayEnabled = DesktopApp.Services.CredentialService.LoadCredential("MinimizeToTray");
+            MinimizeToTray = trayEnabled == "true";
         }
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
@@ -111,8 +114,6 @@ namespace DesktopApp
         private void OnWindowFirstActivated(object sender, WindowActivatedEventArgs e)
         {
             MainWindowInstance!.Activated -= OnWindowFirstActivated;
-            var trayEnabled = DesktopApp.Services.CredentialService.LoadCredential("MinimizeToTray");
-            MinimizeToTray = trayEnabled != "true";
             SetupTrayIcon();
         }
 

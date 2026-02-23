@@ -146,14 +146,15 @@
                            Margin="16,16,16,8" CharacterSpacing="150"/>
 
                 <ListView Grid.Row="1"
-                          x:Name="ProjectList"
-                          SelectionChanged="ProjectList_SelectionChanged"
-                          DragItemsCompleted="ProjectList_DragItemsCompleted"
-                          Background="Transparent"
-                          SelectionMode="Single"
-                          CanReorderItems="True"
-                          CanDragItems="True"
-                          AllowDrop="True">
+          x:Name="ProjectList"
+          SelectionChanged="ProjectList_SelectionChanged"
+          DoubleTapped="ProjectList_DoubleTapped"
+          Background="Transparent"
+          SelectionMode="Single"
+          CanReorderItems="True"
+          CanDragItems="True"
+          AllowDrop="True"
+          DragItemsCompleted="ProjectList_DragItemsCompleted">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Padding" Value="12,8"/>
