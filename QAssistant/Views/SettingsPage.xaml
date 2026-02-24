@@ -194,6 +194,20 @@
                 </StackPanel>
             </Border>
 
+            <!-- Google AI Studio -->
+            <TextBlock Text="Google AI Studio" Foreground="#E2E8F0"
+           FontSize="14" FontWeight="SemiBold" Margin="0,16,0,8"/>
+            <StackPanel Spacing="8">
+                <TextBlock Text="API Key" Foreground="#9CA3AF" FontSize="12"/>
+                <PasswordBox x:Name="GeminiApiKeyBox"
+                 PlaceholderText="Enter your Google AI Studio API key..."
+                 Background="#0F0F13" Foreground="#E2E8F0"
+                 BorderBrush="#2A2A3A" CornerRadius="8" Padding="12"/>
+                <Button Content="Save API Key" Click="SaveGeminiKey_Click"
+            Background="#252535" Foreground="#A78BFA"
+            CornerRadius="8" Padding="12,6"/>
+            </StackPanel>
+
         </StackPanel>
     </ScrollViewer>
 </Page>

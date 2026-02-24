@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="QAssistant.Views.TasksPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -36,6 +36,20 @@
                         CornerRadius="8" Padding="12,6"/>
             </Grid>
         </Border>
+
+        <!-- Busy / Loading Overlay (used instead of a ContentDialog to avoid modal issues) -->
+        <Grid x:Name="BusyOverlay" Visibility="Collapsed" Grid.Row="0" Grid.RowSpan="2"
+              Background="#80000000">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Background="#13131A" Padding="20" CornerRadius="8">
+                    <ProgressRing IsActive="True" Width="48" Height="48"/>
+                    <TextBlock Text="Gemini is analyzing the issue..."
+                               Foreground="#6B7280" FontSize="13" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
 
         <!-- Main Content: Kanban + Detail Panel -->
         <Grid Grid.Row="1">
@@ -340,8 +354,8 @@
                                         <TextBlock x:Name="DetailLabels" Foreground="#A78BFA" FontSize="12" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </StackPanel>
-                                            
-                             <!-- Linear task info -->
+
+                                <!-- Linear task info -->
                                 <StackPanel x:Name="LinearTaskInfo" Spacing="12" Visibility="Collapsed">
                                     <Border Height="1" Background="#2A2A3A"/>
                                     <TextBlock Text="ISSUE DETAILS" Foreground="#6B7280"
@@ -439,6 +453,12 @@
                             BorderBrush="#2A2A3A" BorderThickness="0,1,0,0"
                             Background="#0F0F13">
                         <StackPanel Spacing="8">
+                            <!-- Analyze button (top, full width) -->
+                            <Button x:Name="DetailAnalyzeBtn" Content="🤖 Analyze" Click="AnalyzeIssue_Click"
+                                    HorizontalAlignment="Stretch"
+                                    Background="#A78BFA" Foreground="White"
+                                    CornerRadius="8" Padding="14,8"/>
+                            <!-- Manual actions -->
                             <StackPanel x:Name="ManualActions" Orientation="Horizontal"
                                         Spacing="8" Visibility="Collapsed">
                                 <Button Content="Save Changes" Click="SaveTaskChanges_Click"
@@ -448,6 +468,7 @@
                                         Background="#3F1A1A" Foreground="#F87171"
                                         CornerRadius="8" Padding="14,8"/>
                             </StackPanel>
+                            <!-- Linear actions -->
                             <StackPanel x:Name="LinearActions" Orientation="Horizontal"
                                         Spacing="8" Visibility="Collapsed">
                                 <Button Content="Post Comment" Click="PostComment_Click"
@@ -462,9 +483,10 @@
                 </Grid>
             </Border>
         </Grid>
+
         <!-- Media Lightbox Overlay -->
         <Grid x:Name="LightboxOverlay" Visibility="Collapsed"
-      Background="#CC000000" Grid.RowSpan="2">
+              Background="#CC000000" Grid.RowSpan="2">
             <Grid HorizontalAlignment="Stretch"
                   VerticalAlignment="Stretch"
                   Margin="40"
@@ -477,15 +499,15 @@
 
                 <!-- Lightbox Header -->
                 <Border Grid.Row="0" Padding="16,12"
-                BorderBrush="#2A2A3A" BorderThickness="0,0,0,1">
+                        BorderBrush="#2A2A3A" BorderThickness="0,0,0,1">
                     <Grid>
                         <TextBlock Text="Media Viewer" Foreground="#E2E8F0"
-                           FontSize="14" FontWeight="SemiBold"
-                           VerticalAlignment="Center"/>
+                                   FontSize="14" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
                         <Button Content="✕" Click="CloseLightbox_Click"
-                        HorizontalAlignment="Right"
-                        Background="Transparent" BorderThickness="0"
-                        Foreground="#6B7280" Padding="8,4" FontSize="14"/>
+                                HorizontalAlignment="Right"
+                                Background="Transparent" BorderThickness="0"
+                                Foreground="#6B7280" Padding="8,4" FontSize="14"/>
                     </Grid>
                 </Border>
 
@@ -507,14 +529,16 @@
 
                 <!-- Lightbox Footer -->
                 <Border Grid.Row="2" Padding="16,10"
-                BorderBrush="#2A2A3A" BorderThickness="0,1,0,0"
-                Background="#0F0F13">
+                        BorderBrush="#2A2A3A" BorderThickness="0,1,0,0"
+                        Background="#0F0F13">
                     <Button Content="Open in Browser" Click="LightboxOpenBrowser_Click"
-                    HorizontalAlignment="Right"
-                    Background="#252535" Foreground="#A78BFA"
-                    CornerRadius="8" Padding="14,8"/>
+                            HorizontalAlignment="Right"
+                            Background="#252535" Foreground="#A78BFA"
+                            CornerRadius="8" Padding="14,8"/>
                 </Border>
             </Grid>
         </Grid>
+
     </Grid>
 </Page>
+

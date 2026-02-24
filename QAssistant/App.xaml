@@ -5,6 +5,36 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:tb="using:H.NotifyIcon">
     <Application.Resources>
-        <ResourceDictionary/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Dark Theme Colors -->
+            <Color x:Key="ApplicationBackground">#0F0F13</Color>
+            <Color x:Key="SurfaceColor">#13131A</Color>
+            <Color x:Key="SurfaceVariant">#1A1A24</Color>
+            <Color x:Key="BorderColor">#2A2A3A</Color>
+            <Color x:Key="HoverColor">#252535</Color>
+            <Color x:Key="TextPrimary">#E2E8F0</Color>
+            <Color x:Key="TextSecondary">#6B7280</Color>
+            <Color x:Key="AccentPrimary">#A78BFA</Color>
+            <Color x:Key="AccentSecondary">#F59E0B</Color>
+            <Color x:Key="SuccessColor">#10B981</Color>
+            <Color x:Key="ErrorColor">#EF4444</Color>
+
+            <!-- Brushes -->
+            <SolidColorBrush x:Key="ApplicationBackgroundBrush" Color="#0F0F13"/>
+            <SolidColorBrush x:Key="SurfaceBrush" Color="#13131A"/>
+            <SolidColorBrush x:Key="SurfaceVariantBrush" Color="#1A1A24"/>
+            <SolidColorBrush x:Key="BorderBrush" Color="#2A2A3A"/>
+            <SolidColorBrush x:Key="HoverBrush" Color="#252535"/>
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E2E8F0"/>
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#6B7280"/>
+            <SolidColorBrush x:Key="AccentBrush" Color="#A78BFA"/>
+            <SolidColorBrush x:Key="AccentSecondaryBrush" Color="#F59E0B"/>
+            <SolidColorBrush x:Key="SuccessBrush" Color="#10B981"/>
+            <SolidColorBrush x:Key="ErrorBrush" Color="#EF4444"/>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

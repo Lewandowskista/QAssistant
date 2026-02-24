@@ -43,6 +43,10 @@ namespace QAssistant.Views
             if (!string.IsNullOrEmpty(jiraProject))
                 JiraProjectKeyBox.Text = jiraProject;
 
+            var geminiKey = CredentialService.LoadCredential("GeminiApiKey");
+            if (!string.IsNullOrEmpty(geminiKey))
+                GeminiApiKeyBox.Password = geminiKey;
+
             // Load tray setting — default to true on first run
             var trayEnabled = CredentialService.LoadCredential("MinimizeToTray");
             if (string.IsNullOrEmpty(trayEnabled))
@@ -184,6 +188,15 @@ namespace QAssistant.Views
             ShowStatus(JiraStatusBorder, JiraStatusText, "Jira disconnected.", true);
         }
 
+        private void SaveGeminiKey_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(GeminiApiKeyBox.Password))
+            {
+                CredentialService.SaveCredential("GeminiApiKey", GeminiApiKeyBox.Password);
+                ShowSavedConfirmation("Gemini API key saved!");
+            }
+        }
+
         // ── Helpers ──────────────────────────────────────────────────
         private void ShowStatus(Border border, TextBlock text, string message, bool success)
         {
@@ -195,6 +208,20 @@ namespace QAssistant.Views
             text.Foreground = success
                 ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 52, 211, 153))
                 : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113));
+        }
+
+        // Added helper to show a saved confirmation dialog to fix CS0103
+        private async void ShowSavedConfirmation(string message)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Saved",
+                Content = message,
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+
+            await dialog.ShowAsync();
         }
     }
 }

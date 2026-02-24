@@ -156,20 +156,16 @@ namespace QAssistant.Views
             DetailPanelColumn.Width = new GridLength(340);
             SetActiveTab("Details");
 
-            // Header
             DetailIdentifier.Text = task.IssueIdentifier;
             DetailTitle.Text = task.Title;
 
-            // Status badge
             var (statusColor, statusText) = GetStatusStyle(task.Status);
             DetailStatus.Text = statusText;
             DetailStatusBadge.Background = new SolidColorBrush(statusColor);
             DetailStatus.Foreground = new SolidColorBrush(Colors.White);
 
-            // Priority badge
             DetailPriority.Text = task.Priority.ToString();
 
-            // Meta
             if (!string.IsNullOrEmpty(task.Assignee))
             {
                 DetailAssignee.Text = task.Assignee;
@@ -200,10 +196,7 @@ namespace QAssistant.Views
                 DetailLabelsPanel.Visibility = Visibility.Collapsed;
             }
 
-            // Description
             RenderDescription(task.Description);
-
-            // Media
             RenderMedia(task.RawDescription);
 
             if (_isLinearMode)
@@ -452,7 +445,9 @@ namespace QAssistant.Views
         {
             SetActiveTab("Comments");
             if (_isLinearMode && _selectedTask != null && !string.IsNullOrEmpty(_selectedTask.ExternalId))
+            {
                 await LoadCommentsAsync(_selectedTask.ExternalId);
+            }
         }
 
         private async System.Threading.Tasks.Task LoadCommentsAsync(string issueId)
@@ -606,15 +601,16 @@ namespace QAssistant.Views
         {
             if (_selectedTask == null || string.IsNullOrWhiteSpace(DetailCommentBox.Text)) return;
 
-            var key = CredentialService.LoadCredential("LinearApiKey");
-            if (string.IsNullOrEmpty(key)) return;
-
+            // Ensure the selected task has an ExternalId before calling LinearService.AddCommentAsync
             if (string.IsNullOrEmpty(_selectedTask.ExternalId))
             {
                 StatusText.Visibility = Visibility.Visible;
-                StatusText.Text = "Cannot post comment: missing issue id.";
+                StatusText.Text = "Cannot post comment: task is not linked to Linear.";
                 return;
             }
+
+            var key = CredentialService.LoadCredential("LinearApiKey");
+            if (string.IsNullOrEmpty(key)) return;
 
             try
             {
@@ -716,6 +712,257 @@ namespace QAssistant.Views
                 _vm.SelectedProject.Tasks.Add(task);
                 await _vm.SaveAsync();
                 RefreshBoard(_vm.SelectedProject.Tasks);
+            }
+        }
+
+        private async void AnalyzeIssue_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedTask == null) return;
+
+            var geminiKey = CredentialService.LoadCredential("GeminiApiKey");
+            if (string.IsNullOrEmpty(geminiKey))
+            {
+                var noKeyDialog = new ContentDialog
+                {
+                    Title = "API Key Missing",
+                    Content = "Please add your Google AI Studio API key in Settings.",
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                await noKeyDialog.ShowAsync();
+                return;
+            }
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("You are a QA engineer assistant. Analyze the following issue and provide:");
+            sb.AppendLine("1. Root Cause Analysis");
+            sb.AppendLine("2. Impact Assessment");
+            sb.AppendLine("3. Suggested Fix");
+            sb.AppendLine("4. Prevention Recommendations");
+            sb.AppendLine();
+            sb.AppendLine("## Issue Details");
+            sb.AppendLine($"**ID:** {_selectedTask.IssueIdentifier}");
+            sb.AppendLine($"**Title:** {_selectedTask.Title}");
+            sb.AppendLine($"**Status:** {_selectedTask.Status}");
+            sb.AppendLine($"**Priority:** {_selectedTask.Priority}");
+            sb.AppendLine($"**Assignee:** {_selectedTask.Assignee}");
+            sb.AppendLine($"**Labels:** {_selectedTask.Labels}");
+            if (_selectedTask.DueDate.HasValue)
+                sb.AppendLine($"**Due Date:** {_selectedTask.DueDate.Value:MMM d, yyyy}");
+            sb.AppendLine();
+            sb.AppendLine("## Description");
+            sb.AppendLine(_selectedTask.Description);
+
+            if (_isLinearMode && !string.IsNullOrEmpty(_selectedTask.ExternalId))
+            {
+                try
+                {
+                    var linearKey = CredentialService.LoadCredential("LinearApiKey");
+                    if (!string.IsNullOrEmpty(linearKey))
+                    {
+                        var linearService = new LinearService(linearKey);
+                        var comments = await linearService.GetCommentsAsync(_selectedTask.ExternalId);
+                        if (comments.Count > 0)
+                        {
+                            sb.AppendLine();
+                            sb.AppendLine("## Comments");
+                            foreach (var comment in comments)
+                            {
+                                sb.AppendLine($"**{comment.AuthorName}** ({comment.CreatedAt:MMM d, yyyy}):");
+                                sb.AppendLine(comment.Body);
+                                sb.AppendLine();
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            var loadingContent = new StackPanel
+            {
+                Spacing = 12,
+                Children =
+                {
+                    new ProgressRing { IsActive = true, Width = 40, Height = 40 },
+                    new TextBlock
+                    {
+                        Text = "Gemini is analyzing the issue...",
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                        FontSize = 13
+                    }
+                }
+            };
+
+            var loadingDialog = new ContentDialog
+            {
+                Title = "🤖 Analyzing Issue...",
+                Content = loadingContent,
+                CloseButtonText = "Cancel",
+                XamlRoot = this.XamlRoot
+            };
+
+
+            string analysisResult = string.Empty;
+            var analyzeTask = System.Threading.Tasks.Task.Run(async () =>
+            {
+                var service = new GeminiService(geminiKey);
+                analysisResult = await service.AnalyzeIssueAsync(sb.ToString());
+            });
+
+            // Use the in-page BusyOverlay instead of a ContentDialog to avoid
+            // modal overlay issues. Show the overlay, run the analysis, then hide it.
+            BusyOverlay.Visibility = Visibility.Visible;
+
+            try
+            {
+                await analyzeTask;
+            }
+            catch (Exception ex)
+            {
+                // Surface error in the result dialog instead of crashing silently
+                analysisResult = $"Analysis failed: {ex.Message}";
+            }
+            finally
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+                // Give the UI a short moment to apply the visibility change before showing the result dialog
+                await System.Threading.Tasks.Task.Delay(50);
+            }
+
+            var contentStack = new StackPanel { Spacing = 16 };
+
+            var sections = new[] { "Root Cause Analysis", "Impact Assessment", "Suggested Fix", "Prevention Recommendations" };
+            var sectionTexts = new List<string>();
+            var currentSection = string.Empty;
+
+            foreach (var line in analysisResult.Split('\n'))
+            {
+                bool isSection = false;
+                foreach (var section in sections)
+                {
+                    if (line.Contains(section, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrWhiteSpace(currentSection))
+                            sectionTexts.Add(currentSection);
+                        currentSection = section;
+                        isSection = true;
+                        break;
+                    }
+                }
+                if (!isSection && !string.IsNullOrWhiteSpace(line))
+                {
+                    currentSection += (string.IsNullOrWhiteSpace(currentSection) ? "" : "\n") + line;
+                }
+            }
+            if (!string.IsNullOrWhiteSpace(currentSection))
+                sectionTexts.Add(currentSection);
+
+            var resultLines = analysisResult.Split('\n');
+            int sectionIndex = 0;
+
+            foreach (var section in sections)
+            {
+                var sectionStartIndex = Array.FindIndex(resultLines, r => r.Contains(section, StringComparison.OrdinalIgnoreCase));
+                if (sectionStartIndex < 0) continue;
+
+                int sectionEndIndex = resultLines.Length;
+                for (int i = sectionStartIndex + 1; i < resultLines.Length; i++)
+                {
+                    if (sections.Any(s => resultLines[i].Contains(s, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        sectionEndIndex = i;
+                        break;
+                    }
+                }
+
+                var sectionContent = string.Join("\n", resultLines.Skip(sectionStartIndex + 1).Take(sectionEndIndex - sectionStartIndex - 1))
+                    .Trim();
+
+                if (string.IsNullOrWhiteSpace(sectionContent)) continue;
+
+                var sectionHeader = new TextBlock
+                {
+                    Text = section,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    FontSize = 13,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Margin = new Thickness(0, 8, 0, 4)
+                };
+
+                var sectionBodyBlock = new TextBlock
+                {
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap,
+                    LineHeight = 20
+                };
+
+                var parts = System.Text.RegularExpressions.Regex.Split(sectionContent, @"\*\*");
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    var run = new Run
+                    {
+                        Text = parts[i],
+                        FontWeight = i % 2 == 1 ? Microsoft.UI.Text.FontWeights.Bold : Microsoft.UI.Text.FontWeights.Normal
+                    };
+                    sectionBodyBlock.Inlines.Add(run);
+                }
+
+                contentStack.Children.Add(sectionHeader);
+                contentStack.Children.Add(sectionBodyBlock);
+
+                if (sectionIndex < sections.Length - 1)
+                {
+                    var divider = new Border
+                    {
+                        Height = 1,
+                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                        Margin = new Thickness(0, 8, 0, 0)
+                    };
+                    contentStack.Children.Add(divider);
+                }
+
+                sectionIndex++;
+            }
+
+            var scrollContent = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                MaxHeight = 500,
+                Content = contentStack
+            };
+
+            var resultContent = new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36)),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(20),
+                Child = scrollContent
+            };
+
+            var resultDialog = new ContentDialog
+            {
+                Title = $"🤖 AI Analysis — {_selectedTask.Title}",
+                Content = resultContent,
+                CloseButtonText = "Close",
+                PrimaryButtonText = "Copy to Clipboard",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = this.XamlRoot
+            };
+
+            resultDialog.Resources["ContentDialogMaxWidth"] = 700.0;
+            resultDialog.Resources["ContentDialogBackground"] = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26));
+            resultDialog.Resources["ContentDialogBorderBrush"] = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58));
+            resultDialog.Resources["ContentDialogTitleForeground"] = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240));
+
+            var resultAction = await resultDialog.ShowAsync();
+            if (resultAction == ContentDialogResult.Primary)
+            {
+                var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                dataPackage.SetText(analysisResult);
+                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
             }
         }
     }
