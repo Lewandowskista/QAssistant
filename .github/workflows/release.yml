@@ -9,9 +9,9 @@ on:
 jobs:
   build-and-release:
     runs-on: windows-latest
-    
+
     permissions:
-      contents: write 
+      contents: write
 
     steps:
     - name: Checkout Code
@@ -27,25 +27,20 @@ jobs:
         Invoke-WebRequest -Uri "https://aka.ms/windowsappsdk/1.8/latest/windowsappruntimeinstall-x64.exe" -OutFile "WinAppRuntime.exe"
         Start-Process -FilePath "WinAppRuntime.exe" -Args "--quiet" -Wait
 
-    - name: Restore NuGet Packages
-      run: |
-        dotnet restore QAssistant/QAssistant.csproj -r win-x64
+    - name: Publish Single-File App
+      run: dotnet publish QAssistant/QAssistant.csproj -c Release -o ./publish_output
 
-    - name: Publish App
-      run: |
-        dotnet publish QAssistant/QAssistant.csproj -c Release -r win-x64 --self-contained true --no-restore /p:PublishTrimmed=false /p:PublishReadyToRun=false -o ./publish_output
-
-    - name: Download Windows App Runtime Redistributable
+    - name: Copy Windows App Runtime to output
       run: |
         Invoke-WebRequest -Uri "https://aka.ms/windowsappsdk/1.8/latest/windowsappruntimeinstall-x64.exe" -OutFile "./publish_output/WinAppRuntime_Setup.exe"
 
-    - name: Zip Release
-      run: |
-        Compress-Archive -Path ./publish_output/* -DestinationPath ./QAssistant_v${{ github.ref_name }}.zip
+    - name: Zip output
+      run: Compress-Archive -Path ./publish_output/* -DestinationPath ./QAssistant.zip
 
     - name: Publish to GitHub Releases
       uses: softprops/action-gh-release@v2
       with:
-        files: ./QAssistant_v${{ github.ref_name }}.zip
+        files: ./QAssistant.zip
         generate_release_notes: true
-        body: "## Installation\n1. Extract the zip\n2. Run WinAppRuntime_Setup.exe first (only needed once per machine)\n3. Run QAssistant.exe"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
