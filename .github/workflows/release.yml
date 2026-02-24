@@ -1,0 +1,41 @@
+name: Release Portable App
+
+# 1. This workflow only triggers when you push a tag starting with 'v' (e.g., v1.0.0)
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: # Keeps the manual trigger button
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    
+    # CRITICAL: Actions need permission to write to your repository to create a Release
+    permissions:
+      contents: write 
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Publish Single-File App
+      # 2. Compile the app using the hardcoded rules in your .csproj
+      run: >
+        dotnet publish QAssistant/QAssistant.csproj 
+        -c Release 
+        -o ./publish_output
+
+    - name: Publish to GitHub Releases
+      # 3. This official community action takes your .exe and attaches it to a new Release page
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ./publish_output/QAssistant.exe # The exact file to attach
+        generate_release_notes: true # Auto-generates a changelog based on your commits!
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
