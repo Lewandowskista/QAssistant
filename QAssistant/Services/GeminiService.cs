@@ -106,26 +106,25 @@ namespace QAssistant.Services
             var endpoint = $"{BaseUrl}/{modelPath}:generateContent";
             var url = $"{endpoint}?key={_apiKey}";
 
-            var payload = new
+            // Build JSON manually to avoid reflection-based serialization issues with trimming
+            var json = $$"""
             {
-                contents = new[]
+              "contents": [
                 {
-                    new
+                  "parts": [
                     {
-                        parts = new[]
-                        {
-                            new { text = prompt }
-                        }
+                      "text": {{JsonSerializer.Serialize(prompt)}}
                     }
-                },
-                generationConfig = new
-                {
-                    temperature = 0.3,
-                    maxOutputTokens = 2048
+                  ]
                 }
-            };
+              ],
+              "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 2048
+              }
+            }
+            """;
 
-            var json = JsonSerializer.Serialize(payload);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await _client.PostAsync(url, content);
             var responseStr = await response.Content.ReadAsStringAsync();
