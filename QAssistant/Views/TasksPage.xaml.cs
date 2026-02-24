@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using QAssistant.Models;
+using QAssistant.Services;
 using QAssistant.ViewModels;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -9,8 +11,6 @@ using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
-using QAssistant.Models;
-using QAssistant.Services;
 
 namespace QAssistant.Views
 {
@@ -21,6 +21,7 @@ namespace QAssistant.Views
         private List<ProjectTask> _linearTasks = new();
         private ProjectTask? _selectedTask;
         private string _activeTab = "Details";
+        private string _lightboxUrl = string.Empty;
 
         public TasksPage()
         {
@@ -44,11 +45,11 @@ namespace QAssistant.Views
             {
                 var list = tasks?.ToList() ?? new List<ProjectTask>();
 
-                var todo = list.Where(t => t.Status == TaskStatus.Todo).ToList();
-                var inProgress = list.Where(t => t.Status == TaskStatus.InProgress).ToList();
-                var inReview = list.Where(t => t.Status == TaskStatus.InReview).ToList();
-                var done = list.Where(t => t.Status == TaskStatus.Done).ToList();
-                var blocked = list.Where(t => t.Status == TaskStatus.Blocked).ToList();
+                var todo = list.Where(t => t.Status == Models.TaskStatus.Todo).ToList();
+                var inProgress = list.Where(t => t.Status == Models.TaskStatus.InProgress).ToList();
+                var inReview = list.Where(t => t.Status == Models.TaskStatus.InReview).ToList();
+                var done = list.Where(t => t.Status == Models.TaskStatus.Done).ToList();
+                var blocked = list.Where(t => t.Status == Models.TaskStatus.Blocked).ToList();
 
                 TodoList.ItemsSource = todo;
                 InProgressList.ItemsSource = inProgress;
@@ -150,135 +151,10 @@ namespace QAssistant.Views
             ShowDetailPanel(task);
         }
 
-        private void SetActiveTab(string tab)
-        {
-            _activeTab = tab;
-
-            DetailsTab.Visibility = tab == "Details" ? Visibility.Visible : Visibility.Collapsed;
-            DescriptionTab.Visibility = tab == "Description" ? Visibility.Visible : Visibility.Collapsed;
-            CommentsTab.Visibility = tab == "Comments" ? Visibility.Visible : Visibility.Collapsed;
-
-            var activeColor = Windows.UI.Color.FromArgb(255, 167, 139, 250);
-            var inactiveColor = Windows.UI.Color.FromArgb(255, 107, 114, 128);
-            var activeBg = Windows.UI.Color.FromArgb(255, 26, 26, 36);
-
-            TabDetails.Foreground = new SolidColorBrush(tab == "Details" ? activeColor : inactiveColor);
-            TabDetails.Background = new SolidColorBrush(tab == "Details" ? activeBg : Colors.Transparent);
-            TabDetails.BorderBrush = new SolidColorBrush(tab == "Details" ? activeColor : Colors.Transparent);
-            TabDetails.BorderThickness = new Thickness(0, 0, 0, tab == "Details" ? 2 : 0);
-
-            TabDescription.Foreground = new SolidColorBrush(tab == "Description" ? activeColor : inactiveColor);
-            TabDescription.Background = new SolidColorBrush(tab == "Description" ? activeBg : Colors.Transparent);
-            TabDescription.BorderBrush = new SolidColorBrush(tab == "Description" ? activeColor : Colors.Transparent);
-            TabDescription.BorderThickness = new Thickness(0, 0, 0, tab == "Description" ? 2 : 0);
-
-            TabComments.Foreground = new SolidColorBrush(tab == "Comments" ? activeColor : inactiveColor);
-            TabComments.Background = new SolidColorBrush(tab == "Comments" ? activeBg : Colors.Transparent);
-            TabComments.BorderBrush = new SolidColorBrush(tab == "Comments" ? activeColor : Colors.Transparent);
-            TabComments.BorderThickness = new Thickness(0, 0, 0, tab == "Comments" ? 2 : 0);
-        }
-
-        private void TabDetails_Click(object sender, RoutedEventArgs e) => SetActiveTab("Details");
-        private void TabDescription_Click(object sender, RoutedEventArgs e) => SetActiveTab("Description");
-        private async void TabComments_Click(object sender, RoutedEventArgs e)
-        {
-            SetActiveTab("Comments");
-            if (_isLinearMode && _selectedTask != null && !string.IsNullOrEmpty(_selectedTask.ExternalId))
-                await LoadCommentsAsync(_selectedTask.ExternalId!);
-        }
-
-        private async System.Threading.Tasks.Task LoadCommentsAsync(string issueId)
-        {
-            CommentsContainer.Children.Clear();
-
-            var loadingText = new TextBlock
-            {
-                Text = "Loading comments...",
-                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                FontSize = 12
-            };
-            CommentsContainer.Children.Add(loadingText);
-
-            try
-            {
-                var key = CredentialService.LoadCredential("LinearApiKey");
-                if (string.IsNullOrEmpty(key)) return;
-
-                var service = new LinearService(key);
-                var comments = await service.GetCommentsAsync(issueId);
-
-                CommentsContainer.Children.Clear();
-
-                if (comments.Count == 0)
-                {
-                    CommentsContainer.Children.Add(new TextBlock
-                    {
-                        Text = "No comments yet.",
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                        FontSize = 12
-                    });
-                    return;
-                }
-
-                foreach (var comment in comments)
-                {
-                    var commentBorder = new Border
-                    {
-                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36)),
-                        CornerRadius = new CornerRadius(8),
-                        Padding = new Thickness(12),
-                        BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
-                        BorderThickness = new Thickness(1)
-                    };
-
-                    var commentPanel = new StackPanel { Spacing = 6 };
-
-                    var headerPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                    headerPanel.Children.Add(new TextBlock
-                    {
-                        Text = comment.AuthorName,
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
-                        FontSize = 12,
-                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-                    });
-                    headerPanel.Children.Add(new TextBlock
-                    {
-                        Text = comment.CreatedAt.ToString("MMM d, yyyy · h:mm tt"),
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                        FontSize = 11,
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-
-                    commentPanel.Children.Add(headerPanel);
-                    commentPanel.Children.Add(new TextBlock
-                    {
-                        Text = comment.Body,
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
-                        FontSize = 13,
-                        TextWrapping = TextWrapping.Wrap,
-                        LineHeight = 20
-                    });
-
-                    commentBorder.Child = commentPanel;
-                    CommentsContainer.Children.Add(commentBorder);
-                }
-            }
-            catch (Exception ex)
-            {
-                CommentsContainer.Children.Clear();
-                CommentsContainer.Children.Add(new TextBlock
-                {
-                    Text = $"Error loading comments: {ex.Message}",
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113)),
-                    FontSize = 12,
-                    TextWrapping = TextWrapping.Wrap
-                });
-            }
-        }
-
         private void ShowDetailPanel(ProjectTask task)
         {
             DetailPanelColumn.Width = new GridLength(340);
+            SetActiveTab("Details");
 
             // Header
             DetailIdentifier.Text = task.IssueIdentifier;
@@ -329,6 +205,7 @@ namespace QAssistant.Views
 
             // Media
             RenderMedia(task.RawDescription);
+
             if (_isLinearMode)
             {
                 ManualTaskFields.Visibility = Visibility.Collapsed;
@@ -343,15 +220,15 @@ namespace QAssistant.Views
                 LinearDetailStatus.Text = task.Status.ToString();
                 LinearDetailPriority.Text = task.Priority.ToString();
             }
-
             else
             {
                 LinearCommentFields.Visibility = Visibility.Collapsed;
                 LinearActions.Visibility = Visibility.Collapsed;
+                LinearTaskInfo.Visibility = Visibility.Collapsed;
                 ManualTaskFields.Visibility = Visibility.Visible;
                 ManualActions.Visibility = Visibility.Visible;
 
-                DetailStatusPicker.ItemsSource = Enum.GetValues(typeof(TaskStatus));
+                DetailStatusPicker.ItemsSource = Enum.GetValues(typeof(Models.TaskStatus));
                 DetailStatusPicker.SelectedItem = task.Status;
                 DetailPriorityPicker.ItemsSource = Enum.GetValues(typeof(TaskPriority));
                 DetailPriorityPicker.SelectedItem = task.Priority;
@@ -483,6 +360,7 @@ namespace QAssistant.Views
                 }
                 else
                 {
+                    var capturedUrl = url;
                     var img = new Image
                     {
                         Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform,
@@ -492,7 +370,6 @@ namespace QAssistant.Views
                     var bitmap = new BitmapImage(new Uri(url));
                     img.Source = bitmap;
 
-                    var capturedUrl = url;
                     img.Tapped += (s, e) => ShowMediaLightbox(capturedUrl);
 
                     var border = new Border
@@ -509,86 +386,30 @@ namespace QAssistant.Views
             }
         }
 
+        private void ShowMediaLightbox(string url)
+        {
+            _lightboxUrl = url;
+            LightboxImage.Source = new BitmapImage(new Uri(url));
+            LightboxOverlay.Visibility = Visibility.Visible;
+        }
+
+        private void CloseLightbox_Click(object sender, RoutedEventArgs e)
+        {
+            LightboxOverlay.Visibility = Visibility.Collapsed;
+            LightboxImage.Source = null;
+            _lightboxUrl = string.Empty;
+        }
+
+        private async void LightboxOpenBrowser_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(_lightboxUrl))
+                await Windows.System.Launcher.LaunchUriAsync(new Uri(_lightboxUrl));
+        }
+
         private void CloseDetailPanel()
         {
             DetailPanelColumn.Width = new GridLength(0);
-            SetActiveTab("Details");
             _selectedTask = null;
-        }
-
-        private void ShowMediaLightbox(string url)
-        {
-            var newWindow = new Microsoft.UI.Xaml.Window();
-
-            var img = new Image
-            {
-                Source = new BitmapImage(new Uri(url)),
-                Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
-            };
-
-            var openBtn = new Button
-            {
-                Content = "Open in Browser",
-                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53)),
-                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(14, 8, 14, 8),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(12)
-            };
-            openBtn.Click += async (s, e) =>
-                await Windows.System.Launcher.LaunchUriAsync(new Uri(url));
-
-            var scrollViewer = new ScrollViewer
-            {
-                Content = img,
-                ZoomMode = ZoomMode.Enabled,
-                MinZoomFactor = 0.25f,
-                MaxZoomFactor = 4.0f,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
-            };
-
-            var grid = new Grid { Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 15, 15, 19)) };
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            Grid.SetRow(scrollViewer, 0);
-            Grid.SetRow(openBtn, 1);
-            grid.Children.Add(scrollViewer);
-            grid.Children.Add(openBtn);
-
-            newWindow.Content = grid;
-            newWindow.Title = "Media Viewer";
-
-            // Resize window to fit image once loaded
-            img.ImageOpened += (s, e) =>
-            {
-                var bmp = (BitmapImage)img.Source;
-                double imgW = bmp.PixelWidth;
-                double imgH = bmp.PixelHeight;
-
-                double maxW = 1200;
-                double maxH = 800;
-
-                double scale = Math.Min(maxW / imgW, maxH / imgH);
-                scale = Math.Min(scale, 1.0);
-
-                int winW = (int)(imgW * scale) + 40;
-                int winH = (int)(imgH * scale) + 100;
-
-                var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(
-                    Microsoft.UI.Win32Interop.GetWindowIdFromWindow(
-                        WinRT.Interop.WindowNative.GetWindowHandle(newWindow)));
-
-                appWindow.Resize(new Windows.Graphics.SizeInt32(winW, winH));
-                appWindow.Show();
-            };
-
-            newWindow.Activate();
         }
 
         private void CloseDetail_Click(object sender, RoutedEventArgs e)
@@ -596,13 +417,140 @@ namespace QAssistant.Views
             CloseDetailPanel();
         }
 
-        private (Windows.UI.Color color, string text) GetStatusStyle(TaskStatus status) => status switch
+        private void SetActiveTab(string tab)
         {
-            TaskStatus.Todo => (Windows.UI.Color.FromArgb(255, 55, 65, 81), "Todo"),
-            TaskStatus.InProgress => (Windows.UI.Color.FromArgb(255, 30, 58, 138), "In Progress"),
-            TaskStatus.InReview => (Windows.UI.Color.FromArgb(255, 76, 29, 149), "In Review"),
-            TaskStatus.Done => (Windows.UI.Color.FromArgb(255, 6, 78, 59), "Done"),
-            TaskStatus.Blocked => (Windows.UI.Color.FromArgb(255, 127, 29, 29), "Blocked"),
+            _activeTab = tab;
+
+            DetailsTab.Visibility = tab == "Details" ? Visibility.Visible : Visibility.Collapsed;
+            DescriptionTab.Visibility = tab == "Description" ? Visibility.Visible : Visibility.Collapsed;
+            CommentsTab.Visibility = tab == "Comments" ? Visibility.Visible : Visibility.Collapsed;
+
+            var activeColor = Windows.UI.Color.FromArgb(255, 167, 139, 250);
+            var inactiveColor = Windows.UI.Color.FromArgb(255, 107, 114, 128);
+            var activeBg = Windows.UI.Color.FromArgb(255, 26, 26, 36);
+
+            TabDetails.Foreground = new SolidColorBrush(tab == "Details" ? activeColor : inactiveColor);
+            TabDetails.Background = new SolidColorBrush(tab == "Details" ? activeBg : Colors.Transparent);
+            TabDetails.BorderBrush = new SolidColorBrush(tab == "Details" ? activeColor : Colors.Transparent);
+            TabDetails.BorderThickness = new Thickness(0, 0, 0, tab == "Details" ? 2 : 0);
+
+            TabDescription.Foreground = new SolidColorBrush(tab == "Description" ? activeColor : inactiveColor);
+            TabDescription.Background = new SolidColorBrush(tab == "Description" ? activeBg : Colors.Transparent);
+            TabDescription.BorderBrush = new SolidColorBrush(tab == "Description" ? activeColor : Colors.Transparent);
+            TabDescription.BorderThickness = new Thickness(0, 0, 0, tab == "Description" ? 2 : 0);
+
+            TabComments.Foreground = new SolidColorBrush(tab == "Comments" ? activeColor : inactiveColor);
+            TabComments.Background = new SolidColorBrush(tab == "Comments" ? activeBg : Colors.Transparent);
+            TabComments.BorderBrush = new SolidColorBrush(tab == "Comments" ? activeColor : Colors.Transparent);
+            TabComments.BorderThickness = new Thickness(0, 0, 0, tab == "Comments" ? 2 : 0);
+        }
+
+        private void TabDetails_Click(object sender, RoutedEventArgs e) => SetActiveTab("Details");
+        private void TabDescription_Click(object sender, RoutedEventArgs e) => SetActiveTab("Description");
+
+        private async void TabComments_Click(object sender, RoutedEventArgs e)
+        {
+            SetActiveTab("Comments");
+            if (_isLinearMode && _selectedTask != null && !string.IsNullOrEmpty(_selectedTask.ExternalId))
+                await LoadCommentsAsync(_selectedTask.ExternalId);
+        }
+
+        private async System.Threading.Tasks.Task LoadCommentsAsync(string issueId)
+        {
+            CommentsContainer.Children.Clear();
+
+            var loadingText = new TextBlock
+            {
+                Text = "Loading comments...",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                FontSize = 12
+            };
+            CommentsContainer.Children.Add(loadingText);
+
+            try
+            {
+                var key = CredentialService.LoadCredential("LinearApiKey");
+                if (string.IsNullOrEmpty(key)) return;
+
+                var service = new LinearService(key);
+                var comments = await service.GetCommentsAsync(issueId);
+
+                CommentsContainer.Children.Clear();
+
+                if (comments.Count == 0)
+                {
+                    CommentsContainer.Children.Add(new TextBlock
+                    {
+                        Text = "No comments yet.",
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                        FontSize = 12
+                    });
+                    return;
+                }
+
+                foreach (var comment in comments)
+                {
+                    var commentBorder = new Border
+                    {
+                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36)),
+                        CornerRadius = new CornerRadius(8),
+                        Padding = new Thickness(12),
+                        BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                        BorderThickness = new Thickness(1)
+                    };
+
+                    var commentPanel = new StackPanel { Spacing = 6 };
+
+                    var headerPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                    headerPanel.Children.Add(new TextBlock
+                    {
+                        Text = comment.AuthorName,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                        FontSize = 12,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                    });
+                    headerPanel.Children.Add(new TextBlock
+                    {
+                        Text = comment.CreatedAt.ToString("MMM d, yyyy · h:mm tt"),
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                        FontSize = 11,
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+
+                    commentPanel.Children.Add(headerPanel);
+                    commentPanel.Children.Add(new TextBlock
+                    {
+                        Text = comment.Body,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                        FontSize = 13,
+                        TextWrapping = TextWrapping.Wrap,
+                        LineHeight = 20
+                    });
+
+                    commentBorder.Child = commentPanel;
+                    CommentsContainer.Children.Add(commentBorder);
+                }
+            }
+            catch (Exception ex)
+            {
+                CommentsContainer.Children.Clear();
+                CommentsContainer.Children.Add(new TextBlock
+                {
+                    Text = $"Error loading comments: {ex.Message}",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113)),
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap
+                });
+            }
+        }
+
+        private (Windows.UI.Color color, string text) GetStatusStyle(Models.TaskStatus status) => status switch
+        {
+            Models.TaskStatus.Todo => (Windows.UI.Color.FromArgb(255, 55, 65, 81), "Todo"),
+            Models.TaskStatus.InProgress => (Windows.UI.Color.FromArgb(255, 30, 58, 138), "In Progress"),
+            Models.TaskStatus.InReview => (Windows.UI.Color.FromArgb(255, 76, 29, 149), "In Review"),
+            Models.TaskStatus.Done => (Windows.UI.Color.FromArgb(255, 6, 78, 59), "Done"),
+            Models.TaskStatus.Blocked => (Windows.UI.Color.FromArgb(255, 127, 29, 29), "Blocked"),
             _ => (Windows.UI.Color.FromArgb(255, 55, 65, 81), status.ToString())
         };
 
@@ -620,7 +568,7 @@ namespace QAssistant.Views
         {
             if (_selectedTask == null || _vm?.SelectedProject == null) return;
 
-            _selectedTask.Status = (TaskStatus)DetailStatusPicker.SelectedItem!;
+            _selectedTask.Status = (Models.TaskStatus)DetailStatusPicker.SelectedItem!;
             _selectedTask.Priority = (TaskPriority)DetailPriorityPicker.SelectedItem!;
             _selectedTask.DueDate = DetailSetDueDate.IsChecked == true
                 ? DetailDueDatePicker.Date.DateTime : null;
@@ -656,18 +604,26 @@ namespace QAssistant.Views
 
         private async void PostComment_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedTask == null || string.IsNullOrWhiteSpace(DetailCommentBox.Text) || string.IsNullOrEmpty(_selectedTask.ExternalId)) return;
+            if (_selectedTask == null || string.IsNullOrWhiteSpace(DetailCommentBox.Text)) return;
 
             var key = CredentialService.LoadCredential("LinearApiKey");
             if (string.IsNullOrEmpty(key)) return;
 
+            if (string.IsNullOrEmpty(_selectedTask.ExternalId))
+            {
+                StatusText.Visibility = Visibility.Visible;
+                StatusText.Text = "Cannot post comment: missing issue id.";
+                return;
+            }
+
             try
             {
                 var service = new LinearService(key);
-                await service.AddCommentAsync(_selectedTask.ExternalId!, DetailCommentBox.Text.Trim());
+                await service.AddCommentAsync(_selectedTask.ExternalId, DetailCommentBox.Text.Trim());
                 DetailCommentBox.Text = string.Empty;
                 StatusText.Visibility = Visibility.Visible;
                 StatusText.Text = "Comment posted successfully.";
+                await LoadCommentsAsync(_selectedTask.ExternalId);
             }
             catch (Exception ex)
             {
@@ -695,7 +651,7 @@ namespace QAssistant.Views
             };
             var statusPicker = new ComboBox
             {
-                ItemsSource = Enum.GetValues(typeof(TaskStatus)),
+                ItemsSource = Enum.GetValues(typeof(Models.TaskStatus)),
                 SelectedIndex = 0,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
@@ -752,7 +708,7 @@ namespace QAssistant.Views
                 {
                     Title = titleBox.Text.Trim(),
                     Description = descBox.Text.Trim(),
-                    Status = (TaskStatus)statusPicker.SelectedItem!,
+                    Status = (Models.TaskStatus)statusPicker.SelectedItem!,
                     Priority = (TaskPriority)priorityPicker.SelectedItem!,
                     TicketUrl = ticketBox.Text.Trim(),
                     DueDate = setDueDate.IsChecked == true ? dueDatePicker.Date.DateTime : null

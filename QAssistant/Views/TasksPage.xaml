@@ -462,5 +462,59 @@
                 </Grid>
             </Border>
         </Grid>
+        <!-- Media Lightbox Overlay -->
+        <Grid x:Name="LightboxOverlay" Visibility="Collapsed"
+      Background="#CC000000" Grid.RowSpan="2">
+            <Grid HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch"
+                  Margin="40"
+                  Background="#13131A">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Lightbox Header -->
+                <Border Grid.Row="0" Padding="16,12"
+                BorderBrush="#2A2A3A" BorderThickness="0,0,0,1">
+                    <Grid>
+                        <TextBlock Text="Media Viewer" Foreground="#E2E8F0"
+                           FontSize="14" FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+                        <Button Content="✕" Click="CloseLightbox_Click"
+                        HorizontalAlignment="Right"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="#6B7280" Padding="8,4" FontSize="14"/>
+                    </Grid>
+                </Border>
+
+                <!-- Lightbox Image -->
+                <ScrollViewer Grid.Row="1"
+                              ZoomMode="Enabled"
+                              MinZoomFactor="0.25"
+                              MaxZoomFactor="4.0"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              Padding="16">
+                    <Image x:Name="LightboxImage"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Stretch"
+                           VerticalAlignment="Stretch"/>
+                </ScrollViewer>
+
+                <!-- Lightbox Footer -->
+                <Border Grid.Row="2" Padding="16,10"
+                BorderBrush="#2A2A3A" BorderThickness="0,1,0,0"
+                Background="#0F0F13">
+                    <Button Content="Open in Browser" Click="LightboxOpenBrowser_Click"
+                    HorizontalAlignment="Right"
+                    Background="#252535" Foreground="#A78BFA"
+                    CornerRadius="8" Padding="14,8"/>
+                </Border>
+            </Grid>
+        </Grid>
     </Grid>
 </Page>

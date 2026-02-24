@@ -145,7 +145,7 @@ namespace QAssistant
                     uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP,
                     uCallbackMessage = WM_TRAYICON,
                     hIcon = hIcon, // Pass the memory icon directly!
-                    szTip = "DesktopApp"
+                    szTip = "QAssistant"
                 };
                 if (hIcon == IntPtr.Zero)
                     hIcon = LoadIcon(IntPtr.Zero, new IntPtr(32512));
