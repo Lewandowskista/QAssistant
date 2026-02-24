@@ -28,15 +28,8 @@ jobs:
         Start-Process -FilePath "WinAppRuntime.exe" -Args "--quiet" -Wait
 
     - name: Publish App
-      run: >
-        dotnet publish QAssistant/QAssistant.csproj
-        -c Release
-        -r win-x64
-        --self-contained true
-        /p:PublishTrimmed=false
-        /p:PublishReadyToRun=false
-        /p:TargetFramework=net10.0-windows10.0.19041.0
-        -o ./publish_output
+      run: |
+        dotnet publish QAssistant/QAssistant.csproj -c Release -r win-x64 --self-contained true /p:PublishTrimmed=false /p:PublishReadyToRun=false /p:TargetFramework=net10.0-windows10.0.19041.0 -o ./publish_output
 
     - name: Download Windows App Runtime Redistributable
       run: |
@@ -58,11 +51,3 @@ jobs:
           3. Run `QAssistant.exe`
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-Commit, tag and push:
-```
-git add .
-git commit -m "Update workflow to NET 10"
-git tag v1.0.2
-git push origin v1.0.2
