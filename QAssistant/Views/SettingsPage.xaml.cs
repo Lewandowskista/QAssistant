@@ -190,11 +190,15 @@ namespace QAssistant.Views
 
         private void SaveGeminiKey_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(GeminiApiKeyBox.Password))
+            if (string.IsNullOrWhiteSpace(GeminiApiKeyBox.Password))
             {
-                CredentialService.SaveCredential("GeminiApiKey", GeminiApiKeyBox.Password);
-                ShowSavedConfirmation("Gemini API key saved!");
+                ShowStatus(GeminiStatusBorder, GeminiStatusText,
+                    "Please enter your Google AI Studio API key.", false);
+                return;
             }
+
+            CredentialService.SaveCredential("GeminiApiKey", GeminiApiKeyBox.Password.Trim());
+            ShowStatus(GeminiStatusBorder, GeminiStatusText, "Google AI Studio API key saved successfully.", true);
         }
 
         // ── Helpers ──────────────────────────────────────────────────
@@ -208,20 +212,6 @@ namespace QAssistant.Views
             text.Foreground = success
                 ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 52, 211, 153))
                 : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113));
-        }
-
-        // Added helper to show a saved confirmation dialog to fix CS0103
-        private async void ShowSavedConfirmation(string message)
-        {
-            var dialog = new ContentDialog
-            {
-                Title = "Saved",
-                Content = message,
-                CloseButtonText = "OK",
-                XamlRoot = this.XamlRoot
-            };
-
-            await dialog.ShowAsync();
         }
     }
 }

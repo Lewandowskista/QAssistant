@@ -468,16 +468,22 @@
                                         Background="#3F1A1A" Foreground="#F87171"
                                         CornerRadius="8" Padding="14,8"/>
                             </StackPanel>
-                            <!-- Linear actions -->
-                            <StackPanel x:Name="LinearActions" Orientation="Horizontal"
-                                        Spacing="8" Visibility="Collapsed">
-                                <Button Content="Post Comment" Click="PostComment_Click"
+                            <!-- Linear actions - two buttons side by side, each half width, aligned with Analyze button -->
+                            <Grid x:Name="LinearActions" HorizontalAlignment="Stretch" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="Post Comment" Click="PostComment_Click"
+                                        HorizontalAlignment="Stretch"
                                         Background="#A78BFA" Foreground="White"
-                                        CornerRadius="8" Padding="14,8"/>
-                                <Button Content="Open in Linear" Click="OpenInLinear_Click"
+                                        CornerRadius="8" Padding="14,8" Margin="0,0,4,0"/>
+                                <Button Grid.Column="2" Content="Open in Linear" Click="OpenInLinear_Click"
+                                        HorizontalAlignment="Stretch"
                                         Background="#252535" Foreground="#6B7280"
-                                        CornerRadius="8" Padding="14,8"/>
-                            </StackPanel>
+                                        CornerRadius="8" Padding="14,8" Margin="4,0,0,0"/>
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </Grid>

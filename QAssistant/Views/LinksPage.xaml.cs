@@ -35,14 +35,29 @@ namespace QAssistant.Views
         private void RefreshLinks()
         {
             if (_vm?.SelectedProject == null) return;
+            LinksList.ItemsSource = null;
             LinksList.ItemsSource = _vm.SelectedProject.Links;
             if (LinksList.Items.Count > 0)
                 LinksList.SelectedIndex = 0;
         }
 
+        private bool IsValidUri(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return false;
+            return Uri.TryCreate(url, UriKind.Absolute, out _);
+        }
+
         private async void LinksList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (LinksList.SelectedItem is not EmbedLink link) return;
+
+            if (!IsValidUri(link.Url))
+            {
+                EmptyState.Visibility = Visibility.Visible;
+                WebViewContainer.Visibility = Visibility.Collapsed;
+                return;
+            }
 
             WebViewContainer.Visibility = Visibility.Visible;
             EmptyState.Visibility = Visibility.Collapsed;
@@ -93,6 +108,19 @@ namespace QAssistant.Views
 
             if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(titleBox.Text))
             {
+                if (!IsValidUri(urlBox.Text.Trim()))
+                {
+                    var errorDialog = new ContentDialog
+                    {
+                        Title = "Invalid URL",
+                        Content = "Please enter a valid URL (e.g., https://example.com)",
+                        CloseButtonText = "OK",
+                        XamlRoot = this.XamlRoot
+                    };
+                    await errorDialog.ShowAsync();
+                    return;
+                }
+
                 link.Title = titleBox.Text.Trim();
                 link.Url = urlBox.Text.Trim();
                 await _vm!.SaveAsync();
@@ -171,6 +199,19 @@ namespace QAssistant.Views
                 && !string.IsNullOrWhiteSpace(titleBox.Text)
                 && !string.IsNullOrWhiteSpace(urlBox.Text))
             {
+                if (!IsValidUri(urlBox.Text.Trim()))
+                {
+                    var errorDialog = new ContentDialog
+                    {
+                        Title = "Invalid URL",
+                        Content = "Please enter a valid URL (e.g., https://example.com)",
+                        CloseButtonText = "OK",
+                        XamlRoot = this.XamlRoot
+                    };
+                    await errorDialog.ShowAsync();
+                    return;
+                }
+
                 var link = new EmbedLink
                 {
                     Title = titleBox.Text.Trim(),
