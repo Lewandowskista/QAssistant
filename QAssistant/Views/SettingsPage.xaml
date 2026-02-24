@@ -230,6 +230,23 @@
                 </StackPanel>
             </Border>
 
+            <!-- Diagnostics Section -->
+            <Border Background="#1A1A24" CornerRadius="12"
+                    BorderBrush="#2A2A3A" BorderThickness="1" Padding="24">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="DIAGNOSTICS" Foreground="#6B7280"
+                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                    <TextBlock Foreground="#9CA3AF" FontSize="12"
+                               TextWrapping="Wrap"
+                               Text="View storage paths and logs to help debug data persistence issues."/>
+                    <Button Content="View Storage Diagnostics" Click="ViewStorageDiagnostics_Click"
+                            Background="#252535"
+                            Foreground="#A78BFA"
+                            CornerRadius="8"
+                            Padding="16,8"/>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
     </ScrollViewer>
 </Page>

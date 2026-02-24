@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using QAssistant.Services;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -212,6 +213,62 @@ namespace QAssistant.Views
             text.Foreground = success
                 ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 52, 211, 153))
                 : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113));
+        }
+
+        // ── Diagnostics ──────────────────────────────────────────────
+        private async void ViewStorageDiagnostics_Click(object sender, RoutedEventArgs e)
+        {
+            var storage = new StorageService();
+            var logPath = storage.GetLogPath();
+            var dataPath = storage.GetDataPath();
+
+            var diagnosticInfo = $"Data Path: {dataPath}\n";
+            diagnosticInfo += $"Log Path: {logPath}\n\n";
+
+            // Check file existence
+            diagnosticInfo += $"Data file exists: {System.IO.File.Exists(dataPath)}\n";
+            diagnosticInfo += $"Log file exists: {System.IO.File.Exists(logPath)}\n\n";
+
+            // Try to read log file
+            try
+            {
+                if (System.IO.File.Exists(logPath))
+                {
+                    var logContent = System.IO.File.ReadAllText(logPath);
+                    diagnosticInfo += "Recent Logs:\n";
+                    var lines = logContent.Split('\n');
+                    var recentLines = lines.Length > 10 ? lines.Skip(lines.Length - 10).ToArray() : lines;
+                    diagnosticInfo += string.Join("\n", recentLines);
+                }
+                else
+                {
+                    diagnosticInfo += "No log file found yet.\n";
+                }
+            }
+            catch (Exception ex)
+            {
+                diagnosticInfo += $"Error reading log: {ex.Message}\n";
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = "Storage Diagnostics",
+                Content = new ScrollViewer
+                {
+                    Content = new TextBlock
+                    {
+                        Text = diagnosticInfo,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                        FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
+                        FontSize = 11,
+                        TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap
+                    }
+                },
+                CloseButtonText = "Close",
+                XamlRoot = this.XamlRoot
+            };
+
+            await dialog.ShowAsync();
         }
     }
 }
