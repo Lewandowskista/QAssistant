@@ -492,12 +492,18 @@ namespace DesktopApp.Views
                     var bitmap = new BitmapImage(new Uri(url));
                     img.Source = bitmap;
 
+                    var capturedUrl = url;
+                    img.Tapped += (s, e) => ShowMediaLightbox(capturedUrl);
+
                     var border = new Border
                     {
                         CornerRadius = new CornerRadius(8),
                         Child = img,
-                        Margin = new Thickness(0, 4, 0, 4)
+                        Margin = new Thickness(0, 4, 0, 4),
+                        Opacity = 0.95
                     };
+                    border.PointerEntered += (s, e) => border.Opacity = 1.0;
+                    border.PointerExited += (s, e) => border.Opacity = 0.95;
                     MediaContainer.Children.Add(border);
                 }
             }
@@ -508,6 +514,81 @@ namespace DesktopApp.Views
             DetailPanelColumn.Width = new GridLength(0);
             SetActiveTab("Details");
             _selectedTask = null;
+        }
+
+        private void ShowMediaLightbox(string url)
+        {
+            var newWindow = new Microsoft.UI.Xaml.Window();
+
+            var img = new Image
+            {
+                Source = new BitmapImage(new Uri(url)),
+                Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+
+            var openBtn = new Button
+            {
+                Content = "Open in Browser",
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53)),
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(14, 8, 14, 8),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(12)
+            };
+            openBtn.Click += async (s, e) =>
+                await Windows.System.Launcher.LaunchUriAsync(new Uri(url));
+
+            var scrollViewer = new ScrollViewer
+            {
+                Content = img,
+                ZoomMode = ZoomMode.Enabled,
+                MinZoomFactor = 0.25f,
+                MaxZoomFactor = 4.0f,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+
+            var grid = new Grid { Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 15, 15, 19)) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetRow(scrollViewer, 0);
+            Grid.SetRow(openBtn, 1);
+            grid.Children.Add(scrollViewer);
+            grid.Children.Add(openBtn);
+
+            newWindow.Content = grid;
+            newWindow.Title = "Media Viewer";
+
+            // Resize window to fit image once loaded
+            img.ImageOpened += (s, e) =>
+            {
+                var bmp = (BitmapImage)img.Source;
+                double imgW = bmp.PixelWidth;
+                double imgH = bmp.PixelHeight;
+
+                double maxW = 1200;
+                double maxH = 800;
+
+                double scale = Math.Min(maxW / imgW, maxH / imgH);
+                scale = Math.Min(scale, 1.0);
+
+                int winW = (int)(imgW * scale) + 40;
+                int winH = (int)(imgH * scale) + 100;
+
+                var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(
+                    Microsoft.UI.Win32Interop.GetWindowIdFromWindow(
+                        WinRT.Interop.WindowNative.GetWindowHandle(newWindow)));
+
+                appWindow.Resize(new Windows.Graphics.SizeInt32(winW, winH));
+                appWindow.Show();
+            };
+
+            newWindow.Activate();
         }
 
         private void CloseDetail_Click(object sender, RoutedEventArgs e)
