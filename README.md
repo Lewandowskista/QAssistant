@@ -116,7 +116,7 @@ QAssistant is an always-on-top floating desktop widget designed for QA engineers
 
 #### From GitHub Releases (Recommended)
 
-1. Download the latest `QAssistant.zip` from [Releases](https://github.com/Lewandowskista/DesktopApp/releases)
+1. Download the latest `QAssistant.zip` from [Releases](https://github.com/Lewandowskista/QAssistant/releases)
 2. Extract the zip to a folder of your choice
 3. Run `WinAppRuntime_Setup.exe` to install the Windows App Runtime (if not already installed)
 4. Run `QAssistant.exe`
@@ -125,8 +125,8 @@ QAssistant is an always-on-top floating desktop widget designed for QA engineers
 
 ```bash
 # Clone the repository
-git clone https://github.com/Lewandowskista/DesktopApp.git
-cd DesktopApp
+git clone https://github.com/Lewandowskista/QAssistant.git
+cd QAssistant
 
 # Restore and build
 dotnet restore
@@ -241,7 +241,7 @@ QAssistant uses GitHub Actions for automated builds and releases:
 - **Output:** A portable `.zip` containing:
   - `QAssistant.exe` (single-file, self-contained)
   - `WinAppRuntime_Setup.exe` (Windows App Runtime installer)
-- **Download:** Releases are automatically published to [GitHub Releases](https://github.com/Lewandowskista/DesktopApp/releases)
+- **Download:** Releases are automatically published to [GitHub Releases](https://github.com/Lewandowskista/QAssistant/releases)
 
 ---
 

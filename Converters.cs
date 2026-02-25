@@ -2,7 +2,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 
-namespace DesktopApp
+namespace QAssistant
 {
     public class NullToVisibilityConverter : IValueConverter
     {
