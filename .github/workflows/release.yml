@@ -22,14 +22,17 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
-    - name: Publish Self-Contained App
+    - name: Install Windows App SDK
       run: |
-        dotnet publish QAssistant/QAssistant.csproj `
-          -c Release `
-          -r win-x64 `
-          --self-contained true `
-          -p:PublishSingleFile=false `
-          -o ./publish_output
+        Invoke-WebRequest -Uri "https://aka.ms/windowsappsdk/1.8/latest/windowsappruntimeinstall-x64.exe" -OutFile "WinAppRuntime.exe"
+        Start-Process -FilePath "WinAppRuntime.exe" -Args "--quiet" -Wait
+
+    - name: Publish Single-File App
+      run: dotnet publish QAssistant/QAssistant.csproj -c Release -o ./publish_output
+
+    - name: Copy Windows App Runtime to output
+      run: |
+        Invoke-WebRequest -Uri "https://aka.ms/windowsappsdk/1.8/latest/windowsappruntimeinstall-x64.exe" -OutFile "./publish_output/WinAppRuntime_Setup.exe"
 
     - name: Zip output
       run: Compress-Archive -Path ./publish_output/* -DestinationPath ./QAssistant.zip
