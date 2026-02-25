@@ -91,6 +91,50 @@ namespace QAssistant.Views
             App.MinimizeToTray = enabled;
         }
 
+        private void RefreshProjects_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Get the main window and call refresh
+                if (App.MainWindowInstance != null)
+                {
+                    System.Diagnostics.Debug.WriteLine("Refresh button clicked - calling ForceRefreshProjectList");
+                    App.MainWindowInstance.ForceRefreshProjectList();
+
+                    var dialog = new ContentDialog
+                    {
+                        Title = "Projects Sidebar Refreshed",
+                        Content = "The projects sidebar has been refreshed.",
+                        CloseButtonText = "OK",
+                        XamlRoot = this.XamlRoot
+                    };
+                    _ = dialog.ShowAsync();
+                }
+                else
+                {
+                    var dialog = new ContentDialog
+                    {
+                        Title = "Error",
+                        Content = "Could not access main window.",
+                        CloseButtonText = "OK",
+                        XamlRoot = this.XamlRoot
+                    };
+                    _ = dialog.ShowAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "Error",
+                    Content = $"Error refreshing projects: {ex.Message}",
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                _ = dialog.ShowAsync();
+            }
+        }
+
         // ── Linear ───────────────────────────────────────────────────
         private void SaveLinear_Click(object sender, RoutedEventArgs e)
         {

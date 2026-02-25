@@ -32,7 +32,17 @@ namespace QAssistant
         {
             this.InitializeComponent();
             SetupWindow();
-            this.DispatcherQueue.TryEnqueue(async () => await LoadDataAsync());
+
+            // Delay data loading to ensure UI is fully initialized
+            this.DispatcherQueue.TryEnqueue(async () =>
+            {
+                // First, let the UI fully render
+                await System.Threading.Tasks.Task.Delay(100);
+
+                // Then load data
+                await LoadDataAsync();
+            });
+
             this.Closed += (s, e) =>
             {
                 if (App.MinimizeToTray)
@@ -52,7 +62,13 @@ namespace QAssistant
             try
             {
                 await ViewModel.InitializeAsync();
-                RefreshProjectList();
+
+                // Ensure window is rendered before updating UI
+                this.DispatcherQueue.TryEnqueue(() =>
+                {
+                    System.Diagnostics.Debug.WriteLine("Window rendered, now refreshing project list");
+                    RefreshProjectList();
+                });
 
                 _reminderService.Start(
                     () => ViewModel.Projects.ToList(),
@@ -521,12 +537,21 @@ namespace QAssistant
             {
                 System.Diagnostics.Debug.WriteLine($"RefreshProjectList called. Projects count: {ViewModel.Projects?.Count ?? 0}");
 
+                // Clear the binding completely
                 ProjectList.ItemsSource = null;
+                System.Diagnostics.Debug.WriteLine("ItemsSource cleared");
+
                 if (ViewModel.Projects?.Count > 0)
                 {
+                    // Rebind the collection
                     ProjectList.ItemsSource = ViewModel.Projects;
                     System.Diagnostics.Debug.WriteLine($"ItemsSource set to {ViewModel.Projects.Count} projects");
 
+                    // Force UI layout to update
+                    ProjectList.UpdateLayout();
+                    System.Diagnostics.Debug.WriteLine("ProjectList layout updated");
+
+                    // Select the appropriate project
                     if (ViewModel.SelectedProject != null)
                     {
                         ProjectList.SelectedItem = ViewModel.SelectedProject;
@@ -537,17 +562,35 @@ namespace QAssistant
                         ProjectList.SelectedIndex = 0;
                         System.Diagnostics.Debug.WriteLine($"Auto-selected first project");
                     }
+
+                    // Force another layout pass to ensure items are visible
+                    ProjectList.UpdateLayout();
+                    System.Diagnostics.Debug.WriteLine("ProjectList layout updated again");
                 }
                 else
                 {
                     System.Diagnostics.Debug.WriteLine($"No projects to display");
                 }
+
                 NavigateToCurrentTab();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"RefreshProjectList error: {ex.Message}\n{ex.StackTrace}");
             }
+        }
+
+        /// <summary>
+        /// Public method to force a refresh of the project list UI.
+        /// Can be called from other pages/components if needed.
+        /// </summary>
+        public void ForceRefreshProjectList()
+        {
+            System.Diagnostics.Debug.WriteLine("ForceRefreshProjectList called from external source");
+            this.DispatcherQueue.TryEnqueue(() =>
+            {
+                RefreshProjectList();
+            });
         }
     }
 }

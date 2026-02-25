@@ -41,6 +41,15 @@
                           Toggled="MinimizeToTrayToggle_Toggled"
                           OnContent="" OffContent=""/>
                     </Grid>
+
+                    <!-- Refresh Projects Sidebar -->
+                    <Button x:Name="RefreshProjectsButton" Content="🔄 Refresh Projects Sidebar"
+                    Click="RefreshProjects_Click"
+                    Background="#252535" Foreground="#A78BFA"
+                    CornerRadius="8" Padding="12,8"
+                    HorizontalAlignment="Left"/>
+                    <TextBlock Text="If projects don't appear, click this button to manually refresh the sidebar."
+                           Foreground="#6B7280" FontSize="11"/>
                 </StackPanel>
             </Border>
 
