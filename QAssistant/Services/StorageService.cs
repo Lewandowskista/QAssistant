@@ -18,6 +18,10 @@ namespace QAssistant.Services
     [JsonSerializable(typeof(LinkType))]
     [JsonSerializable(typeof(Models.TaskStatus))]
     [JsonSerializable(typeof(TaskPriority))]
+    [JsonSourceGenerationOptions(
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true)]
     public partial class AppJsonContext : JsonSerializerContext
     {
     }
@@ -45,7 +49,13 @@ namespace QAssistant.Services
                 _dataPath = Path.Combine(folder, "projects.json");
                 _logPath = Path.Combine(folder, "storage.log");
 
-                _jsonContext = new AppJsonContext(new JsonSerializerOptions { WriteIndented = true });
+                var options = new JsonSerializerOptions 
+                { 
+                    WriteIndented = true,
+                    PropertyNameCaseInsensitive = true,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+                _jsonContext = new AppJsonContext(options);
 
                 LogMessage($"StorageService initialized. Data path: {_dataPath}");
             }
@@ -115,7 +125,7 @@ namespace QAssistant.Services
 
                 // Ensure directory exists before writing
                 var folder = Path.GetDirectoryName(_dataPath);
-                if (!Directory.Exists(folder))
+                if (!string.IsNullOrEmpty(folder) && !Directory.Exists(folder))
                 {
                     Directory.CreateDirectory(folder);
                     LogMessage($"Created directory: {folder}");

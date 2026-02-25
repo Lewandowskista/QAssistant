@@ -107,13 +107,20 @@ namespace QAssistant.Services
             var url = $"{endpoint}?key={_apiKey}";
 
             // Build JSON manually to avoid reflection-based serialization issues with trimming
+            // Escape the prompt string properly for JSON
+            var escapedPrompt = prompt
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r");
+
             var json = $$"""
             {
               "contents": [
                 {
                   "parts": [
                     {
-                      "text": {{JsonSerializer.Serialize(prompt)}}
+                      "text": "{{escapedPrompt}}"
                     }
                   ]
                 }
