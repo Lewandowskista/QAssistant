@@ -26,7 +26,6 @@ namespace QAssistant.Views
         private ProjectTask? _selectedTask;
         private string _activeTab = "Details";
         private string _lightboxUrl = string.Empty;
-        private bool _isAnalyzing = false;
         private DispatcherTimer? _rateLimitDismissTimer;
         private ProjectTask? _draggedTask;
         private List<LinearWorkflowState> _linearStates = new();
