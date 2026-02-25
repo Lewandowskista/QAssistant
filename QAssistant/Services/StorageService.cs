@@ -28,6 +28,9 @@ namespace QAssistant.Services
 
     public class StorageService
     {
+        private static readonly Lazy<StorageService> _instance = new(() => new StorageService());
+        public static StorageService Instance => _instance.Value;
+
         private readonly string _dataPath;
         private readonly string _logPath;
         private readonly AppJsonContext _jsonContext;
@@ -84,7 +87,11 @@ namespace QAssistant.Services
             {
                 var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 var logEntry = $"[{timestamp}] {message}{Environment.NewLine}";
-                File.AppendAllText(_logPath, logEntry);
+                _ = Task.Run(() =>
+                {
+                    try { File.AppendAllText(_logPath, logEntry); }
+                    catch { /* Ignore log errors */ }
+                });
             }
             catch { /* Ignore log errors */ }
         }
@@ -93,16 +100,10 @@ namespace QAssistant.Services
         {
             try
             {
-                LogMessage($"LoadProjectsAsync called. File exists: {File.Exists(_dataPath)}");
-
                 if (!File.Exists(_dataPath))
-                {
-                    LogMessage("projects.json does not exist, returning empty list");
                     return new List<Project>();
-                }
 
                 var fileContent = await File.ReadAllTextAsync(_dataPath);
-                LogMessage($"Read file content, length: {fileContent.Length}");
 
                 List<Project>? result = null;
                 try
@@ -112,13 +113,11 @@ namespace QAssistant.Services
                 catch (Exception deserializeEx)
                 {
                     LogMessage($"JsonSerializerContext deserialization failed: {deserializeEx.Message}. Trying default deserializer...");
-                    // Fallback to default deserializer for debugging
                     var options = new JsonSerializerOptions { WriteIndented = true, PropertyNameCaseInsensitive = true };
                     result = JsonSerializer.Deserialize<List<Project>>(fileContent, options);
                 }
 
                 result ??= new List<Project>();
-                LogMessage($"LoadProjectsAsync succeeded. Loaded {result.Count} projects");
                 return result;
             }
             catch (Exception ex)
@@ -133,68 +132,25 @@ namespace QAssistant.Services
         {
             try
             {
-                LogMessage($"SaveProjectsAsync called with {projects.Count} projects");
-                LogMessage($"Target path: {_dataPath}");
-
                 // Ensure directory exists before writing
                 var folder = Path.GetDirectoryName(_dataPath);
                 if (!string.IsNullOrEmpty(folder) && !Directory.Exists(folder))
-                {
                     Directory.CreateDirectory(folder);
-                    LogMessage($"Created directory: {folder}");
-                }
 
-                // Verify folder exists
-                if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
-                {
-                    LogMessage($"ERROR: Directory does not exist and could not be created: {folder}");
-                    throw new Exception($"Cannot access directory: {folder}");
-                }
-
-                // Serialize to string first for better error logging
+                // Serialize
                 string jsonContent;
                 try
                 {
                     jsonContent = JsonSerializer.Serialize(projects, _jsonContext.ListProject);
-                    LogMessage($"Serialization successful. Content length: {jsonContent.Length}");
                 }
                 catch (Exception serializeEx)
                 {
                     LogMessage($"JsonSerializerContext serialization failed: {serializeEx.Message}. Trying default serializer...");
                     var options = new JsonSerializerOptions { WriteIndented = true };
                     jsonContent = JsonSerializer.Serialize(projects, options);
-                    LogMessage($"Default serialization successful. Content length: {jsonContent.Length}");
                 }
 
-                // Write to file with explicit error handling
-                try
-                {
-                    await File.WriteAllTextAsync(_dataPath, jsonContent);
-                    LogMessage($"File write successful: {_dataPath}");
-
-                    // Verify file was written
-                    if (File.Exists(_dataPath))
-                    {
-                        var fileInfo = new FileInfo(_dataPath);
-                        LogMessage($"File verified. Size: {fileInfo.Length} bytes");
-                    }
-                    else
-                    {
-                        LogMessage($"ERROR: File was not created after write operation");
-                    }
-                }
-                catch (UnauthorizedAccessException uaEx)
-                {
-                    LogMessage($"Access denied writing to {_dataPath}: {uaEx.Message}");
-                    throw;
-                }
-                catch (IOException ioEx)
-                {
-                    LogMessage($"IO error writing to {_dataPath}: {ioEx.Message}");
-                    throw;
-                }
-
-                LogMessage($"SaveProjectsAsync succeeded. Saved {projects.Count} projects to {_dataPath}");
+                await File.WriteAllTextAsync(_dataPath, jsonContent);
             }
             catch (Exception ex)
             {

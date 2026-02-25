@@ -11,7 +11,7 @@ namespace QAssistant.ViewModels
 {
     public partial class MainViewModel : ObservableObject
     {
-        private readonly StorageService _storage = new();
+        private readonly StorageService _storage = StorageService.Instance;
 
         [ObservableProperty]
         public partial ObservableCollection<Project> Projects { get; set; } = new();
@@ -41,11 +41,10 @@ namespace QAssistant.ViewModels
                 }
 
                 SelectedProject = Projects.Count > 0 ? Projects[0] : null;
-                System.Diagnostics.Debug.WriteLine($"MainViewModel.InitializeAsync completed. Projects: {Projects.Count}, Selected: {SelectedProject?.Name}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"MainViewModel.InitializeAsync error: {ex.Message}\n{ex.StackTrace}");
+                System.Diagnostics.Debug.WriteLine($"MainViewModel.InitializeAsync error: {ex.Message}");
                 throw;
             }
         }

@@ -12,11 +12,24 @@ namespace QAssistant.Services
 {
     public class LinearService
     {
-        private readonly HttpClient _client = new();
+        private readonly HttpClient _client;
         private const string Endpoint = "https://api.linear.app/graphql";
+
+        // Pre-compiled regex patterns for CleanDescription and ExtractMediaUrls
+        private static readonly Regex s_markdownImageRegex = new(@"!\[.*?\]\(.*?\)", RegexOptions.Compiled);
+        private static readonly Regex s_markdownLinkRegex = new(@"\[([^\]]+)\]\([^\)]+\)", RegexOptions.Compiled);
+        private static readonly Regex s_htmlTagRegex = new(@"<[^>]+>", RegexOptions.Compiled);
+        private static readonly Regex s_markdownHeaderRegex = new(@"#{1,6}\s", RegexOptions.Compiled);
+        private static readonly Regex s_boldItalicRegex = new(@"\*{1,3}([^\*]+)\*{1,3}", RegexOptions.Compiled);
+        private static readonly Regex s_codeBlockRegex = new(@"```[\s\S]*?```", RegexOptions.Compiled);
+        private static readonly Regex s_inlineCodeRegex = new(@"`([^`]+)`", RegexOptions.Compiled);
+        private static readonly Regex s_excessNewlinesRegex = new(@"\n{3,}", RegexOptions.Compiled);
+        private static readonly Regex s_extractMarkdownImageUrlRegex = new(@"!\[.*?\]\((.*?)\)", RegexOptions.Compiled);
+        private static readonly Regex s_extractHtmlImgSrcRegex = new(@"<img[^>]+src=""([^""]+)""", RegexOptions.Compiled);
 
         public LinearService(string apiKey)
         {
+            _client = new HttpClient();
             _client.DefaultRequestHeaders.Add("Authorization", apiKey);
             _client.DefaultRequestHeaders.Accept
                 .Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -240,21 +253,14 @@ namespace QAssistant.Services
         {
             if (string.IsNullOrEmpty(raw)) return string.Empty;
 
-            // Remove markdown images — handled separately via ExtractMediaUrls
-            raw = System.Text.RegularExpressions.Regex.Replace(raw, @"!\[.*?\]\(.*?\)", "[image]");
-            // Remove markdown links [text](url) -> text
-            raw = System.Text.RegularExpressions.Regex.Replace(raw, @"\[([^\]]+)\]\([^\)]+\)", "$1");
-            // Remove HTML tags
-            raw = System.Text.RegularExpressions.Regex.Replace(raw, @"<[^>]+>", "");
-            // Remove markdown headers
-            raw = System.Text.RegularExpressions.Regex.Replace(raw, @"#{1,6}\s", "");
-            // Remove bold/italic
-            raw = System.Text.RegularExpressions.Regex.Replace(raw, @"\*{1,3}([^\*]+)\*{1,3}", "$1");
-            // Remove code blocks
-            raw = System.Text.RegularExpressions.Regex.Replace(raw, @"```[\s\S]*?```", "[code block]");
-            raw = System.Text.RegularExpressions.Regex.Replace(raw, @"`([^`]+)`", "$1");
-            // Trim excess whitespace
-            raw = System.Text.RegularExpressions.Regex.Replace(raw, @"\n{3,}", "\n\n").Trim();
+            raw = s_markdownImageRegex.Replace(raw, "[image]");
+            raw = s_markdownLinkRegex.Replace(raw, "$1");
+            raw = s_htmlTagRegex.Replace(raw, "");
+            raw = s_markdownHeaderRegex.Replace(raw, "");
+            raw = s_boldItalicRegex.Replace(raw, "$1");
+            raw = s_codeBlockRegex.Replace(raw, "[code block]");
+            raw = s_inlineCodeRegex.Replace(raw, "$1");
+            raw = s_excessNewlinesRegex.Replace(raw, "\n\n").Trim();
 
             return raw;
         }
@@ -264,14 +270,10 @@ namespace QAssistant.Services
             var urls = new List<string>();
             if (string.IsNullOrEmpty(raw)) return urls;
 
-            // Extract markdown images ![alt](url)
-            var imageMatches = System.Text.RegularExpressions.Regex.Matches(raw, @"!\[.*?\]\((.*?)\)");
-            foreach (System.Text.RegularExpressions.Match match in imageMatches)
+            foreach (Match match in s_extractMarkdownImageUrlRegex.Matches(raw))
                 urls.Add(match.Groups[1].Value);
 
-            // Extract HTML img src
-            var htmlMatches = System.Text.RegularExpressions.Regex.Matches(raw, @"<img[^>]+src=""([^""]+)""");
-            foreach (System.Text.RegularExpressions.Match match in htmlMatches)
+            foreach (Match match in s_extractHtmlImgSrcRegex.Matches(raw))
                 urls.Add(match.Groups[1].Value);
 
             return urls;

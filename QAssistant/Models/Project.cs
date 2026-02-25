@@ -10,7 +10,18 @@ namespace QAssistant.Models
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public string Color { get; set; } = "#A78BFA";
+
+        private string _color = "#A78BFA";
+        public string Color
+        {
+            get => _color;
+            set
+            {
+                _color = value;
+                _cachedBrush = null;
+            }
+        }
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public List<Note> Notes { get; set; } = new();
         public List<ProjectTask> Tasks { get; set; } = new();
@@ -18,10 +29,14 @@ namespace QAssistant.Models
         public List<FileAttachment> Attachments { get; set; } = new();
 
         [JsonIgnore]
+        private SolidColorBrush? _cachedBrush;
+
+        [JsonIgnore]
         public SolidColorBrush ColorBrush
         {
             get
             {
+                if (_cachedBrush != null) return _cachedBrush;
                 try
                 {
                     var hex = Color.StartsWith("#") ? Color[1..] : Color;
@@ -30,11 +45,13 @@ namespace QAssistant.Models
                         byte r = Convert.ToByte(hex[0..2], 16);
                         byte g = Convert.ToByte(hex[2..4], 16);
                         byte b = Convert.ToByte(hex[4..6], 16);
-                        return new SolidColorBrush(Windows.UI.Color.FromArgb(255, r, g, b));
+                        _cachedBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, r, g, b));
+                        return _cachedBrush;
                     }
                 }
                 catch { }
-                return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250));
+                _cachedBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250));
+                return _cachedBrush;
             }
         }
 

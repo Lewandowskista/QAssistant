@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using QAssistant.Helpers;
 using QAssistant.Models;
 using QAssistant.Services;
 using QAssistant.ViewModels;
@@ -586,6 +587,7 @@ namespace QAssistant.Views
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = this.XamlRoot
             };
+            DialogHelper.ApplyDarkTheme(dialog);
 
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary)
@@ -696,6 +698,7 @@ namespace QAssistant.Views
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = this.XamlRoot
             };
+            DialogHelper.ApplyDarkTheme(dialog);
 
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(titleBox.Text))
@@ -729,6 +732,7 @@ namespace QAssistant.Views
                     CloseButtonText = "OK",
                     XamlRoot = this.XamlRoot
                 };
+                DialogHelper.ApplyDarkTheme(noKeyDialog);
                 await noKeyDialog.ShowAsync();
                 return;
             }
@@ -953,9 +957,7 @@ namespace QAssistant.Views
             };
 
             resultDialog.Resources["ContentDialogMaxWidth"] = 700.0;
-            resultDialog.Resources["ContentDialogBackground"] = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26));
-            resultDialog.Resources["ContentDialogBorderBrush"] = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58));
-            resultDialog.Resources["ContentDialogTitleForeground"] = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240));
+            DialogHelper.ApplyDarkTheme(resultDialog);
 
             var resultAction = await resultDialog.ShowAsync();
             if (resultAction == ContentDialogResult.Primary)

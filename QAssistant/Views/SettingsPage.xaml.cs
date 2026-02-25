@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using QAssistant.Helpers;
 using QAssistant.Services;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -24,7 +25,7 @@ namespace QAssistant.Views
         {
             try
             {
-                var storage = new StorageService();
+                var storage = StorageService.Instance;
                 var dataPath = storage.GetDataPath();
                 var logPath = storage.GetLogPath();
 
@@ -108,6 +109,7 @@ namespace QAssistant.Views
                         CloseButtonText = "OK",
                         XamlRoot = this.XamlRoot
                     };
+                    DialogHelper.ApplyDarkTheme(dialog);
                     _ = dialog.ShowAsync();
                 }
                 else
@@ -119,6 +121,7 @@ namespace QAssistant.Views
                         CloseButtonText = "OK",
                         XamlRoot = this.XamlRoot
                     };
+                    DialogHelper.ApplyDarkTheme(dialog);
                     _ = dialog.ShowAsync();
                 }
             }
@@ -131,6 +134,7 @@ namespace QAssistant.Views
                     CloseButtonText = "OK",
                     XamlRoot = this.XamlRoot
                 };
+                DialogHelper.ApplyDarkTheme(dialog);
                 _ = dialog.ShowAsync();
             }
         }
@@ -281,7 +285,7 @@ namespace QAssistant.Views
         // ── Diagnostics ──────────────────────────────────────────────
         private async void ViewStorageDiagnostics_Click(object sender, RoutedEventArgs e)
         {
-            var storage = new StorageService();
+            var storage = StorageService.Instance;
             var logPath = storage.GetLogPath();
             var dataPath = storage.GetDataPath();
 
@@ -330,6 +334,7 @@ namespace QAssistant.Views
                 CloseButtonText = "Close",
                 XamlRoot = this.XamlRoot
             };
+            DialogHelper.ApplyDarkTheme(dialog);
 
             await dialog.ShowAsync();
         }
@@ -338,7 +343,7 @@ namespace QAssistant.Views
         {
             try
             {
-                var storage = new StorageService();
+                var storage = StorageService.Instance;
                 var logPath = storage.GetLogPath();
 
                 if (!System.IO.File.Exists(logPath))
@@ -350,6 +355,7 @@ namespace QAssistant.Views
                         CloseButtonText = "OK",
                         XamlRoot = this.XamlRoot
                     };
+                    DialogHelper.ApplyDarkTheme(dialog);
                     await dialog.ShowAsync();
                     return;
                 }
@@ -366,6 +372,7 @@ namespace QAssistant.Views
                     CloseButtonText = "OK",
                     XamlRoot = this.XamlRoot
                 };
+                DialogHelper.ApplyDarkTheme(dialog);
                 await dialog.ShowAsync();
             }
         }

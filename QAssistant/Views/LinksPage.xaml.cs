@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using QAssistant.Helpers;
 using QAssistant.Models;
 using System;
 using System.IO;
@@ -103,6 +104,7 @@ namespace QAssistant.Views
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = this.XamlRoot
             };
+            DialogHelper.ApplyDarkTheme(dialog);
 
             var result = await dialog.ShowAsync();
 
@@ -117,6 +119,7 @@ namespace QAssistant.Views
                         CloseButtonText = "OK",
                         XamlRoot = this.XamlRoot
                     };
+                    DialogHelper.ApplyDarkTheme(errorDialog);
                     await errorDialog.ShowAsync();
                     return;
                 }
@@ -193,6 +196,7 @@ namespace QAssistant.Views
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = this.XamlRoot
             };
+            DialogHelper.ApplyDarkTheme(dialog);
 
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary
@@ -208,6 +212,7 @@ namespace QAssistant.Views
                         CloseButtonText = "OK",
                         XamlRoot = this.XamlRoot
                     };
+                    DialogHelper.ApplyDarkTheme(errorDialog);
                     await errorDialog.ShowAsync();
                     return;
                 }

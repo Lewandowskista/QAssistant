@@ -13,6 +13,7 @@ using QAssistant.Models;
 using QAssistant.Services;
 using WinRT.Interop;
 using System.Runtime.InteropServices;
+using QAssistant.Helpers;
 
 namespace QAssistant
 {
@@ -39,15 +40,10 @@ namespace QAssistant
 
             SetupWindow();
 
-            // Delay data loading to ensure UI is fully initialized
-            this.DispatcherQueue.TryEnqueue(async () =>
-            {
-                // First, let the UI fully render
-                await System.Threading.Tasks.Task.Delay(100);
-
-                // Then load data
-                await LoadDataAsync();
-            });
+            // Load data after UI is fully initialized (low priority ensures layout completes first)
+            this.DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                async () => await LoadDataAsync());
 
             this.Closed += (s, e) =>
             {
@@ -68,13 +64,7 @@ namespace QAssistant
             try
             {
                 await ViewModel.InitializeAsync();
-
-                // Ensure window is rendered before updating UI
-                this.DispatcherQueue.TryEnqueue(() =>
-                {
-                    System.Diagnostics.Debug.WriteLine("Window rendered, now refreshing project list");
-                    RefreshProjectList();
-                });
+                RefreshProjectList();
 
                 _reminderService.Start(
                     () => ViewModel.Projects.ToList(),
@@ -83,7 +73,7 @@ namespace QAssistant
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"LoadDataAsync error: {ex.Message}\n{ex.StackTrace}");
+                System.Diagnostics.Debug.WriteLine($"LoadDataAsync error: {ex.Message}");
             }
         }
 
@@ -350,6 +340,7 @@ namespace QAssistant
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = ContentFrame.XamlRoot
             };
+            DialogHelper.ApplyDarkTheme(dialog);
 
             var result = await dialog.ShowAsync();
 
@@ -371,6 +362,7 @@ namespace QAssistant
                     DefaultButton = ContentDialogButton.Close,
                     XamlRoot = ContentFrame.XamlRoot
                 };
+                DialogHelper.ApplyDarkTheme(confirmDialog);
 
                 var confirmResult = await confirmDialog.ShowAsync();
                 if (confirmResult == ContentDialogResult.Primary)
@@ -399,6 +391,7 @@ namespace QAssistant
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = ContentFrame.XamlRoot
             };
+            DialogHelper.ApplyDarkTheme(dialog);
 
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(nameBox.Text))
@@ -426,7 +419,7 @@ namespace QAssistant
         {
             if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
 
-            var query = sender.Text.Trim().ToLower();
+            var query = sender.Text.Trim();
             if (string.IsNullOrEmpty(query))
             {
                 sender.ItemsSource = null;
@@ -439,7 +432,8 @@ namespace QAssistant
             {
                 foreach (var note in project.Notes)
                 {
-                    if (note.Title.ToLower().Contains(query) || note.Content.ToLower().Contains(query))
+                    if (note.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                        note.Content.Contains(query, StringComparison.OrdinalIgnoreCase))
                     {
                         results.Add(new SearchResult
                         {
@@ -455,7 +449,8 @@ namespace QAssistant
 
                 foreach (var task in project.Tasks)
                 {
-                    if (task.Title.ToLower().Contains(query) || task.Description.ToLower().Contains(query))
+                    if (task.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                        task.Description.Contains(query, StringComparison.OrdinalIgnoreCase))
                     {
                         results.Add(new SearchResult
                         {
@@ -541,48 +536,25 @@ namespace QAssistant
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"RefreshProjectList called. Projects count: {ViewModel.Projects?.Count ?? 0}");
-
-                // Clear the binding completely
                 ProjectList.ItemsSource = null;
-                System.Diagnostics.Debug.WriteLine("ItemsSource cleared");
 
                 if (ViewModel.Projects?.Count > 0)
                 {
-                    // Rebind the collection
                     ProjectList.ItemsSource = ViewModel.Projects;
-                    System.Diagnostics.Debug.WriteLine($"ItemsSource set to {ViewModel.Projects.Count} projects");
 
-                    // Force UI layout to update
-                    ProjectList.UpdateLayout();
-                    System.Diagnostics.Debug.WriteLine("ProjectList layout updated");
-
-                    // Select the appropriate project
                     if (ViewModel.SelectedProject != null)
-                    {
                         ProjectList.SelectedItem = ViewModel.SelectedProject;
-                        System.Diagnostics.Debug.WriteLine($"Selected project: {ViewModel.SelectedProject.Name}");
-                    }
                     else if (ViewModel.Projects.Count > 0)
-                    {
                         ProjectList.SelectedIndex = 0;
-                        System.Diagnostics.Debug.WriteLine($"Auto-selected first project");
-                    }
 
-                    // Force another layout pass to ensure items are visible
                     ProjectList.UpdateLayout();
-                    System.Diagnostics.Debug.WriteLine("ProjectList layout updated again");
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"No projects to display");
                 }
 
                 NavigateToCurrentTab();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"RefreshProjectList error: {ex.Message}\n{ex.StackTrace}");
+                System.Diagnostics.Debug.WriteLine($"RefreshProjectList error: {ex.Message}");
             }
         }
 
@@ -592,7 +564,6 @@ namespace QAssistant
         /// </summary>
         public void ForceRefreshProjectList()
         {
-            System.Diagnostics.Debug.WriteLine("ForceRefreshProjectList called from external source");
             this.DispatcherQueue.TryEnqueue(() =>
             {
                 RefreshProjectList();

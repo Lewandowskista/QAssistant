@@ -2,9 +2,11 @@ using QAssistant.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using QAssistant.Helpers;
 using QAssistant.Models;
 using System;
 using System.Linq;
+using System.Threading;
 
 namespace QAssistant.Views
 {
@@ -13,6 +15,7 @@ namespace QAssistant.Views
         private MainViewModel? _vm;
         private Note? _activeNote;
         private bool _isLoading = false;
+        private CancellationTokenSource? _saveCts;
 
         public NotesPage()
         {
@@ -74,7 +77,7 @@ namespace QAssistant.Views
             NotesList.ItemsSource = null;
             NotesList.ItemsSource = _vm?.SelectedProject?.Notes;
             NotesList.SelectedItem = _activeNote;
-            if (_vm != null) await _vm.SaveAsync();
+            await DebouncedSaveAsync();
         }
 
         private async void NoteContent_Changed(object sender, TextChangedEventArgs e)
@@ -83,7 +86,21 @@ namespace QAssistant.Views
             _activeNote.Content = NoteContentBox.Text;
             _activeNote.UpdatedAt = DateTime.Now;
             LastSavedText.Text = $"Last saved: {_activeNote.UpdatedAt:MMM d, yyyy h:mm tt}";
-            if (_vm != null) await _vm.SaveAsync();
+            await DebouncedSaveAsync();
+        }
+
+        private async System.Threading.Tasks.Task DebouncedSaveAsync()
+        {
+            _saveCts?.Cancel();
+            _saveCts = new CancellationTokenSource();
+            var token = _saveCts.Token;
+            try
+            {
+                await System.Threading.Tasks.Task.Delay(500, token);
+                if (!token.IsCancellationRequested && _vm != null)
+                    await _vm.SaveAsync();
+            }
+            catch (OperationCanceledException) { }
         }
 
         private async void AddNote_Click(object sender, RoutedEventArgs e)
@@ -123,6 +140,7 @@ namespace QAssistant.Views
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = this.XamlRoot
             };
+            DialogHelper.ApplyDarkTheme(dialog);
 
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary)
