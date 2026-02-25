@@ -6,7 +6,7 @@
     xmlns:local="using:QAssistant"
     xmlns:converters="using:QAssistant.Converters">
 
-    <Grid Background="#0F0F13">
+    <Grid Background="#0F0F13" RequestedTheme="Dark">
         <Grid.Resources>
             <converters:HexToBrushConverter x:Key="HexToBrushConverter"/>
         </Grid.Resources>

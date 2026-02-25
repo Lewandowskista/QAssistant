@@ -28,7 +28,7 @@ jobs:
         Start-Process -FilePath "WinAppRuntime.exe" -Args "--quiet" -Wait
 
     - name: Publish Single-File App
-      run: dotnet publish QAssistant/QAssistant.csproj -c Release -o ./publish_output
+      run: dotnet publish QAssistant/QAssistant.csproj -c Release -r win-x64 --self-contained true -o ./publish_output
 
     - name: Copy Windows App Runtime to output
       run: |
