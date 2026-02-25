@@ -14,6 +14,7 @@ using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace QAssistant.Views
 {
@@ -25,6 +26,10 @@ namespace QAssistant.Views
         private ProjectTask? _selectedTask;
         private string _activeTab = "Details";
         private string _lightboxUrl = string.Empty;
+        private bool _isAnalyzing = false;
+        private DispatcherTimer? _rateLimitDismissTimer;
+        private ProjectTask? _draggedTask;
+        private List<LinearWorkflowState> _linearStates = new();
 
         public TasksPage()
         {
@@ -48,23 +53,29 @@ namespace QAssistant.Views
             {
                 var list = tasks?.ToList() ?? new List<ProjectTask>();
 
+                var backlog = list.Where(t => t.Status == Models.TaskStatus.Backlog).ToList();
                 var todo = list.Where(t => t.Status == Models.TaskStatus.Todo).ToList();
                 var inProgress = list.Where(t => t.Status == Models.TaskStatus.InProgress).ToList();
                 var inReview = list.Where(t => t.Status == Models.TaskStatus.InReview).ToList();
                 var done = list.Where(t => t.Status == Models.TaskStatus.Done).ToList();
-                var blocked = list.Where(t => t.Status == Models.TaskStatus.Blocked).ToList();
+                var canceled = list.Where(t => t.Status == Models.TaskStatus.Canceled).ToList();
+                var duplicate = list.Where(t => t.Status == Models.TaskStatus.Duplicate).ToList();
 
+                BacklogList.ItemsSource = backlog;
                 TodoList.ItemsSource = todo;
                 InProgressList.ItemsSource = inProgress;
                 InReviewList.ItemsSource = inReview;
                 DoneList.ItemsSource = done;
-                BlockedList.ItemsSource = blocked;
+                CanceledList.ItemsSource = canceled;
+                DuplicateList.ItemsSource = duplicate;
 
+                BacklogCount.Text = backlog.Count.ToString();
                 TodoCount.Text = todo.Count.ToString();
                 InProgressCount.Text = inProgress.Count.ToString();
                 InReviewCount.Text = inReview.Count.ToString();
                 DoneCount.Text = done.Count.ToString();
-                BlockedCount.Text = blocked.Count.ToString();
+                CanceledCount.Text = canceled.Count.ToString();
+                DuplicateCount.Text = duplicate.Count.ToString();
             }
             catch (Exception ex)
             {
@@ -91,6 +102,12 @@ namespace QAssistant.Views
             {
                 var service = new LinearService(key);
                 _linearTasks = await service.GetIssuesAsync(teamId);
+
+                try
+                {
+                    _linearStates = await service.GetWorkflowStatesAsync();
+                }
+                catch { _linearStates = new(); }
 
                 if (_linearTasks.Count == 0)
                     StatusText.Text = "No issues found in this team.";
@@ -168,6 +185,7 @@ namespace QAssistant.Views
             DetailStatus.Foreground = new SolidColorBrush(Colors.White);
 
             DetailPriority.Text = task.Priority.ToString();
+            DetailPriority.Foreground = GetPriorityBrush(task.Priority);
 
             if (!string.IsNullOrEmpty(task.Assignee))
             {
@@ -215,6 +233,7 @@ namespace QAssistant.Views
                 LinearDetailIdentifier.Text = task.IssueIdentifier;
                 LinearDetailStatus.Text = task.Status.ToString();
                 LinearDetailPriority.Text = task.Priority.ToString();
+                LinearDetailPriority.Foreground = GetPriorityBrush(task.Priority);
             }
             else
             {
@@ -592,12 +611,23 @@ namespace QAssistant.Views
 
         private (Windows.UI.Color color, string text) GetStatusStyle(Models.TaskStatus status) => status switch
         {
+            Models.TaskStatus.Backlog => (Windows.UI.Color.FromArgb(255, 75, 85, 99), "Backlog"),
             Models.TaskStatus.Todo => (Windows.UI.Color.FromArgb(255, 55, 65, 81), "Todo"),
             Models.TaskStatus.InProgress => (Windows.UI.Color.FromArgb(255, 30, 58, 138), "In Progress"),
             Models.TaskStatus.InReview => (Windows.UI.Color.FromArgb(255, 76, 29, 149), "In Review"),
             Models.TaskStatus.Done => (Windows.UI.Color.FromArgb(255, 6, 78, 59), "Done"),
-            Models.TaskStatus.Blocked => (Windows.UI.Color.FromArgb(255, 127, 29, 29), "Blocked"),
+            Models.TaskStatus.Canceled => (Windows.UI.Color.FromArgb(255, 127, 29, 29), "Canceled"),
+            Models.TaskStatus.Duplicate => (Windows.UI.Color.FromArgb(255, 107, 114, 128), "Duplicate"),
             _ => (Windows.UI.Color.FromArgb(255, 55, 65, 81), status.ToString())
+        };
+
+        private static SolidColorBrush GetPriorityBrush(TaskPriority priority) => priority switch
+        {
+            TaskPriority.Low => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 16, 185, 129)),      // Green
+            TaskPriority.Medium => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 245, 158, 11)),    // Yellow
+            TaskPriority.High => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 249, 115, 22)),      // Orange
+            TaskPriority.Critical => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68)),   // Red
+            _ => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
         };
 
         private void DetailSetDueDate_Checked(object sender, RoutedEventArgs e)
@@ -787,37 +817,8 @@ namespace QAssistant.Views
                 return;
             }
 
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine("You are a senior QA engineer assistant. Analyze the following issue thoroughly and provide a detailed analysis for ALL four of the following sections. Each section MUST contain multiple sentences with specific, actionable insights.");
-            sb.AppendLine();
-            sb.AppendLine("Format your response using EXACTLY these markdown section headers (one per section):");
-            sb.AppendLine("## Root Cause Analysis");
-            sb.AppendLine("## Impact Assessment");
-            sb.AppendLine("## Suggested Fix");
-            sb.AppendLine("## Prevention Recommendations");
-            sb.AppendLine();
-            sb.AppendLine("Even if the issue description is brief, infer likely causes from the title and context and provide thorough analysis for every section. Do not skip any section. Do not combine sections.");
-            sb.AppendLine();
-            sb.AppendLine("---");
-            sb.AppendLine();
-            sb.AppendLine("## Issue Details");
-            sb.AppendLine($"**Title:** {_selectedTask.Title}");
-            if (!string.IsNullOrEmpty(_selectedTask.IssueIdentifier))
-                sb.AppendLine($"**ID:** {_selectedTask.IssueIdentifier}");
-            sb.AppendLine($"**Status:** {_selectedTask.Status}");
-            sb.AppendLine($"**Priority:** {_selectedTask.Priority}");
-            if (!string.IsNullOrEmpty(_selectedTask.Assignee))
-                sb.AppendLine($"**Assignee:** {_selectedTask.Assignee}");
-            if (!string.IsNullOrEmpty(_selectedTask.Labels))
-                sb.AppendLine($"**Labels:** {_selectedTask.Labels}");
-            if (_selectedTask.DueDate.HasValue)
-                sb.AppendLine($"**Due Date:** {_selectedTask.DueDate.Value:MMM d, yyyy}");
-            sb.AppendLine();
-            sb.AppendLine("## Description");
-            sb.AppendLine(string.IsNullOrWhiteSpace(_selectedTask.Description)
-                ? "(No description provided — analyze based on the title and available metadata.)"
-                : _selectedTask.Description);
-
+            // Fetch Linear comments if applicable (needed before building the prompt)
+            System.Collections.Generic.List<Models.LinearComment>? linearComments = null;
             if (_isLinearMode && !string.IsNullOrEmpty(_selectedTask.ExternalId))
             {
                 try
@@ -826,22 +827,16 @@ namespace QAssistant.Views
                     if (!string.IsNullOrEmpty(linearKey))
                     {
                         var linearService = new LinearService(linearKey);
-                        var comments = await linearService.GetCommentsAsync(_selectedTask.ExternalId);
-                        if (comments.Count > 0)
-                        {
-                            sb.AppendLine();
-                            sb.AppendLine("## Comments");
-                            foreach (var comment in comments)
-                            {
-                                sb.AppendLine($"**{comment.AuthorName}** ({comment.CreatedAt:MMM d, yyyy}):");
-                                sb.AppendLine(comment.Body);
-                                sb.AppendLine();
-                            }
-                        }
+                        linearComments = await linearService.GetCommentsAsync(_selectedTask.ExternalId);
+                        if (linearComments.Count == 0)
+                            linearComments = null;
                     }
                 }
                 catch { }
             }
+
+            // Build a compact TOON-formatted prompt to reduce token consumption
+            var toonPrompt = GeminiService.BuildToonPrompt(_selectedTask, linearComments);
 
             var loadingContent = new StackPanel
             {
@@ -860,7 +855,7 @@ namespace QAssistant.Views
 
             var loadingDialog = new ContentDialog
             {
-                Title = "🤖 Analyzing Issue...",
+                Title = "Analyzing Issue...",
                 Content = loadingContent,
                 CloseButtonText = "Cancel",
                 XamlRoot = this.XamlRoot
@@ -871,7 +866,7 @@ namespace QAssistant.Views
             var analyzeTask = System.Threading.Tasks.Task.Run(async () =>
             {
                 var service = new GeminiService(geminiKey);
-                analysisResult = await service.AnalyzeIssueAsync(sb.ToString());
+                analysisResult = await service.AnalyzeIssueAsync(toonPrompt);
             });
 
             // Use the in-page BusyOverlay instead of a ContentDialog to avoid
@@ -881,6 +876,16 @@ namespace QAssistant.Views
             try
             {
                 await analyzeTask;
+            }
+            catch (AggregateException ae) when (ae.InnerException is GeminiAllModelsRateLimitedException)
+            {
+                ShowRateLimitBanner();
+                return;
+            }
+            catch (GeminiAllModelsRateLimitedException)
+            {
+                ShowRateLimitBanner();
+                return;
             }
             catch (Exception ex)
             {
@@ -927,7 +932,20 @@ namespace QAssistant.Views
                     contentParts.Add(inlineContent);
                 contentParts.AddRange(bodyLines);
 
-                var sectionContent = string.Join("\n", contentParts).Trim();
+                var rawContent = string.Join("\n", contentParts).Trim();
+
+                // Clean markdown artifacts for better display and normalize bullets
+                var cleanedLines = rawContent.Split('\n').Select(line =>
+                {
+                    var trimmed = line.TrimStart();
+                    if (trimmed.StartsWith("### ")) return trimmed[4..];
+                    if (trimmed.StartsWith("## ")) return trimmed[3..];
+                    if (trimmed.StartsWith("# ")) return trimmed[2..];
+                    if (trimmed.StartsWith("- ")) return "\u2022 " + trimmed[2..];
+                    if (trimmed.StartsWith("* ") && !trimmed.StartsWith("**")) return "\u2022 " + trimmed[2..];
+                    return line;
+                });
+                var sectionContent = string.Join("\n", cleanedLines).Trim();
 
                 if (string.IsNullOrWhiteSpace(sectionContent)) continue;
 
@@ -935,28 +953,51 @@ namespace QAssistant.Views
                 {
                     Text = section,
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    FontFamily = new FontFamily("Segoe UI, Segoe UI Symbol, Segoe UI Emoji"),
                     FontSize = 13,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    Margin = new Thickness(0, 8, 0, 4)
+                    Margin = new Thickness(0, 8, 0, 4),
+                    IsTextSelectionEnabled = true
                 };
 
                 var sectionBodyBlock = new TextBlock
                 {
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                    FontFamily = new FontFamily("Segoe UI, Segoe UI Symbol, Segoe UI Emoji"),
                     FontSize = 12,
                     TextWrapping = TextWrapping.Wrap,
-                    LineHeight = 20
+                    LineHeight = 20,
+                    IsTextSelectionEnabled = true
                 };
 
-                var parts = System.Text.RegularExpressions.Regex.Split(sectionContent, @"\*\*");
-                for (int i = 0; i < parts.Length; i++)
+                // Parse inline formatting: **bold** and `code`
+                var inlinePattern = new System.Text.RegularExpressions.Regex(@"(\*\*.*?\*\*|`[^`]+`)");
+                var segments = inlinePattern.Split(sectionContent);
+                foreach (var segment in segments)
                 {
-                    var run = new Run
+                    if (string.IsNullOrEmpty(segment)) continue;
+
+                    if (segment.StartsWith("**") && segment.EndsWith("**") && segment.Length > 4)
                     {
-                        Text = parts[i],
-                        FontWeight = i % 2 == 1 ? Microsoft.UI.Text.FontWeights.Bold : Microsoft.UI.Text.FontWeights.Normal
-                    };
-                    sectionBodyBlock.Inlines.Add(run);
+                        sectionBodyBlock.Inlines.Add(new Run
+                        {
+                            Text = segment[2..^2],
+                            FontWeight = Microsoft.UI.Text.FontWeights.Bold
+                        });
+                    }
+                    else if (segment.StartsWith('`') && segment.EndsWith('`') && segment.Length > 2)
+                    {
+                        sectionBodyBlock.Inlines.Add(new Run
+                        {
+                            Text = segment[1..^1],
+                            FontFamily = new FontFamily("Consolas"),
+                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
+                        });
+                    }
+                    else
+                    {
+                        sectionBodyBlock.Inlines.Add(new Run { Text = segment });
+                    }
                 }
 
                 contentStack.Children.Add(sectionHeader);
@@ -995,7 +1036,7 @@ namespace QAssistant.Views
 
             var resultDialog = new ContentDialog
             {
-                Title = $"🤖 AI Analysis — {_selectedTask.Title}",
+                Title = $"AI Analysis — {_selectedTask.Title}",
                 Content = resultContent,
                 CloseButtonText = "Close",
                 PrimaryButtonText = "Copy to Clipboard",
@@ -1013,6 +1054,103 @@ namespace QAssistant.Views
                 dataPackage.SetText(analysisResult);
                 Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
             }
+        }
+
+        private void KanbanList_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+        {
+            if (e.Items.Count > 0 && e.Items[0] is ProjectTask task)
+            {
+                _draggedTask = task;
+                e.Data.RequestedOperation = DataPackageOperation.Move;
+            }
+        }
+
+        private void KanbanColumn_DragOver(object sender, Microsoft.UI.Xaml.DragEventArgs e)
+        {
+            e.AcceptedOperation = DataPackageOperation.Move;
+        }
+
+        private async void KanbanColumn_Drop(object sender, Microsoft.UI.Xaml.DragEventArgs e)
+        {
+            if (_draggedTask == null) return;
+
+            var border = sender as Border;
+            var tag = border?.Tag?.ToString();
+            if (string.IsNullOrEmpty(tag)) return;
+
+            if (!Enum.TryParse<Models.TaskStatus>(tag, out var newStatus)) return;
+            if (_draggedTask.Status == newStatus) { _draggedTask = null; return; }
+
+            var task = _draggedTask;
+            _draggedTask = null;
+            task.Status = newStatus;
+
+            if (_isLinearMode && task.Source == TaskSource.Linear && !string.IsNullOrEmpty(task.ExternalId))
+            {
+                var key = CredentialService.LoadCredential("LinearApiKey");
+
+                // Lazily fetch workflow states if they weren't loaded yet
+                if (_linearStates.Count == 0 && !string.IsNullOrEmpty(key))
+                {
+                    try
+                    {
+                        var svc = new LinearService(key);
+                        _linearStates = await svc.GetWorkflowStatesAsync();
+                    }
+                    catch { _linearStates = new(); }
+                }
+
+                var matchedStateId = LinearService.FindMatchingStateId(newStatus, _linearStates);
+
+                if (matchedStateId != null)
+                {
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(key))
+                        {
+                            var service = new LinearService(key);
+                            await service.UpdateIssueStatusAsync(task.ExternalId, matchedStateId);
+                            StatusText.Visibility = Visibility.Visible;
+                            StatusText.Text = $"Updated {task.IssueIdentifier} → {newStatus}";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        StatusText.Visibility = Visibility.Visible;
+                        StatusText.Text = $"Failed to update Linear: {ex.Message}";
+                    }
+                }
+                else
+                {
+                    StatusText.Visibility = Visibility.Visible;
+                    StatusText.Text = $"No matching Linear state for '{newStatus}'. Check team workflow states.";
+                }
+
+                RefreshBoard(_linearTasks);
+            }
+            else
+            {
+                if (_vm?.SelectedProject != null)
+                {
+                    await _vm.SaveAsync();
+                    RefreshBoard(_vm.SelectedProject.Tasks);
+                }
+            }
+        }
+
+        private void ShowRateLimitBanner()
+        {
+            BusyOverlay.Visibility = Visibility.Collapsed;
+            RateLimitBanner.Visibility = Visibility.Visible;
+
+            _rateLimitDismissTimer?.Stop();
+            _rateLimitDismissTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            _rateLimitDismissTimer.Tick += (_, _) =>
+            {
+                RateLimitBanner.Visibility = Visibility.Collapsed;
+                _rateLimitDismissTimer.Stop();
+            };
+            _rateLimitDismissTimer.Start();
         }
     }
 }

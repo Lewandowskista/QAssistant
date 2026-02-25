@@ -252,8 +252,15 @@ namespace QAssistant
             await ViewModel.SaveAsync();
         }
 
-        private async void ProjectList_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+        private async void ProjectList_RightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)
         {
+            // Select the right-tapped item
+            if ((e.OriginalSource as FrameworkElement)?.DataContext is Project project)
+            {
+                ProjectList.SelectedItem = project;
+                ViewModel.SelectedProject = project;
+            }
+
             if (ViewModel.SelectedProject == null) return;
 
             var nameBox = new TextBox

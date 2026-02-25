@@ -28,7 +28,7 @@
                 <ListView Grid.Row="1" x:Name="LinksList"
           Background="Transparent" SelectionMode="Single"
           SelectionChanged="LinksList_SelectionChanged"
-          DoubleTapped="LinksList_DoubleTapped"
+          RightTapped="LinksList_RightTapped"
           CanReorderItems="True" CanDragItems="True"
           AllowDrop="True"
           DragItemsCompleted="LinksList_DragItemsCompleted">

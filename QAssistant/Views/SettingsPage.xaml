@@ -43,7 +43,7 @@
                     </Grid>
 
                     <!-- Refresh Projects Sidebar -->
-                    <Button x:Name="RefreshProjectsButton" Content="🔄 Refresh Projects Sidebar"
+                    <Button x:Name="RefreshProjectsButton" Content="Refresh Projects Sidebar"
                     Click="RefreshProjects_Click"
                     Background="#252535" Foreground="#A78BFA"
                     CornerRadius="8" Padding="12,8"
@@ -57,13 +57,24 @@
             <Border Background="#1A1A24" CornerRadius="12"
                     BorderBrush="#2A2A3A" BorderThickness="1" Padding="24">
                 <StackPanel Spacing="16">
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="Linear" Foreground="#E2E8F0"
-                                   FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock Foreground="#6B7280" FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Text="Get your API key from linear.app → Settings → API → Personal API Keys"/>
-                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="Linear" Foreground="#E2E8F0"
+                                       FontSize="16" FontWeight="SemiBold"/>
+                            <TextBlock Foreground="#6B7280" FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Text="Get your API key from linear.app → Settings → API → Personal API Keys"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Get API Key"
+                                Click="OpenLinearKeys_Click"
+                                Background="#252535" Foreground="#A78BFA"
+                                CornerRadius="8" Padding="12,8"
+                                VerticalAlignment="Top"/>
+                    </Grid>
 
                     <StackPanel Spacing="8">
                         <TextBlock Text="API Key" Foreground="#9CA3AF" FontSize="12"/>
@@ -121,13 +132,24 @@
             <Border Background="#1A1A24" CornerRadius="12"
                     BorderBrush="#2A2A3A" BorderThickness="1" Padding="24">
                 <StackPanel Spacing="16">
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="Jira" Foreground="#E2E8F0"
-                                   FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock Foreground="#6B7280" FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Text="Get your API token from id.atlassian.com → Security → API tokens"/>
-                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="Jira" Foreground="#E2E8F0"
+                                       FontSize="16" FontWeight="SemiBold"/>
+                            <TextBlock Foreground="#6B7280" FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Text="Get your API token from id.atlassian.com → Security → API tokens"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Get API Token"
+                                Click="OpenJiraKeys_Click"
+                                Background="#252535" Foreground="#A78BFA"
+                                CornerRadius="8" Padding="12,8"
+                                VerticalAlignment="Top"/>
+                    </Grid>
 
                     <StackPanel Spacing="8">
                         <TextBlock Text="Domain" Foreground="#9CA3AF" FontSize="12"/>
@@ -207,13 +229,24 @@
             <Border Background="#1A1A24" CornerRadius="12"
                     BorderBrush="#2A2A3A" BorderThickness="1" Padding="24">
                 <StackPanel Spacing="16">
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="Google AI Studio" Foreground="#E2E8F0"
-                                   FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock Foreground="#6B7280" FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Text="Get your API key from aistudio.google.com → API Keys"/>
-                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="Google AI Studio" Foreground="#E2E8F0"
+                                       FontSize="16" FontWeight="SemiBold"/>
+                            <TextBlock Foreground="#6B7280" FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Text="Get your API key from aistudio.google.com → API Keys"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Get API Key"
+                                Click="OpenGeminiKeys_Click"
+                                Background="#252535" Foreground="#A78BFA"
+                                CornerRadius="8" Padding="12,8"
+                                VerticalAlignment="Top"/>
+                    </Grid>
 
                     <StackPanel Spacing="8">
                         <TextBlock Text="API Key" Foreground="#9CA3AF" FontSize="12"/>

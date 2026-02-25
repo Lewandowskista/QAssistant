@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace QAssistant.Models
 {
@@ -8,5 +9,6 @@ namespace QAssistant.Models
         public string Title { get; set; } = "Untitled Note";
         public string Content { get; set; } = string.Empty;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
+        public List<FileAttachment> Attachments { get; set; } = new();
     }
 }

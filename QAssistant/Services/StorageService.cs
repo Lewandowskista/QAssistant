@@ -18,6 +18,7 @@ namespace QAssistant.Services
     [JsonSerializable(typeof(LinkType))]
     [JsonSerializable(typeof(Models.TaskStatus))]
     [JsonSerializable(typeof(TaskPriority))]
+    [JsonSerializable(typeof(AttachmentScope))]
     [JsonSourceGenerationOptions(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNameCaseInsensitive = true,

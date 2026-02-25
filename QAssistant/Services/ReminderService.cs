@@ -48,7 +48,7 @@ namespace QAssistant.Services
             {
                 foreach (var task in project.Tasks)
                 {
-                    if (task.Status == Models.TaskStatus.Done) continue;
+                    if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate) continue;
                     if (task.DueDate == null) continue;
 
                     var due = task.DueDate.Value.Date;
@@ -90,7 +90,7 @@ namespace QAssistant.Services
             {
                 foreach (var task in project.Tasks)
                 {
-                    if (task.Status == Models.TaskStatus.Done) continue;
+                    if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate) continue;
                     total++;
                     if (task.DueDate?.Date == today) dueToday++;
                     else if (task.DueDate?.Date < today) overdue++;

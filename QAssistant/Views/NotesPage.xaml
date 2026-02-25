@@ -29,7 +29,8 @@
                           SelectionChanged="NotesList_SelectionChanged"
                           CanReorderItems="True" CanDragItems="True"
                           AllowDrop="True"
-                          DragItemsCompleted="NotesList_DragItemsCompleted">
+                          DragItemsCompleted="NotesList_DragItemsCompleted"
+                          KeyDown="NotesList_KeyDown">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Padding" Value="12,8"/>
@@ -106,19 +107,25 @@
                          Padding="20,16"
                          TextChanged="NoteTitle_Changed"/>
 
-                <!-- Content -->
-                <TextBox Grid.Row="1"
-                         x:Name="NoteContentBox"
-                         PlaceholderText="Write your note here..."
-                         AcceptsReturn="True"
-                         TextWrapping="Wrap"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         Foreground="#E2E8F0"
-                         Padding="20,16"
-                         FontSize="14"
-                         VerticalAlignment="Stretch"
-                         TextChanged="NoteContent_Changed"/>
+                <!-- Content + inline attachments -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBox x:Name="NoteContentBox"
+                                 PlaceholderText="Write your note here..."
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Foreground="#E2E8F0"
+                                 Padding="20,16"
+                                 FontSize="14"
+                                 MinHeight="200"
+                                 TextChanged="NoteContent_Changed"/>
+
+                        <StackPanel x:Name="AttachmentItems" Spacing="8"
+                                    Margin="20,0,20,16"/>
+                    </StackPanel>
+                </ScrollViewer>
 
                 <!-- Footer -->
                 <Border Grid.Row="2" Background="#13131A"
@@ -128,13 +135,27 @@
                         <TextBlock x:Name="LastSavedText"
                                    Foreground="#6B7280" FontSize="11"
                                    VerticalAlignment="Center"/>
-                        <Button Content="Delete Note"
-                                Click="DeleteNote_Click"
-                                HorizontalAlignment="Right"
-                                Background="#3F1A1A"
-                                Foreground="#F87171"
-                                CornerRadius="6"
-                                Padding="12,6"/>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right" Spacing="6">
+                            <Button Content="Paste"
+                                    Click="PasteMedia_Click"
+                                    Background="#252535"
+                                    Foreground="#A78BFA"
+                                    CornerRadius="6"
+                                    Padding="10,6"/>
+                            <Button Content="+ Attach"
+                                    Click="AttachFile_Click"
+                                    Background="#252535"
+                                    Foreground="#A78BFA"
+                                    CornerRadius="6"
+                                    Padding="10,6"/>
+                            <Button Content="Delete Note"
+                                    Click="DeleteNote_Click"
+                                    Background="#3F1A1A"
+                                    Foreground="#F87171"
+                                    CornerRadius="6"
+                                    Padding="12,6"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
             </Grid>

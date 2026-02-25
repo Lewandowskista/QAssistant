@@ -16,6 +16,9 @@ namespace QAssistant.Models
         public Guid? NoteId { get; set; }
 
         public bool IsImage => MimeType.StartsWith("image/");
+        public bool IsVideo => MimeType.StartsWith("video/");
+        public bool IsAudio => MimeType.StartsWith("audio/");
+        public bool IsMedia => IsImage || IsVideo || IsAudio;
 
         public string FileSizeDisplay => FileSizeBytes < 1024 * 1024
             ? $"{FileSizeBytes / 1024} KB"

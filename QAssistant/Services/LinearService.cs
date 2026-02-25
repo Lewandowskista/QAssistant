@@ -196,7 +196,24 @@ namespace QAssistant.Services
                     success
                 }}
             }}";
-            await PostQueryAsync(mutation);
+            var response = await PostQueryAsync(mutation);
+
+            using var doc = JsonDocument.Parse(response);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0)
+            {
+                var msg = errors[0].TryGetProperty("message", out var msgEl) ? msgEl.GetString() : "Unknown error";
+                throw new Exception($"Linear API error: {msg}");
+            }
+
+            if (root.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("issueUpdate", out var issueUpdate) &&
+                issueUpdate.TryGetProperty("success", out var success) &&
+                !success.GetBoolean())
+            {
+                throw new Exception("Linear rejected the status update.");
+            }
         }
 
         public async Task<List<LinearComment>> GetCommentsAsync(string issueId)
@@ -306,11 +323,14 @@ namespace QAssistant.Services
 
         private static Models.TaskStatus MapLinearStatus(string state) => state.ToLower() switch
         {
-            "done" or "completed" => Models.TaskStatus.Done,
+            "backlog" or "triage" or "unstarted" => Models.TaskStatus.Backlog,
+            "todo" => Models.TaskStatus.Todo,
             "in progress" or "started" => Models.TaskStatus.InProgress,
-            "in review" => Models.TaskStatus.InReview,
-            "cancelled" or "blocked" => Models.TaskStatus.Blocked,
-            _ => Models.TaskStatus.Todo
+            "in review" or "review" or "qa" => Models.TaskStatus.InReview,
+            "done" or "completed" or "closed" => Models.TaskStatus.Done,
+            "canceled" or "cancelled" => Models.TaskStatus.Canceled,
+            "duplicate" => Models.TaskStatus.Duplicate,
+            _ => Models.TaskStatus.Backlog
         };
 
         private static TaskPriority MapLinearPriority(int priority) => priority switch
@@ -320,9 +340,89 @@ namespace QAssistant.Services
             3 => TaskPriority.Medium,
             _ => TaskPriority.Low
         };
+
+        public async Task<List<LinearWorkflowState>> GetWorkflowStatesAsync()
+        {
+            var query = @"
+    {
+        workflowStates(first: 200) {
+            nodes {
+                id
+                name
+            }
+        }
+    }";
+
+            var response = await PostQueryAsync(query);
+            var states = new List<LinearWorkflowState>();
+
+            try
+            {
+                using var doc = JsonDocument.Parse(response);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty("data", out var data)) return states;
+                if (!data.TryGetProperty("workflowStates", out var statesEl)) return states;
+
+                var nodes = statesEl.GetProperty("nodes");
+                foreach (var node in nodes.EnumerateArray())
+                {
+                    states.Add(new LinearWorkflowState
+                    {
+                        Id = node.GetProperty("id").GetString() ?? "",
+                        Name = node.GetProperty("name").GetString() ?? ""
+                    });
+                }
+            }
+            catch { }
+
+            return states;
+        }
+
+        public static string? FindMatchingStateId(Models.TaskStatus targetStatus, List<LinearWorkflowState> states)
+        {
+            if (states.Count == 0) return null;
+
+            // First pass: find a state whose name maps back to the target status via MapLinearStatus.
+            // This reuses the exact same inbound mapping logic, so it handles custom names
+            // like "Backlog", "Started", "Completed", "Cancelled", etc.
+            foreach (var state in states)
+            {
+                if (MapLinearStatus(state.Name) == targetStatus)
+                    return state.Id;
+            }
+
+            // Second pass: try common default names as a fallback
+            var candidateNames = targetStatus switch
+            {
+                Models.TaskStatus.Backlog => new[] { "Backlog", "Triage", "Unstarted" },
+                Models.TaskStatus.Todo => new[] { "Todo" },
+                Models.TaskStatus.InProgress => new[] { "In Progress", "Started", "Doing" },
+                Models.TaskStatus.InReview => new[] { "In Review", "Review", "QA" },
+                Models.TaskStatus.Done => new[] { "Done", "Completed", "Closed" },
+                Models.TaskStatus.Canceled => new[] { "Canceled", "Cancelled" },
+                Models.TaskStatus.Duplicate => new[] { "Duplicate" },
+                _ => Array.Empty<string>()
+            };
+
+            foreach (var candidate in candidateNames)
+            {
+                var match = states.FirstOrDefault(s =>
+                    s.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase));
+                if (match != null) return match.Id;
+            }
+
+            return null;
+        }
     }
 
     public class LinearTeam
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
+
+    public class LinearWorkflowState
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;

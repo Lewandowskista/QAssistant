@@ -140,6 +140,11 @@ namespace QAssistant.Views
         }
 
         // ── Linear ───────────────────────────────────────────────────
+        private async void OpenLinearKeys_Click(object sender, RoutedEventArgs e)
+        {
+            await Windows.System.Launcher.LaunchUriAsync(new Uri("https://linear.app/settings/api"));
+        }
+
         private void SaveLinear_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(LinearApiKeyBox.Password) ||
@@ -193,6 +198,11 @@ namespace QAssistant.Views
         }
 
         // ── Jira ─────────────────────────────────────────────────────
+        private async void OpenJiraKeys_Click(object sender, RoutedEventArgs e)
+        {
+            await Windows.System.Launcher.LaunchUriAsync(new Uri("https://id.atlassian.com/manage-profile/security/api-tokens"));
+        }
+
         private void SaveJira_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(JiraDomainBox.Text) ||
@@ -254,6 +264,11 @@ namespace QAssistant.Views
             JiraApiTokenBox.Password = string.Empty;
             JiraProjectKeyBox.Text = string.Empty;
             ShowStatus(JiraStatusBorder, JiraStatusText, "Jira disconnected.", true);
+        }
+
+        private async void OpenGeminiKeys_Click(object sender, RoutedEventArgs e)
+        {
+            await Windows.System.Launcher.LaunchUriAsync(new Uri("https://aistudio.google.com/apikey"));
         }
 
         private void SaveGeminiKey_Click(object sender, RoutedEventArgs e)

@@ -81,8 +81,12 @@ namespace QAssistant.Views
             LinksList.ItemsSource = _vm.SelectedProject.Links;
         }
 
-        private async void LinksList_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+        private async void LinksList_RightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)
         {
+            // Select the right-tapped item
+            if ((e.OriginalSource as FrameworkElement)?.DataContext is EmbedLink tappedLink)
+                LinksList.SelectedItem = tappedLink;
+
             if (LinksList.SelectedItem is not EmbedLink link) return;
 
             var titleBox = new TextBox { Text = link.Title, PlaceholderText = "Title..." };

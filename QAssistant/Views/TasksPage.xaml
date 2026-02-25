@@ -3,7 +3,12 @@
     x:Class="QAssistant.Views.TasksPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:QAssistant.Converters"
     Background="#0F0F13">
+
+    <Page.Resources>
+        <converters:TaskPriorityToBrushConverter x:Key="PriorityColorConverter"/>
+    </Page.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -52,6 +57,7 @@
 
 
         <!-- Main Content: Kanban + Detail Panel -->
+        <!-- Main Content: Kanban + Detail Panel -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -64,21 +70,24 @@
                           VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal" Spacing="12" Padding="16">
 
-                    <!-- TODO -->
+                    <!-- BACKLOG -->
                     <Border Width="240" Background="#1A1A24" CornerRadius="12"
                             Padding="12" BorderBrush="#2A2A3A" BorderThickness="1"
-                            VerticalAlignment="Top">
+                            VerticalAlignment="Top"
+                            AllowDrop="True" Tag="Backlog"
+                            DragOver="KanbanColumn_DragOver" Drop="KanbanColumn_Drop">
                         <StackPanel Spacing="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="TODO" Foreground="#6B7280"
+                                <TextBlock Text="BACKLOG" Foreground="#9CA3AF"
                                            FontSize="11" FontWeight="SemiBold" CharacterSpacing="150"/>
                                 <Border Background="#252535" CornerRadius="8" Padding="6,2">
-                                    <TextBlock x:Name="TodoCount" Text="0" Foreground="#6B7280" FontSize="11"/>
+                                    <TextBlock x:Name="BacklogCount" Text="0" Foreground="#6B7280" FontSize="11"/>
                                 </Border>
                             </StackPanel>
-                            <ListView x:Name="TodoList" Background="Transparent"
+                            <ListView x:Name="BacklogList" Background="Transparent"
                                       SelectionMode="None" ItemClick="Task_Click"
-                                      IsItemClickEnabled="True" MaxHeight="600">
+                                      IsItemClickEnabled="True" MaxHeight="600"
+                                      CanDragItems="True" DragItemsStarting="KanbanList_DragItemsStarting">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="0"/>
@@ -94,7 +103,51 @@
                                             <StackPanel Spacing="4">
                                                 <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
-                                                <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
+                                                <TextBlock Text="{Binding Priority}" Foreground="{Binding Priority, Converter={StaticResource PriorityColorConverter}}" FontSize="11"/>
+                                                <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
+                                                <TextBlock Text="{Binding Labels}" Foreground="#A78BFA" FontSize="11" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- TODO -->
+                    <Border Width="240" Background="#1A1A24" CornerRadius="12"
+                            Padding="12" BorderBrush="#2A2A3A" BorderThickness="1"
+                            VerticalAlignment="Top"
+                            AllowDrop="True" Tag="Todo"
+                            DragOver="KanbanColumn_DragOver" Drop="KanbanColumn_Drop">
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="TODO" Foreground="#6B7280"
+                                           FontSize="11" FontWeight="SemiBold" CharacterSpacing="150"/>
+                                <Border Background="#252535" CornerRadius="8" Padding="6,2">
+                                    <TextBlock x:Name="TodoCount" Text="0" Foreground="#6B7280" FontSize="11"/>
+                                </Border>
+                            </StackPanel>
+                            <ListView x:Name="TodoList" Background="Transparent"
+                                      SelectionMode="None" ItemClick="Task_Click"
+                                      IsItemClickEnabled="True" MaxHeight="600"
+                                      CanDragItems="True" DragItemsStarting="KanbanList_DragItemsStarting">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0,4"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#252535" CornerRadius="8"
+                                                Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
+                                                <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Priority}" Foreground="{Binding Priority, Converter={StaticResource PriorityColorConverter}}" FontSize="11"/>
                                                 <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Labels}" Foreground="#A78BFA" FontSize="11" TextWrapping="Wrap"/>
                                             </StackPanel>
@@ -108,7 +161,9 @@
                     <!-- IN PROGRESS -->
                     <Border Width="240" Background="#1A1A24" CornerRadius="12"
                             Padding="12" BorderBrush="#2A2A3A" BorderThickness="1"
-                            VerticalAlignment="Top">
+                            VerticalAlignment="Top"
+                            AllowDrop="True" Tag="InProgress"
+                            DragOver="KanbanColumn_DragOver" Drop="KanbanColumn_Drop">
                         <StackPanel Spacing="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="IN PROGRESS" Foreground="#3B82F6"
@@ -119,7 +174,8 @@
                             </StackPanel>
                             <ListView x:Name="InProgressList" Background="Transparent"
                                       SelectionMode="None" ItemClick="Task_Click"
-                                      IsItemClickEnabled="True" MaxHeight="600">
+                                      IsItemClickEnabled="True" MaxHeight="600"
+                                      CanDragItems="True" DragItemsStarting="KanbanList_DragItemsStarting">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="0"/>
@@ -135,7 +191,7 @@
                                             <StackPanel Spacing="4">
                                                 <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
-                                                <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
+                                                <TextBlock Text="{Binding Priority}" Foreground="{Binding Priority, Converter={StaticResource PriorityColorConverter}}" FontSize="11"/>
                                                 <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Labels}" Foreground="#A78BFA" FontSize="11" TextWrapping="Wrap"/>
                                             </StackPanel>
@@ -149,7 +205,9 @@
                     <!-- IN REVIEW -->
                     <Border Width="240" Background="#1A1A24" CornerRadius="12"
                             Padding="12" BorderBrush="#2A2A3A" BorderThickness="1"
-                            VerticalAlignment="Top">
+                            VerticalAlignment="Top"
+                            AllowDrop="True" Tag="InReview"
+                            DragOver="KanbanColumn_DragOver" Drop="KanbanColumn_Drop">
                         <StackPanel Spacing="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="IN REVIEW" Foreground="#A78BFA"
@@ -160,7 +218,8 @@
                             </StackPanel>
                             <ListView x:Name="InReviewList" Background="Transparent"
                                       SelectionMode="None" ItemClick="Task_Click"
-                                      IsItemClickEnabled="True" MaxHeight="600">
+                                      IsItemClickEnabled="True" MaxHeight="600"
+                                      CanDragItems="True" DragItemsStarting="KanbanList_DragItemsStarting">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="0"/>
@@ -176,7 +235,7 @@
                                             <StackPanel Spacing="4">
                                                 <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
-                                                <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
+                                                <TextBlock Text="{Binding Priority}" Foreground="{Binding Priority, Converter={StaticResource PriorityColorConverter}}" FontSize="11"/>
                                                 <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Labels}" Foreground="#A78BFA" FontSize="11" TextWrapping="Wrap"/>
                                             </StackPanel>
@@ -190,7 +249,9 @@
                     <!-- DONE -->
                     <Border Width="240" Background="#1A1A24" CornerRadius="12"
                             Padding="12" BorderBrush="#2A2A3A" BorderThickness="1"
-                            VerticalAlignment="Top">
+                            VerticalAlignment="Top"
+                            AllowDrop="True" Tag="Done"
+                            DragOver="KanbanColumn_DragOver" Drop="KanbanColumn_Drop">
                         <StackPanel Spacing="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="DONE" Foreground="#10B981"
@@ -201,7 +262,8 @@
                             </StackPanel>
                             <ListView x:Name="DoneList" Background="Transparent"
                                       SelectionMode="None" ItemClick="Task_Click"
-                                      IsItemClickEnabled="True" MaxHeight="600">
+                                      IsItemClickEnabled="True" MaxHeight="600"
+                                      CanDragItems="True" DragItemsStarting="KanbanList_DragItemsStarting">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="0"/>
@@ -217,7 +279,7 @@
                                             <StackPanel Spacing="4">
                                                 <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
-                                                <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
+                                                <TextBlock Text="{Binding Priority}" Foreground="{Binding Priority, Converter={StaticResource PriorityColorConverter}}" FontSize="11"/>
                                                 <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Labels}" Foreground="#A78BFA" FontSize="11" TextWrapping="Wrap"/>
                                             </StackPanel>
@@ -228,21 +290,24 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- BLOCKED -->
+                    <!-- CANCELED -->
                     <Border Width="240" Background="#1A1A24" CornerRadius="12"
                             Padding="12" BorderBrush="#2A2A3A" BorderThickness="1"
-                            VerticalAlignment="Top">
+                            VerticalAlignment="Top"
+                            AllowDrop="True" Tag="Canceled"
+                            DragOver="KanbanColumn_DragOver" Drop="KanbanColumn_Drop">
                         <StackPanel Spacing="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="BLOCKED" Foreground="#EF4444"
+                                <TextBlock Text="CANCELED" Foreground="#EF4444"
                                            FontSize="11" FontWeight="SemiBold" CharacterSpacing="150"/>
                                 <Border Background="#252535" CornerRadius="8" Padding="6,2">
-                                    <TextBlock x:Name="BlockedCount" Text="0" Foreground="#6B7280" FontSize="11"/>
+                                    <TextBlock x:Name="CanceledCount" Text="0" Foreground="#6B7280" FontSize="11"/>
                                 </Border>
                             </StackPanel>
-                            <ListView x:Name="BlockedList" Background="Transparent"
+                            <ListView x:Name="CanceledList" Background="Transparent"
                                       SelectionMode="None" ItemClick="Task_Click"
-                                      IsItemClickEnabled="True" MaxHeight="600">
+                                      IsItemClickEnabled="True" MaxHeight="600"
+                                      CanDragItems="True" DragItemsStarting="KanbanList_DragItemsStarting">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="0"/>
@@ -258,7 +323,51 @@
                                             <StackPanel Spacing="4">
                                                 <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
-                                                <TextBlock Text="{Binding Priority}" Foreground="#F59E0B" FontSize="11"/>
+                                                <TextBlock Text="{Binding Priority}" Foreground="{Binding Priority, Converter={StaticResource PriorityColorConverter}}" FontSize="11"/>
+                                                <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
+                                                <TextBlock Text="{Binding Labels}" Foreground="#A78BFA" FontSize="11" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- DUPLICATE -->
+                    <Border Width="240" Background="#1A1A24" CornerRadius="12"
+                            Padding="12" BorderBrush="#2A2A3A" BorderThickness="1"
+                            VerticalAlignment="Top"
+                            AllowDrop="True" Tag="Duplicate"
+                            DragOver="KanbanColumn_DragOver" Drop="KanbanColumn_Drop">
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="DUPLICATE" Foreground="#F59E0B"
+                                           FontSize="11" FontWeight="SemiBold" CharacterSpacing="150"/>
+                                <Border Background="#252535" CornerRadius="8" Padding="6,2">
+                                    <TextBlock x:Name="DuplicateCount" Text="0" Foreground="#6B7280" FontSize="11"/>
+                                </Border>
+                            </StackPanel>
+                            <ListView x:Name="DuplicateList" Background="Transparent"
+                                      SelectionMode="None" ItemClick="Task_Click"
+                                      IsItemClickEnabled="True" MaxHeight="600"
+                                      CanDragItems="True" DragItemsStarting="KanbanList_DragItemsStarting">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0,4"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#252535" CornerRadius="8"
+                                                Padding="12" BorderBrush="#2A2A3A" BorderThickness="1">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="{Binding IssueIdentifier}" Foreground="#6B7280" FontSize="11"/>
+                                                <TextBlock Text="{Binding Title}" Foreground="#E2E8F0" FontSize="13" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Priority}" Foreground="{Binding Priority, Converter={StaticResource PriorityColorConverter}}" FontSize="11"/>
                                                 <TextBlock Text="{Binding Assignee}" Foreground="#6B7280" FontSize="11"/>
                                                 <TextBlock Text="{Binding Labels}" Foreground="#A78BFA" FontSize="11" TextWrapping="Wrap"/>
                                             </StackPanel>
@@ -302,10 +411,12 @@
                                     </Border>
                                 </StackPanel>
                             </StackPanel>
-                            <Button Content="✕" Click="CloseDetail_Click"
+                            <Button Click="CloseDetail_Click"
                                     HorizontalAlignment="Right" VerticalAlignment="Top"
                                     Background="Transparent" BorderThickness="0"
-                                    Foreground="#6B7280" Padding="8,4" FontSize="14"/>
+                                    Foreground="#6B7280" Padding="8,4">
+                                <FontIcon Glyph="&#xE711;" FontSize="12" FontFamily="Segoe Fluent Icons"/>
+                            </Button>
                         </Grid>
                     </Border>
 
@@ -454,7 +565,7 @@
                             Background="#0F0F13">
                         <StackPanel Spacing="8">
                             <!-- Analyze button (top, full width) -->
-                            <Button x:Name="DetailAnalyzeBtn" Content="🤖 Analyze" Click="AnalyzeIssue_Click"
+                            <Button x:Name="DetailAnalyzeBtn" Content="Analyze" Click="AnalyzeIssue_Click"
                                     HorizontalAlignment="Stretch"
                                     Background="#A78BFA" Foreground="White"
                                     CornerRadius="8" Padding="14,8"/>
@@ -510,10 +621,12 @@
                         <TextBlock Text="Media Viewer" Foreground="#E2E8F0"
                                    FontSize="14" FontWeight="SemiBold"
                                    VerticalAlignment="Center"/>
-                        <Button Content="✕" Click="CloseLightbox_Click"
+                        <Button Click="CloseLightbox_Click"
                                 HorizontalAlignment="Right"
                                 Background="Transparent" BorderThickness="0"
-                                Foreground="#6B7280" Padding="8,4" FontSize="14"/>
+                                Foreground="#6B7280" Padding="8,4">
+                            <FontIcon Glyph="&#xE711;" FontSize="12" FontFamily="Segoe Fluent Icons"/>
+                        </Button>
                     </Grid>
                 </Border>
 
@@ -544,6 +657,22 @@
                 </Border>
             </Grid>
         </Grid>
+
+        <!-- Rate-limit notification banner -->
+        <Border x:Name="RateLimitBanner" Visibility="Collapsed"
+                Grid.Row="0" Grid.RowSpan="2"
+                VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                Margin="0,0,0,16"
+                Background="#3C1414" BorderBrush="#F87171" BorderThickness="1"
+                CornerRadius="8" Padding="16,10">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE7BA;" FontSize="14"
+                          Foreground="#F87171" VerticalAlignment="Center"/>
+                <TextBlock x:Name="RateLimitText"
+                           Text="All AI models are currently rate-limited. Please try again later."
+                           Foreground="#FCA5A5" FontSize="12" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
 
     </Grid>
 </Page>

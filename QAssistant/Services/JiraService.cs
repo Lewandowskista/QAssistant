@@ -185,7 +185,7 @@ namespace QAssistant.Services
             "done" or "closed" or "resolved" => Models.TaskStatus.Done,
             "in progress" or "in development" => Models.TaskStatus.InProgress,
             "in review" or "code review" or "testing" => Models.TaskStatus.InReview,
-            "blocked" or "impediment" => Models.TaskStatus.Blocked,
+            "blocked" or "impediment" => Models.TaskStatus.Canceled,
             _ => Models.TaskStatus.Todo
         };
 

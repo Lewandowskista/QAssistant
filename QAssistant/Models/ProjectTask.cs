@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace QAssistant.Models
 {
-    public enum TaskStatus { Todo, InProgress, InReview, Done, Blocked }
+    public enum TaskStatus { Backlog, Todo, InProgress, InReview, Done, Canceled, Duplicate }
     public enum TaskPriority { Low, Medium, High, Critical }
     public enum TaskSource { Manual, Linear, Jira }
 

@@ -148,7 +148,7 @@
                 <ListView Grid.Row="1"
           x:Name="ProjectList"
           SelectionChanged="ProjectList_SelectionChanged"
-          DoubleTapped="ProjectList_DoubleTapped"
+          RightTapped="ProjectList_RightTapped"
           Background="Transparent"
           SelectionMode="Single"
           CanReorderItems="True"
@@ -160,6 +160,21 @@
                             <Setter Property="Padding" Value="8,6"/>
                             <Setter Property="Margin" Value="6,2"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <ListViewItemPresenter
+                                            SelectedBackground="#2D2D3F"
+                                            SelectedForeground="#E2E8F0"
+                                            SelectedPressedBackground="#3D3D5F"
+                                            SelectedPointerOverBackground="#353550"
+                                            PointerOverBackground="#252535"
+                                            PressedBackground="#1A1A2E"
+                                            CornerRadius="8"
+                                            ContentMargin="8,6"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
@@ -268,12 +283,13 @@
                    VerticalAlignment="Center"
                    TextWrapping="Wrap"/>
                     <Button Grid.Column="2"
-                Content="✕"
                 Click="DismissNotification_Click"
                 Background="Transparent"
                 BorderThickness="0"
                 Foreground="#6B7280"
-                Padding="8,4"/>
+                Padding="8,4">
+                        <FontIcon Glyph="&#xE711;" FontSize="10" FontFamily="Segoe Fluent Icons"/>
+                    </Button>
                 </Grid>
             </Border>
 
