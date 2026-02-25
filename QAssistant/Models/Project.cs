@@ -37,5 +37,8 @@ namespace QAssistant.Models
                 return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250));
             }
         }
+
+        // Display name when no DataTemplate is present
+        public override string ToString() => Name;
     }
 }

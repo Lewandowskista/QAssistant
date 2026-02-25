@@ -154,27 +154,8 @@
           CanReorderItems="True"
           CanDragItems="True"
           AllowDrop="True"
-          DragItemsCompleted="ProjectList_DragItemsCompleted">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="Padding" Value="8,6"/>
-                            <Setter Property="Margin" Value="6,2"/>
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                <Border Width="4" Height="20" CornerRadius="2"
-                                        Background="{Binding ColorBrush}"/>
-                                <TextBlock Text="{Binding Name}"
-                                           Foreground="#E2E8F0" FontSize="13"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+          Foreground="#E2E8F0"
+          DragItemsCompleted="ProjectList_DragItemsCompleted"/>
 
                 <Button Grid.Row="2"
                         Content="+ New Project"
