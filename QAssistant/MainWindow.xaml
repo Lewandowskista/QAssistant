@@ -161,63 +161,9 @@
           DragItemsCompleted="ProjectList_DragItemsCompleted">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
-                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Padding" Value="8,6"/>
                             <Setter Property="Margin" Value="6,2"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListViewItem">
-                                        <Grid MinHeight="36">
-                                            <Border x:Name="SelectionBorder" CornerRadius="8" Background="#2D2D3F" Opacity="0"/>
-                                            <Border x:Name="HoverBorder" CornerRadius="8" Background="#252535" Opacity="0"/>
-                                            <ContentPresenter Margin="8,6"
-                                                              HorizontalAlignment="Stretch"
-                                                              VerticalAlignment="Center"/>
-                                            <VisualStateManager.VisualStateGroups>
-                                                <VisualStateGroup x:Name="CommonStates">
-                                                    <VisualState x:Name="Normal"/>
-                                                    <VisualState x:Name="PointerOver">
-                                                        <VisualState.Setters>
-                                                            <Setter Target="HoverBorder.Opacity" Value="1"/>
-                                                        </VisualState.Setters>
-                                                    </VisualState>
-                                                    <VisualState x:Name="Pressed">
-                                                        <VisualState.Setters>
-                                                            <Setter Target="HoverBorder.Background" Value="#1A1A2E"/>
-                                                            <Setter Target="HoverBorder.Opacity" Value="1"/>
-                                                        </VisualState.Setters>
-                                                    </VisualState>
-                                                </VisualStateGroup>
-                                                <VisualStateGroup x:Name="SelectionStates">
-                                                    <VisualState x:Name="Unselected"/>
-                                                    <VisualState x:Name="Selected">
-                                                        <VisualState.Setters>
-                                                            <Setter Target="SelectionBorder.Opacity" Value="1"/>
-                                                        </VisualState.Setters>
-                                                    </VisualState>
-                                                    <VisualState x:Name="SelectedUnfocused">
-                                                        <VisualState.Setters>
-                                                            <Setter Target="SelectionBorder.Opacity" Value="1"/>
-                                                        </VisualState.Setters>
-                                                    </VisualState>
-                                                    <VisualState x:Name="SelectedPointerOver">
-                                                        <VisualState.Setters>
-                                                            <Setter Target="SelectionBorder.Opacity" Value="1"/>
-                                                            <Setter Target="SelectionBorder.Background" Value="#353550"/>
-                                                        </VisualState.Setters>
-                                                    </VisualState>
-                                                    <VisualState x:Name="SelectedPressed">
-                                                        <VisualState.Setters>
-                                                            <Setter Target="SelectionBorder.Opacity" Value="1"/>
-                                                            <Setter Target="SelectionBorder.Background" Value="#3D3D5F"/>
-                                                        </VisualState.Setters>
-                                                    </VisualState>
-                                                </VisualStateGroup>
-                                            </VisualStateManager.VisualStateGroups>
-                                        </Grid>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
                         </Style>
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
