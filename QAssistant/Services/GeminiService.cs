@@ -24,7 +24,7 @@ namespace QAssistant.Services
         /// TOON uses compact key-value pairs and directive-style instructions to
         /// significantly reduce token consumption while preserving semantic quality.
         /// </summary>
-        public static string BuildToonPrompt(ProjectTask task, IReadOnlyList<LinearComment>? comments = null)
+        public static string BuildToonPrompt(ProjectTask task, IReadOnlyList<LinearComment>? comments = null, int attachedImageCount = 0)
         {
             var sb = new StringBuilder();
 
@@ -65,6 +65,9 @@ namespace QAssistant.Services
                     sb.AppendLine($" {{author:{c.AuthorName},date:{c.CreatedAt:yyyy-MM-dd},body:{c.Body}}}");
                 sb.AppendLine("]");
             }
+
+            if (attachedImageCount > 0)
+                sb.AppendLine($"@media:{attachedImageCount}_image(s)_attached—analyze visual content for additional context (screenshots, error messages, UI state, logs)");
 
             return sb.ToString();
         }
@@ -136,7 +139,7 @@ namespace QAssistant.Services
             return fallback.Item1;
         }
 
-        public async Task<string> AnalyzeIssueAsync(string prompt, string? modelName = null)
+        public async Task<string> AnalyzeIssueAsync(string prompt, IReadOnlyList<(string MimeType, string Base64Data)>? images = null, string? modelName = null)
         {
             if (string.IsNullOrEmpty(modelName))
             {
@@ -156,7 +159,7 @@ namespace QAssistant.Services
             // Try the primary model first
             try
             {
-                return await SendGenerateRequestAsync(prompt, primaryModel);
+                return await SendGenerateRequestAsync(prompt, primaryModel, images);
             }
             catch (GeminiRateLimitException firstEx)
             {
@@ -165,7 +168,7 @@ namespace QAssistant.Services
                 // Try the other model
                 try
                 {
-                    return await SendGenerateRequestAsync(prompt, fallbackModel);
+                    return await SendGenerateRequestAsync(prompt, fallbackModel, images);
                 }
                 catch (GeminiRateLimitException secondEx)
                 {
@@ -200,7 +203,7 @@ namespace QAssistant.Services
                 || bodyLower.Contains("requests per day");
         }
 
-        private async Task<string> SendGenerateRequestAsync(string prompt, string modelName)
+        private async Task<string> SendGenerateRequestAsync(string prompt, string modelName, IReadOnlyList<(string MimeType, string Base64Data)>? images = null)
         {
             var modelPath = NormalizeModelPath(modelName);
 
@@ -215,23 +218,33 @@ namespace QAssistant.Services
                 .Replace("\n", "\\n")
                 .Replace("\r", "\\r");
 
-            var json = $$"""
+            var jsonBuilder = new StringBuilder();
+            jsonBuilder.AppendLine("{");
+            jsonBuilder.AppendLine("  \"contents\": [");
+            jsonBuilder.AppendLine("    {");
+            jsonBuilder.AppendLine("      \"parts\": [");
+            jsonBuilder.Append($"        {{\"text\": \"{escapedPrompt}\"}}");
+
+            if (images is { Count: > 0 })
             {
-              "contents": [
+                foreach (var (mimeType, base64Data) in images)
                 {
-                  "parts": [
-                    {
-                      "text": "{{escapedPrompt}}"
-                    }
-                  ]
+                    jsonBuilder.AppendLine(",");
+                    jsonBuilder.Append($"        {{\"inline_data\": {{\"mime_type\": \"{mimeType}\", \"data\": \"{base64Data}\"}}}}");
                 }
-              ],
-              "generationConfig": {
-                "temperature": 0.3,
-                "maxOutputTokens": 8192
-              }
             }
-            """;
+
+            jsonBuilder.AppendLine();
+            jsonBuilder.AppendLine("      ]");
+            jsonBuilder.AppendLine("    }");
+            jsonBuilder.AppendLine("  ],");
+            jsonBuilder.AppendLine("  \"generationConfig\": {");
+            jsonBuilder.AppendLine("    \"temperature\": 0.3,");
+            jsonBuilder.AppendLine("    \"maxOutputTokens\": 8192");
+            jsonBuilder.AppendLine("  }");
+            jsonBuilder.Append("}");
+
+            var json = jsonBuilder.ToString();
 
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await _client.PostAsync(url, content);

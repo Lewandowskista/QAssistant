@@ -409,13 +409,13 @@
                     <Border Grid.Row="1" Background="#0F0F13"
                             BorderBrush="#2A2A3A" BorderThickness="0,0,0,1">
                         <StackPanel Orientation="Horizontal" Spacing="0">
-                            <Button x:Name="TabDetails" Content="Details"
-                                    Click="TabDetails_Click"
+                            <Button x:Name="TabDescription" Content="Description"
+                                    Click="TabDescription_Click"
                                     Background="#1A1A24" Foreground="#A78BFA"
                                     BorderThickness="0,0,0,2" BorderBrush="#A78BFA"
                                     CornerRadius="0" Padding="16,10" FontSize="12"/>
-                            <Button x:Name="TabDescription" Content="Description"
-                                    Click="TabDescription_Click"
+                            <Button x:Name="TabDetails" Content="Details"
+                                    Click="TabDetails_Click"
                                     Background="Transparent" Foreground="#6B7280"
                                     BorderThickness="0" CornerRadius="0"
                                     Padding="16,10" FontSize="12"/>
@@ -432,7 +432,7 @@
                         <Grid>
 
                             <!-- Details Tab -->
-                            <StackPanel x:Name="DetailsTab" Spacing="16" Padding="20,16">
+                            <StackPanel x:Name="DetailsTab" Spacing="16" Padding="20,16" Visibility="Collapsed">
                                 <StackPanel Spacing="8">
                                     <StackPanel x:Name="DetailAssigneePanel" Orientation="Horizontal"
                                                 Spacing="8" Visibility="Collapsed">
@@ -509,7 +509,7 @@
 
                             <!-- Description Tab -->
                             <StackPanel x:Name="DescriptionTab" Spacing="16"
-                                        Padding="20,16" Visibility="Collapsed">
+                                        Padding="20,16">
                                 <RichTextBlock x:Name="DetailDescription"
                                                Foreground="#E2E8F0" FontSize="13"
                                                TextWrapping="Wrap" LineHeight="22"/>

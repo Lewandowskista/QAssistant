@@ -292,9 +292,10 @@ namespace QAssistant.Services
         {
             if (string.IsNullOrEmpty(raw)) return string.Empty;
 
-            raw = s_markdownImageRegex.Replace(raw, "[image]");
+            raw = s_markdownImageRegex.Replace(raw, "");
             raw = s_markdownLinkRegex.Replace(raw, "$1");
             raw = s_htmlTagRegex.Replace(raw, "");
+            raw = s_extractPlainImageUrlRegex.Replace(raw, "");
             raw = s_markdownHeaderRegex.Replace(raw, "");
             raw = s_boldItalicRegex.Replace(raw, "$1");
             raw = s_codeBlockRegex.Replace(raw, "[code block]");

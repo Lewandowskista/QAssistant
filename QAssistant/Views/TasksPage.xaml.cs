@@ -173,7 +173,7 @@ namespace QAssistant.Views
         private void ShowDetailPanel(ProjectTask task)
         {
             DetailPanelColumn.Width = new GridLength(340);
-            SetActiveTab("Details");
+            SetActiveTab("Description");
 
             DetailIdentifier.Text = task.IssueIdentifier;
             DetailTitle.Text = task.Title;
@@ -308,14 +308,6 @@ namespace QAssistant.Views
                     {
                         Text = "• " + line[2..],
                         Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
-                    });
-                }
-                else if (line.StartsWith("[image]"))
-                {
-                    para.Inlines.Add(new Run
-                    {
-                        Text = "🖼 [image]",
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
                     });
                 }
                 else if (line.StartsWith("[code block]"))
@@ -453,6 +445,57 @@ namespace QAssistant.Views
                 }
                 catch { }
             }
+        }
+
+        private async System.Threading.Tasks.Task<List<(string MimeType, string Base64Data)>> DownloadImageAttachmentsAsync(
+            List<string> urls, int maxImages = 4, long maxBytesPerImage = 4 * 1024 * 1024)
+        {
+            var results = new List<(string MimeType, string Base64Data)>();
+
+            foreach (var url in urls)
+            {
+                if (results.Count >= maxImages) break;
+
+                var lower = url.ToLowerInvariant();
+                // Skip video and embed URLs
+                if (lower.EndsWith(".mp4") || lower.EndsWith(".webm") ||
+                    lower.Contains("youtube") || lower.Contains("loom"))
+                    continue;
+
+                try
+                {
+                    using var httpClient = new HttpClient();
+                    if (url.Contains("linear.app", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var key = CredentialService.LoadCredential("LinearApiKey");
+                        if (!string.IsNullOrEmpty(key))
+                            httpClient.DefaultRequestHeaders.Add("Authorization", key);
+                    }
+
+                    var bytes = await httpClient.GetByteArrayAsync(new Uri(url));
+                    if (bytes.Length > maxBytesPerImage) continue;
+
+                    var mimeType = GetMimeTypeFromUrl(url);
+                    var base64 = Convert.ToBase64String(bytes);
+                    results.Add((mimeType, base64));
+                }
+                catch
+                {
+                    // Skip attachments that fail to download
+                }
+            }
+
+            return results;
+        }
+
+        private static string GetMimeTypeFromUrl(string url)
+        {
+            var lower = url.Split('?')[0].ToLowerInvariant();
+            if (lower.EndsWith(".png")) return "image/png";
+            if (lower.EndsWith(".gif")) return "image/gif";
+            if (lower.EndsWith(".webp")) return "image/webp";
+            if (lower.EndsWith(".bmp")) return "image/bmp";
+            return "image/jpeg";
         }
 
         private void CloseLightbox_Click(object sender, RoutedEventArgs e)
@@ -834,8 +877,15 @@ namespace QAssistant.Views
                 catch { }
             }
 
+            // Download image attachments for multimodal analysis
+            var imageData = new List<(string MimeType, string Base64Data)>();
+            if (_selectedTask.AttachmentUrls is { Count: > 0 })
+            {
+                imageData = await DownloadImageAttachmentsAsync(_selectedTask.AttachmentUrls);
+            }
+
             // Build a compact TOON-formatted prompt to reduce token consumption
-            var toonPrompt = GeminiService.BuildToonPrompt(_selectedTask, linearComments);
+            var toonPrompt = GeminiService.BuildToonPrompt(_selectedTask, linearComments, imageData.Count);
 
             var loadingContent = new StackPanel
             {
@@ -862,10 +912,11 @@ namespace QAssistant.Views
 
 
             string analysisResult = string.Empty;
+            var images = imageData.Count > 0 ? imageData : null;
             var analyzeTask = System.Threading.Tasks.Task.Run(async () =>
             {
                 var service = new GeminiService(geminiKey);
-                analysisResult = await service.AnalyzeIssueAsync(toonPrompt);
+                analysisResult = await service.AnalyzeIssueAsync(toonPrompt, images);
             });
 
             // Use the in-page BusyOverlay instead of a ContentDialog to avoid
