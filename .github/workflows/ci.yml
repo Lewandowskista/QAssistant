@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Install Windows App SDK
+      run: |
+        Invoke-WebRequest -Uri "https://aka.ms/windowsappsdk/1.8/latest/windowsappruntimeinstall-x64.exe" -OutFile "WinAppRuntime.exe" -ErrorAction Stop
+        $result = Start-Process -FilePath "WinAppRuntime.exe" -Args "--quiet" -Wait -PassThru
+        if ($result.ExitCode -ne 0) { exit $result.ExitCode }
+
+    - name: Build
+      run: dotnet build QAssistant/QAssistant.csproj -c Release -r win-x64
