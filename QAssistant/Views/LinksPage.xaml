@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="QAssistant.Views.LinksPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls"
+    Background="#0F0F13">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Links Sidebar -->
+        <Border Grid.Column="0" Background="#1A1A24"
+                BorderBrush="#2A2A3A" BorderThickness="0,0,1,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="LINKS"
+                           Foreground="#6B7280" FontSize="10" FontWeight="SemiBold"
+                           Margin="16,16,16,8" CharacterSpacing="150"/>
+
+                <ListView Grid.Row="1" x:Name="LinksList"
+          Background="Transparent" SelectionMode="Single"
+          SelectionChanged="LinksList_SelectionChanged"
+          RightTapped="LinksList_RightTapped"
+          CanReorderItems="True" CanDragItems="True"
+          AllowDrop="True"
+          DragItemsCompleted="LinksList_DragItemsCompleted">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Padding" Value="12,8"/>
+                            <Setter Property="Margin" Value="6,2"/>
+                            <Setter Property="CornerRadius" Value="8"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <ListViewItemPresenter
+                                            SelectedBackground="#2D2D3F"
+                                            SelectedForeground="#E2E8F0"
+                                            SelectedPressedBackground="#3D3D5F"
+                                            SelectedPointerOverBackground="#353550"
+                                            PointerOverBackground="#252535"
+                                            PressedBackground="#1A1A2E"
+                                            CornerRadius="8"
+                                            ContentMargin="12,8"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Spacing="2" Padding="4">
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="#E2E8F0" FontSize="13"/>
+                                <TextBlock Text="{Binding Type}"
+                                           Foreground="#6B7280" FontSize="11"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <Button Grid.Row="2" Content="+ Add Link"
+                        Click="AddLink_Click"
+                        HorizontalAlignment="Stretch"
+                        Margin="12,8,12,16"
+                        Background="#252535"
+                        Foreground="#A78BFA"
+                        CornerRadius="8"
+                        Padding="12,8"/>
+            </Grid>
+        </Border>
+
+        <!-- WebView / Empty State -->
+        <Grid Grid.Column="1">
+            <StackPanel x:Name="EmptyState"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="12">
+                <TextBlock Text="Select a link to preview it"
+                           Foreground="#6B7280" FontSize="14"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <Border x:Name="WebViewContainer" Visibility="Collapsed">
+                <controls:WebView2 x:Name="EmbedWebView"/>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

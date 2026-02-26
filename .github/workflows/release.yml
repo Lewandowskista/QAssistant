@@ -1,0 +1,46 @@
+name: Release Portable App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Install Windows App SDK
+      run: |
+        Invoke-WebRequest -Uri "https://aka.ms/windowsappsdk/1.8/latest/windowsappruntimeinstall-x64.exe" -OutFile "WinAppRuntime.exe"
+        Start-Process -FilePath "WinAppRuntime.exe" -Args "--quiet" -Wait
+
+    - name: Publish Single-File App
+      run: dotnet publish QAssistant/QAssistant.csproj -c Release -r win-x64 --self-contained true -o ./publish_output
+
+    - name: Copy Windows App Runtime to output
+      run: |
+        Invoke-WebRequest -Uri "https://aka.ms/windowsappsdk/1.8/latest/windowsappruntimeinstall-x64.exe" -OutFile "./publish_output/WinAppRuntime_Setup.exe"
+
+    - name: Zip output
+      run: Compress-Archive -Path ./publish_output/* -DestinationPath ./QAssistant.zip
+
+    - name: Publish to GitHub Releases
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ./QAssistant.zip
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
