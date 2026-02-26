@@ -15,6 +15,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.System;
 
 namespace QAssistant.Views
 {
@@ -533,23 +534,24 @@ namespace QAssistant.Views
             DescriptionTab.Visibility = tab == "Description" ? Visibility.Visible : Visibility.Collapsed;
             CommentsTab.Visibility = tab == "Comments" ? Visibility.Visible : Visibility.Collapsed;
 
-            var activeColor = Windows.UI.Color.FromArgb(255, 167, 139, 250);
-            var inactiveColor = Windows.UI.Color.FromArgb(255, 107, 114, 128);
-            var activeBg = Windows.UI.Color.FromArgb(255, 26, 26, 36);
+            var activeBrush = (SolidColorBrush)Application.Current.Resources["AccentBrush"];
+            var inactiveBrush = (SolidColorBrush)Application.Current.Resources["TextSecondaryBrush"];
+            var activeBgBrush = (SolidColorBrush)Application.Current.Resources["HoverBrush"];
+            var transparent = new SolidColorBrush(Colors.Transparent);
 
-            TabDetails.Foreground = new SolidColorBrush(tab == "Details" ? activeColor : inactiveColor);
-            TabDetails.Background = new SolidColorBrush(tab == "Details" ? activeBg : Colors.Transparent);
-            TabDetails.BorderBrush = new SolidColorBrush(tab == "Details" ? activeColor : Colors.Transparent);
+            TabDetails.Foreground = tab == "Details" ? activeBrush : inactiveBrush;
+            TabDetails.Background = tab == "Details" ? activeBgBrush : transparent;
+            TabDetails.BorderBrush = tab == "Details" ? activeBrush : transparent;
             TabDetails.BorderThickness = new Thickness(0, 0, 0, tab == "Details" ? 2 : 0);
 
-            TabDescription.Foreground = new SolidColorBrush(tab == "Description" ? activeColor : inactiveColor);
-            TabDescription.Background = new SolidColorBrush(tab == "Description" ? activeBg : Colors.Transparent);
-            TabDescription.BorderBrush = new SolidColorBrush(tab == "Description" ? activeColor : Colors.Transparent);
+            TabDescription.Foreground = tab == "Description" ? activeBrush : inactiveBrush;
+            TabDescription.Background = tab == "Description" ? activeBgBrush : transparent;
+            TabDescription.BorderBrush = tab == "Description" ? activeBrush : transparent;
             TabDescription.BorderThickness = new Thickness(0, 0, 0, tab == "Description" ? 2 : 0);
 
-            TabComments.Foreground = new SolidColorBrush(tab == "Comments" ? activeColor : inactiveColor);
-            TabComments.Background = new SolidColorBrush(tab == "Comments" ? activeBg : Colors.Transparent);
-            TabComments.BorderBrush = new SolidColorBrush(tab == "Comments" ? activeColor : Colors.Transparent);
+            TabComments.Foreground = tab == "Comments" ? activeBrush : inactiveBrush;
+            TabComments.Background = tab == "Comments" ? activeBgBrush : transparent;
+            TabComments.BorderBrush = tab == "Comments" ? activeBrush : transparent;
             TabComments.BorderThickness = new Thickness(0, 0, 0, tab == "Comments" ? 2 : 0);
         }
 
@@ -924,30 +926,6 @@ namespace QAssistant.Views
             // Build a compact TOON-formatted prompt to reduce token consumption
             var toonPrompt = GeminiService.BuildToonPrompt(_selectedTask, linearComments, imageData.Count);
 
-            var loadingContent = new StackPanel
-            {
-                Spacing = 12,
-                Children =
-                {
-                    new ProgressRing { IsActive = true, Width = 40, Height = 40 },
-                    new TextBlock
-                    {
-                        Text = "Gemini is analyzing the issue...",
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                        FontSize = 13
-                    }
-                }
-            };
-
-            var loadingDialog = new ContentDialog
-            {
-                Title = "Analyzing Issue...",
-                Content = loadingContent,
-                CloseButtonText = "Cancel",
-                XamlRoot = this.XamlRoot
-            };
-
-
             string analysisResult = string.Empty;
             var images = imageData.Count > 0 ? imageData : null;
             var analyzeTask = System.Threading.Tasks.Task.Run(async () =>
@@ -1241,6 +1219,126 @@ namespace QAssistant.Views
                 _rateLimitDismissTimer.Stop();
             };
             _rateLimitDismissTimer.Start();
+        }
+
+        // ── Keyboard Shortcuts ───────────────────────────────────────
+
+        private void Page_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            var ctrl = Microsoft.UI.Input.InputKeyboardSource
+                .GetKeyStateForCurrentThread(VirtualKey.Control)
+                .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+
+            // ── Escape: dismiss overlays in priority order ──
+            if (e.Key == VirtualKey.Escape)
+            {
+                if (ShortcutOverlay.Visibility == Visibility.Visible)
+                {
+                    ShortcutOverlay.Visibility = Visibility.Collapsed;
+                    e.Handled = true;
+                    return;
+                }
+
+                if (LightboxOverlay.Visibility == Visibility.Visible)
+                {
+                    CloseLightbox_Click(this, new RoutedEventArgs());
+                    e.Handled = true;
+                    return;
+                }
+
+                if (_selectedTask != null)
+                {
+                    CloseDetailPanel();
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            if (!ctrl) return;
+
+            switch (e.Key)
+            {
+                // Ctrl+/ — Toggle shortcut overlay
+                // The /? key is virtual key code 191 (0xBF)
+                case (VirtualKey)191:
+                    ToggleShortcutOverlay();
+                    e.Handled = true;
+                    break;
+
+                // Ctrl+1 — Manual mode
+                case VirtualKey.Number1:
+                    ManualMode_Click(this, new RoutedEventArgs());
+                    e.Handled = true;
+                    break;
+
+                // Ctrl+2 — Linear mode
+                case VirtualKey.Number2:
+                    LinearMode_Click(this, new RoutedEventArgs());
+                    e.Handled = true;
+                    break;
+
+                // Ctrl+R — Refresh (Linear mode only)
+                case VirtualKey.R:
+                    if (_isLinearMode)
+                    {
+                        Refresh_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                    }
+                    break;
+
+                // Ctrl+N — New task (Manual mode only)
+                case VirtualKey.N:
+                    if (!_isLinearMode)
+                    {
+                        AddTask_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                    }
+                    break;
+
+                // Ctrl+S — Save task changes (detail panel open, manual mode)
+                case VirtualKey.S:
+                    if (_selectedTask != null && !_isLinearMode)
+                    {
+                        SaveTaskChanges_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                    }
+                    break;
+
+                // Ctrl+D — Delete task (detail panel open, manual mode)
+                case VirtualKey.D:
+                    if (_selectedTask != null && !_isLinearMode)
+                    {
+                        DeleteTask_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                    }
+                    break;
+
+                // Ctrl+O — Open in Linear (detail panel open, linear mode)
+                case VirtualKey.O:
+                    if (_selectedTask != null && _isLinearMode)
+                    {
+                        OpenInLinear_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                    }
+                    break;
+            }
+        }
+
+        private void ToggleShortcutOverlay()
+        {
+            ShortcutOverlay.Visibility = ShortcutOverlay.Visibility == Visibility.Visible
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
+
+        private void ShortcutHint_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleShortcutOverlay();
+        }
+
+        private void CloseShortcutOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            ShortcutOverlay.Visibility = Visibility.Collapsed;
         }
     }
 }

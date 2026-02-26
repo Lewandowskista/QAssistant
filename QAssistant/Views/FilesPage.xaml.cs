@@ -57,7 +57,8 @@ namespace QAssistant.Views
                 BorderBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(
                     Windows.UI.Color.FromArgb(255, 42, 42, 58)),
                 BorderThickness = new Thickness(1),
-                Margin = new Thickness(0, 0, 0, 4)
+                Margin = new Thickness(0, 0, 0, 4),
+                Tag = file
             };
 
             var innerGrid = new Grid();
@@ -296,10 +297,15 @@ namespace QAssistant.Views
         private async void FilesList_DragItemsCompleted(object sender, DragItemsCompletedEventArgs e)
         {
             if (_vm?.SelectedProject == null) return;
-            var reordered = FilesList.Items.OfType<FileAttachment>().ToList();
+            var reordered = FilesList.Items
+                .OfType<Border>()
+                .Select(b => b.Tag as FileAttachment)
+                .Where(f => f != null)
+                .ToList();
+            if (reordered.Count == 0) return; // Safety: don't clear if extraction failed
             _vm.SelectedProject.Attachments.Clear();
             foreach (var file in reordered)
-                _vm.SelectedProject.Attachments.Add(file);
+                _vm.SelectedProject.Attachments.Add(file!);
             await _vm.SaveAsync();
         }
     }

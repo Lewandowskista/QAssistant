@@ -19,7 +19,7 @@ namespace QAssistant.Services
 
         private static HttpClient CreateClient(string email, string apiToken)
         {
-            var client = new HttpClient();
+            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
             var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{email}:{apiToken}"));
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));

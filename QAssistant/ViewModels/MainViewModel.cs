@@ -62,7 +62,19 @@ namespace QAssistant.ViewModels
         [RelayCommand]
         private void SelectTab(string tab) => ActiveTab = tab;
 
-        public async Task SaveAsync() =>
-            await _storage.SaveProjectsAsync(new List<Project>(Projects));
+        public event Action<Exception>? SaveFailed;
+
+        public async Task SaveAsync()
+        {
+            try
+            {
+                await _storage.SaveProjectsAsync(new List<Project>(Projects));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"MainViewModel.SaveAsync error: {ex.Message}");
+                SaveFailed?.Invoke(ex);
+            }
+        }
     }
 }

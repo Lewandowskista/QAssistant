@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:QAssistant">
 
-    <Grid Background="#0F0F13" RequestedTheme="Dark">
+    <Grid Background="{ThemeResource ApplicationBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="48"/>
             <RowDefinition Height="*"/>
@@ -17,8 +17,8 @@
 
         <!-- TITLEBAR -->
         <Border Grid.Row="0" Grid.ColumnSpan="2"
-        Background="#13131A"
-        BorderBrush="#2A2A3A" BorderThickness="0,0,0,1">
+        Background="{ThemeResource SurfaceBrush}"
+        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
             <Grid Padding="16,0" Height="48">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -30,7 +30,7 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8"
                     VerticalAlignment="Center">
                     <TextBlock Text="QAssistant" FontSize="14" FontWeight="SemiBold"
-                       Foreground="#A78BFA" VerticalAlignment="Center"/>
+                       Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Drag region -->
@@ -52,7 +52,7 @@
               BorderThickness="0">
                         <ToggleButton.Style>
                             <Style TargetType="ToggleButton">
-                                <Setter Property="Background" Value="#252535"/>
+                                <Setter Property="Background" Value="{ThemeResource HoverBrush}"/>
                                 <Setter Property="BorderThickness" Value="0"/>
                                 <Setter Property="CornerRadius" Value="6"/>
                                 <Setter Property="Template">
@@ -88,7 +88,7 @@
                         <TextBlock Text="&#xE921;" 
                FontFamily="Segoe Fluent Icons"
                FontSize="12"
-               Foreground="#A78BFA"
+               Foreground="{ThemeResource AccentBrush}"
                VerticalAlignment="Center"
                HorizontalAlignment="Center"/>
                     </Button>
@@ -105,7 +105,7 @@
                         <TextBlock Text="&#xE922;" 
                FontFamily="Segoe Fluent Icons"
                FontSize="12"
-               Foreground="#A78BFA"
+               Foreground="{ThemeResource AccentBrush}"
                VerticalAlignment="Center"
                HorizontalAlignment="Center"/>
                     </Button>
@@ -122,7 +122,7 @@
                         <TextBlock Text="&#xE8BB;" 
                FontFamily="Segoe Fluent Icons"
                FontSize="12"
-               Foreground="#A78BFA"
+               Foreground="{ThemeResource AccentBrush}"
                VerticalAlignment="Center"
                HorizontalAlignment="Center"/>
                     </Button>
@@ -132,8 +132,8 @@
 
         <!-- SIDEBAR -->
         <Border Grid.Row="1" Grid.Column="0"
-                Background="#1A1A24"
-                BorderBrush="#2A2A3A" BorderThickness="0,0,1,0">
+                Background="{ThemeResource SurfaceVariantBrush}"
+                BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,1,0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -142,7 +142,7 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Text="PROJECTS"
-                           Foreground="#6B7280" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="10" FontWeight="SemiBold"
                            Margin="16,16,16,8" CharacterSpacing="150"/>
 
                 <ListView Grid.Row="1"
@@ -164,12 +164,12 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListViewItem">
                                         <ListViewItemPresenter
-                                            SelectedBackground="#2D2D3F"
-                                            SelectedForeground="#E2E8F0"
-                                            SelectedPressedBackground="#3D3D5F"
-                                            SelectedPointerOverBackground="#353550"
-                                            PointerOverBackground="#252535"
-                                            PressedBackground="#1A1A2E"
+                                            SelectedBackground="{ThemeResource ListAccentLowBrush}"
+                                            SelectedForeground="{ThemeResource TextPrimaryBrush}"
+                                            SelectedPressedBackground="{ThemeResource ListAccentMediumBrush}"
+                                            SelectedPointerOverBackground="{ThemeResource ListAccentMediumBrush}"
+                                            PointerOverBackground="{ThemeResource HoverBrush}"
+                                            PressedBackground="{ThemeResource BorderBrush}"
                                             CornerRadius="8"
                                             ContentMargin="8,6"/>
                                     </ControlTemplate>
@@ -183,7 +183,7 @@
                                 <Border Width="4" Height="20" CornerRadius="2"
                                         Background="{Binding ColorBrush}"/>
                                 <TextBlock Text="{Binding Name}"
-                                           Foreground="#E2E8F0" FontSize="13"
+                                           Foreground="{ThemeResource TextPrimaryBrush}" FontSize="13"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
@@ -196,8 +196,8 @@
                         Click="AddProject_Click"
                         HorizontalAlignment="Stretch"
                         Margin="12,8,12,16"
-                        Background="#252535"
-                        Foreground="#A78BFA"
+                        Background="{ThemeResource HoverBrush}"
+                        Foreground="{ThemeResource AccentBrush}"
                         CornerRadius="8"
                         Padding="12,8"/>
             </Grid>
@@ -212,8 +212,8 @@
             </Grid.RowDefinitions>
 
             <!-- Tab bar -->
-            <Border Grid.Row="0" Background="#13131A"
-        BorderBrush="#2A2A3A" BorderThickness="0,0,0,1"
+            <Border Grid.Row="0" Background="{ThemeResource SurfaceBrush}"
+        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
         Padding="12,0">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -225,23 +225,23 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
                         <Button x:Name="TabLinks" Content="Links"
                     Click="Tab_Click" Tag="Links"
-                    Background="#2D2D3F" Foreground="#E2E8F0"
+                    Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource TextPrimaryBrush}"
                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
                         <Button x:Name="TabNotes" Content="Notes"
                     Click="Tab_Click" Tag="Notes"
-                    Background="Transparent" Foreground="#6B7280"
+                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
                         <Button x:Name="TabTasks" Content="Tasks"
                     Click="Tab_Click" Tag="Tasks"
-                    Background="Transparent" Foreground="#6B7280"
+                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
                         <Button x:Name="TabFiles" Content="Files"
                      Click="Tab_Click" Tag="Files"
-                     Background="Transparent" Foreground="#6B7280"
+                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                      CornerRadius="8" Padding="14,8" Margin="0,6"/>
                         <Button x:Name="TabSettings" Content="Settings"
                     Click="Tab_Click" Tag="Settings"
-                    Background="Transparent" Foreground="#6B7280"
+                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
                     </StackPanel>
 
@@ -294,7 +294,7 @@
             </Border>
 
             <!-- Content frame -->
-            <Frame Grid.Row="2" x:Name="ContentFrame" Background="#0F0F13"/>
+            <Frame Grid.Row="2" x:Name="ContentFrame" Background="{ThemeResource ApplicationBackgroundBrush}"/>
         </Grid>
     </Grid>
 </Window>

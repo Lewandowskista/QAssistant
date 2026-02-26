@@ -136,7 +136,10 @@ namespace QAssistant.Services
                 result ??= new List<Project>();
 
                 if (!fileContent.StartsWith(EncryptedPrefix, StringComparison.Ordinal))
-                    await SaveProjectsAsync(result);
+                {
+                    try { await SaveProjectsAsync(result); }
+                    catch (Exception saveEx) { LogMessage($"Migration save failed: {saveEx.Message}"); }
+                }
 
                 return result;
             }
@@ -184,6 +187,7 @@ namespace QAssistant.Services
             {
                 LogMessage($"SaveProjectsAsync error: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                 Debug.WriteLine($"StorageService SaveProjectsAsync error: {ex.Message}\n{ex.StackTrace}");
+                throw;
             }
         }
 

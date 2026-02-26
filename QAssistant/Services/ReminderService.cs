@@ -47,45 +47,58 @@ namespace QAssistant.Services
         {
             if (_getProjects == null || _showBanner == null) return;
 
+            // Snapshot project/task data to avoid cross-thread InvalidOperationException.
+            // The timer callback runs on a thread-pool thread while the UI thread may
+            // modify the ObservableCollection<Project> or List<ProjectTask> concurrently.
+            List<ProjectTask> allTasks;
+            try
+            {
+                allTasks = _getProjects()
+                    .SelectMany(p => p.Tasks.ToList())
+                    .ToList();
+            }
+            catch
+            {
+                // Collection was modified during enumeration; skip this tick.
+                return;
+            }
+
             var now = DateTime.Now;
             var currentOverdueTasks = new List<ProjectTask>();
             var currentUpcomingTasks = new List<ProjectTask>();
 
-            foreach (var project in _getProjects())
+            foreach (var task in allTasks)
             {
-                foreach (var task in project.Tasks)
+                if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate)
                 {
-                    if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate)
-                    {
-                        _notifiedOverdue.Remove(task.Id);
-                        _notifiedUpcoming.Remove(task.Id);
-                        continue;
-                    }
+                    _notifiedOverdue.Remove(task.Id);
+                    _notifiedUpcoming.Remove(task.Id);
+                    continue;
+                }
 
-                    if (task.DueDate == null)
-                    {
-                        _notifiedOverdue.Remove(task.Id);
-                        _notifiedUpcoming.Remove(task.Id);
-                        continue;
-                    }
+                if (task.DueDate == null)
+                {
+                    _notifiedOverdue.Remove(task.Id);
+                    _notifiedUpcoming.Remove(task.Id);
+                    continue;
+                }
 
-                    var due = task.DueDate.Value;
+                var due = task.DueDate.Value;
 
-                    if (due < now)
-                    {
-                        currentOverdueTasks.Add(task);
-                        _notifiedUpcoming.Remove(task.Id);
-                    }
-                    else if (due < now.AddMinutes(30))
-                    {
-                        currentUpcomingTasks.Add(task);
-                        _notifiedOverdue.Remove(task.Id);
-                    }
-                    else
-                    {
-                        _notifiedOverdue.Remove(task.Id);
-                        _notifiedUpcoming.Remove(task.Id);
-                    }
+                if (due < now)
+                {
+                    currentOverdueTasks.Add(task);
+                    _notifiedUpcoming.Remove(task.Id);
+                }
+                else if (due < now.AddMinutes(30))
+                {
+                    currentUpcomingTasks.Add(task);
+                    _notifiedOverdue.Remove(task.Id);
+                }
+                else
+                {
+                    _notifiedOverdue.Remove(task.Id);
+                    _notifiedUpcoming.Remove(task.Id);
                 }
             }
 
@@ -173,18 +186,27 @@ namespace QAssistant.Services
             var now = DateTime.Now;
             int dueToday = 0, overdue = 0, total = 0;
 
-            foreach (var project in _getProjects())
+            List<ProjectTask> allTasks;
+            try
             {
-                foreach (var task in project.Tasks)
+                allTasks = _getProjects()
+                    .SelectMany(p => p.Tasks.ToList())
+                    .ToList();
+            }
+            catch
+            {
+                return;
+            }
+
+            foreach (var task in allTasks)
+            {
+                if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate) continue;
+                total++;
+
+                if (task.DueDate.HasValue)
                 {
-                    if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate) continue;
-                    total++;
-                    
-                    if (task.DueDate.HasValue)
-                    {
-                        if (task.DueDate.Value < now) overdue++;
-                        else if (task.DueDate.Value.Date == today) dueToday++;
-                    }
+                    if (task.DueDate.Value < now) overdue++;
+                    else if (task.DueDate.Value.Date == today) dueToday++;
                 }
             }
 

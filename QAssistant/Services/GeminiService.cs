@@ -16,11 +16,12 @@ namespace QAssistant.Services
     {
         private readonly HttpClient _client = CreateClient(apiKey);
         private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta";
+        private const string PrimaryModel = "models/gemini-2.5-flash";
         private const string FallbackModel = "models/gemini-3-flash";
 
         private static HttpClient CreateClient(string apiKey)
         {
-            var client = new HttpClient();
+            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             client.DefaultRequestHeaders.Add("x-goog-api-key", apiKey);
             return client;
@@ -143,19 +144,12 @@ namespace QAssistant.Services
 
         public async Task<string> AnalyzeIssueAsync(string prompt, IReadOnlyList<(string MimeType, string Base64Data)>? images = null, string? modelName = null)
         {
-            if (string.IsNullOrEmpty(modelName))
-            {
-                modelName = await FindModelSupportingGenerateContentAsync();
-                if (string.IsNullOrEmpty(modelName))
-                {
-                    var modelsJson = await _client.GetStringAsync($"{BaseUrl}/models");
-                    throw new Exception("No model supporting a generate-like method found. Call ListModelsAsync to inspect available models. Response: " + modelsJson);
-                }
-            }
+            var primaryModel = NormalizeModelPath(modelName ?? PrimaryModel);
 
-            var primaryModel = NormalizeModelPath(modelName!);
+            // If the caller explicitly passed the fallback model as primary, swap so there is
+            // always a distinct second model to try.
             var fallbackModel = string.Equals(primaryModel, FallbackModel, StringComparison.OrdinalIgnoreCase)
-                ? NormalizeModelPath(modelName!)
+                ? PrimaryModel
                 : FallbackModel;
 
             // Try the primary model first
@@ -167,14 +161,12 @@ namespace QAssistant.Services
             {
                 Debug.WriteLine($"Rate limit hit on {primaryModel}, falling back to {fallbackModel}: {firstEx.Message}");
 
-                // Try the other model
                 try
                 {
                     return await SendGenerateRequestAsync(prompt, fallbackModel, images);
                 }
                 catch (GeminiRateLimitException secondEx)
                 {
-                    // Both models are rate-limited
                     throw new GeminiAllModelsRateLimitedException(primaryModel, fallbackModel, secondEx);
                 }
             }

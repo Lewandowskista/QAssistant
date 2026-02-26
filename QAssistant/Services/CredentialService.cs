@@ -9,26 +9,40 @@ namespace QAssistant.Services
         public static void SaveCredential(string key, string value)
         {
             var byteArray = Encoding.UTF8.GetBytes(value);
-            var cred = new CREDENTIAL
+            IntPtr targetName = IntPtr.Zero;
+            IntPtr credentialBlob = IntPtr.Zero;
+            IntPtr userName = IntPtr.Zero;
+            IntPtr credPtr = IntPtr.Zero;
+
+            try
             {
-                Type = 1,
-                TargetName = Marshal.StringToCoTaskMemUni("QAssistant_" + key),
-                CredentialBlob = Marshal.AllocCoTaskMem(byteArray.Length),
-                CredentialBlobSize = (uint)byteArray.Length,
-                Persist = 2,
-                UserName = Marshal.StringToCoTaskMemUni("QAssistant")
-            };
+                targetName = Marshal.StringToCoTaskMemUni("QAssistant_" + key);
+                credentialBlob = Marshal.AllocCoTaskMem(byteArray.Length);
+                userName = Marshal.StringToCoTaskMemUni("QAssistant");
 
-            Marshal.Copy(byteArray, 0, cred.CredentialBlob, byteArray.Length);
+                Marshal.Copy(byteArray, 0, credentialBlob, byteArray.Length);
 
-            var credPtr = Marshal.AllocCoTaskMem(Marshal.SizeOf(cred));
-            Marshal.StructureToPtr(cred, credPtr, false);
-            CredWrite(credPtr, 0);
+                var cred = new CREDENTIAL
+                {
+                    Type = 1,
+                    TargetName = targetName,
+                    CredentialBlob = credentialBlob,
+                    CredentialBlobSize = (uint)byteArray.Length,
+                    Persist = 2,
+                    UserName = userName
+                };
 
-            Marshal.FreeCoTaskMem(credPtr);
-            Marshal.FreeCoTaskMem(cred.CredentialBlob);
-            Marshal.FreeCoTaskMem(cred.TargetName);
-            Marshal.FreeCoTaskMem(cred.UserName);
+                credPtr = Marshal.AllocCoTaskMem(Marshal.SizeOf(cred));
+                Marshal.StructureToPtr(cred, credPtr, false);
+                CredWrite(credPtr, 0);
+            }
+            finally
+            {
+                if (credPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(credPtr);
+                if (credentialBlob != IntPtr.Zero) Marshal.FreeCoTaskMem(credentialBlob);
+                if (targetName != IntPtr.Zero) Marshal.FreeCoTaskMem(targetName);
+                if (userName != IntPtr.Zero) Marshal.FreeCoTaskMem(userName);
+            }
         }
 
         public static string? LoadCredential(string key)

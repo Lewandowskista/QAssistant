@@ -31,9 +31,8 @@ namespace QAssistant.Services
         private static readonly Regex s_extractPlainImageUrlRegex = new(@"https?://[^\s\)\]""]+\.(?:png|jpe?g|gif|webp|svg|bmp|mp4|webm|mov)(?:\?[^\s\)\]""]*)?", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static HttpClient CreateClient(string apiKey)
-
         {
-            var client = new HttpClient();
+            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
             client.DefaultRequestHeaders.Add("Authorization", apiKey);
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             return client;
@@ -42,7 +41,45 @@ namespace QAssistant.Services
 
         public async Task<List<ProjectTask>> GetIssuesAsync(string teamId)
         {
-            var query = @"
+            // Resolve the caller-supplied identifier (UUID, key like "ENG", or name) to a
+            // real team UUID before building the query, because team(id: ...) requires a UUID.
+            string? resolvedTeamId = null;
+            if (!string.IsNullOrEmpty(teamId))
+                resolvedTeamId = await ResolveTeamUuidAsync(teamId);
+
+            string response;
+            bool useTeamQuery = !string.IsNullOrEmpty(resolvedTeamId);
+
+            if (useTeamQuery)
+            {
+                var query = @"
+    query($teamId: String!) {
+        team(id: $teamId) {
+            issues(first: 50) {
+                nodes {
+                    id
+                    identifier
+                    title
+                    description
+                    priority
+                    state { name }
+                    assignee { name }
+                    dueDate
+                    url
+                    labels { nodes { name } }
+                    attachments { nodes { url title } }
+                }
+            }
+        }
+    }";
+                response = await PostQueryAsync(query, new System.Text.Json.Nodes.JsonObject
+                {
+                    ["teamId"] = resolvedTeamId
+                });
+            }
+            else
+            {
+                var query = @"
     {
         issues(first: 50) {
             nodes {
@@ -60,8 +97,9 @@ namespace QAssistant.Services
             }
         }
     }";
+                response = await PostQueryAsync(query);
+            }
 
-            var response = await PostQueryAsync(query);
             var tasks = new List<ProjectTask>();
 
             try
@@ -75,7 +113,11 @@ namespace QAssistant.Services
                 if (!root.TryGetProperty("data", out var data))
                     throw new Exception("Unexpected response from Linear API.");
 
-                var nodes = data.GetProperty("issues").GetProperty("nodes");
+                var issuesEl = useTeamQuery
+                    ? data.GetProperty("team").GetProperty("issues")
+                    : data.GetProperty("issues");
+
+                var nodes = issuesEl.GetProperty("nodes");
 
                 foreach (var node in nodes.EnumerateArray())
                 {
@@ -155,7 +197,7 @@ namespace QAssistant.Services
 
         public async Task<List<LinearTeam>> GetTeamsAsync()
         {
-            var query = "{ teams { nodes { id name } } }";
+            var query = "{ teams { nodes { id key name } } }";
             var response = await PostQueryAsync(query);
             var teams = new List<LinearTeam>();
 
@@ -179,6 +221,7 @@ namespace QAssistant.Services
                     teams.Add(new LinearTeam
                     {
                         Id = node.GetProperty("id").GetString() ?? "",
+                        Key = node.TryGetProperty("key", out var k) ? k.GetString() ?? "" : "",
                         Name = node.GetProperty("name").GetString() ?? ""
                     });
                 }
@@ -189,6 +232,23 @@ namespace QAssistant.Services
             }
 
             return teams;
+        }
+
+        /// <summary>
+        /// Resolves any team identifier (UUID, team key like "ENG", or team name) to the
+        /// team's UUID required by the <c>team(id: ...)</c> GraphQL query.
+        /// Returns <c>null</c> if no matching team is found.
+        /// </summary>
+        private async Task<string?> ResolveTeamUuidAsync(string teamId)
+        {
+            if (Guid.TryParse(teamId, out _))
+                return teamId;
+
+            var teams = await GetTeamsAsync();
+            return teams.FirstOrDefault(t =>
+                string.Equals(t.Key, teamId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(t.Name, teamId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(t.Id, teamId, StringComparison.OrdinalIgnoreCase))?.Id;
         }
 
         public async Task UpdateIssueStatusAsync(string issueId, string stateId)
@@ -436,6 +496,7 @@ namespace QAssistant.Services
     public class LinearTeam
     {
         public string Id { get; set; } = string.Empty;
+        public string Key { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
     }
 

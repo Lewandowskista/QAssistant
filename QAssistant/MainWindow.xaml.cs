@@ -36,7 +36,9 @@ namespace QAssistant
             // Force dark theme in code - ensures it applies in all environments
             // (GitHub Actions runners default to Light theme which makes items invisible)
             if (this.Content is FrameworkElement root)
+            {
                 root.RequestedTheme = ElementTheme.Dark;
+            }
 
             SetupWindow();
 
@@ -55,6 +57,8 @@ namespace QAssistant
                 else
                 {
                     ReminderService.Stop();
+                    NotificationService.Instance.Unregister();
+                    ((App)Application.Current).RemoveTrayIcon();
                 }
             };
         }
@@ -63,6 +67,7 @@ namespace QAssistant
         {
             try
             {
+                ViewModel.SaveFailed += OnViewModelSaveFailed;
                 await ViewModel.InitializeAsync();
                 RefreshProjectList();
 
@@ -196,19 +201,32 @@ namespace QAssistant
             NotificationBanner.Visibility = Visibility.Collapsed;
         }
 
+        private void OnViewModelSaveFailed(Exception ex)
+        {
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "Save Failed",
+                    Content = $"Your changes could not be saved.\n\n{ex.Message}",
+                    CloseButtonText = "OK",
+                    XamlRoot = Content.XamlRoot
+                };
+                await dialog.ShowAsync();
+            });
+        }
+
         // ── Events ───────────────────────────────────────────────────
         private void PinToggle_Checked(object sender, RoutedEventArgs e)
         {
             SetAlwaysOnTop(true);
-            PinToggle.Background = new SolidColorBrush(
-                Windows.UI.Color.FromArgb(255, 167, 139, 250));
+            PinToggle.Background = (Brush)Application.Current.Resources["AccentBrush"];
         }
 
         private void PinToggle_Unchecked(object sender, RoutedEventArgs e)
         {
             SetAlwaysOnTop(false);
-            PinToggle.Background = new SolidColorBrush(
-                Windows.UI.Color.FromArgb(255, 37, 37, 53));
+            PinToggle.Background = (Brush)Application.Current.Resources["HoverBrush"];
         }
 
         private void MinimizeBtn_Click(object sender, RoutedEventArgs e)
@@ -310,7 +328,7 @@ namespace QAssistant
                             Convert.ToByte(hex[5..7], 16))),
                     Padding = new Thickness(0),
                     BorderThickness = new Thickness(hex == selectedColor ? 2 : 0),
-                    BorderBrush = new SolidColorBrush(Colors.White),
+                    BorderBrush = (Brush)Application.Current.Resources["TextPrimaryBrush"],
                     Tag = hex
                 };
 
@@ -330,14 +348,14 @@ namespace QAssistant
             panel.Children.Add(new TextBlock
             {
                 Text = "Project Name",
-                Foreground = new SolidColorBrush(Colors.White),
+                Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
                 FontSize = 12
             });
             panel.Children.Add(nameBox);
             panel.Children.Add(new TextBlock
             {
                 Text = "Color",
-                Foreground = new SolidColorBrush(Colors.White),
+                Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
                 FontSize = 12,
                 Margin = new Thickness(0, 8, 0, 0)
             });
@@ -353,7 +371,7 @@ namespace QAssistant
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = ContentFrame.XamlRoot
             };
-            DialogHelper.ApplyDarkTheme(dialog);
+            // DialogHelper.ApplyDarkTheme(dialog);
 
             var result = await dialog.ShowAsync();
 
@@ -375,7 +393,7 @@ namespace QAssistant
                     DefaultButton = ContentDialogButton.Close,
                     XamlRoot = ContentFrame.XamlRoot
                 };
-                DialogHelper.ApplyDarkTheme(confirmDialog);
+                // DialogHelper.ApplyDarkTheme(confirmDialog);
 
                 var confirmResult = await confirmDialog.ShowAsync();
                 if (confirmResult == ContentDialogResult.Primary)
@@ -404,7 +422,7 @@ namespace QAssistant
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = ContentFrame.XamlRoot
             };
-            DialogHelper.ApplyDarkTheme(dialog);
+            // DialogHelper.ApplyDarkTheme(dialog);
 
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(nameBox.Text))
@@ -537,11 +555,11 @@ namespace QAssistant
             {
                 bool active = tab.Tag.ToString() == ViewModel.ActiveTab;
                 tab.Background = active
-                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 45, 45, 63))
+                    ? (Brush)Application.Current.Resources["ListAccentLowBrush"]
                     : new SolidColorBrush(Colors.Transparent);
                 tab.Foreground = active
-                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
-                    : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+                    ? (Brush)Application.Current.Resources["TextPrimaryBrush"]
+                    : (Brush)Application.Current.Resources["TextSecondaryBrush"];
             }
         }
 

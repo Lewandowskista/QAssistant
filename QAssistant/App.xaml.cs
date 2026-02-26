@@ -136,22 +136,7 @@ namespace QAssistant
 
                 // Load default app icon
                 IntPtr hInstance = GetModuleHandle(null);
-
                 IntPtr hIcon = LoadIcon(hInstance, new IntPtr(32512));
-
-                if (hIcon == IntPtr.Zero)
-                    hIcon = LoadIcon(IntPtr.Zero, new IntPtr(32512));
-
-                _nid = new NOTIFYICONDATA
-                {
-                    cbSize = Marshal.SizeOf<NOTIFYICONDATA>(),
-                    hWnd = MainWindowHandle,
-                    uID = 1,
-                    uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP,
-                    uCallbackMessage = WM_TRAYICON,
-                    hIcon = hIcon, // Pass the memory icon directly!
-                    szTip = "QAssistant"
-                };
                 if (hIcon == IntPtr.Zero)
                     hIcon = LoadIcon(IntPtr.Zero, new IntPtr(32512));
 
