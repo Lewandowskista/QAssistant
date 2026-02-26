@@ -9,6 +9,9 @@ namespace QAssistant
 {
     public partial class App : Application
     {
+        [DllImport("shell32.dll", SetLastError = true)]
+        private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+
         public static IntPtr MainWindowHandle { get; private set; }
         public static MainWindow? MainWindowInstance { get; private set; }
         public static bool MinimizeToTray { get; set; } = false;
@@ -108,6 +111,8 @@ namespace QAssistant
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
+            SetCurrentProcessExplicitAppUserModelID("QAssistant.App");
+
             m_window = new MainWindow();
             MainWindowInstance = (MainWindow)m_window;
             m_window.Activate();
@@ -239,6 +244,9 @@ namespace QAssistant
         {
             if (MainWindowInstance != null)
                 ((App)Application.Current).RemoveTrayIcon();
+            
+            NotificationService.Instance.Unregister();
+            
             System.Diagnostics.Process.GetCurrentProcess().Kill();
         }
 

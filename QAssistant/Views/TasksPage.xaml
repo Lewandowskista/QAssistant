@@ -500,9 +500,12 @@
                                                   Foreground="#E2E8F0"
                                                   Checked="DetailSetDueDate_Checked"
                                                   Unchecked="DetailSetDueDate_Unchecked"/>
-                                        <DatePicker x:Name="DetailDueDatePicker"
-                                                    HorizontalAlignment="Stretch"
-                                                    Visibility="Collapsed"/>
+                                        <StackPanel x:Name="DetailDateTimePicker" Spacing="8" Visibility="Collapsed">
+                                            <DatePicker x:Name="DetailDueDatePicker"
+                                                        HorizontalAlignment="Stretch"/>
+                                            <TimePicker x:Name="DetailDueTimePicker"
+                                                        HorizontalAlignment="Stretch"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>

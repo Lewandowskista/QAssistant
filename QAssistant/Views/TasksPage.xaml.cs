@@ -198,7 +198,7 @@ namespace QAssistant.Views
 
             if (task.DueDate.HasValue)
             {
-                DetailDueDate.Text = task.DueDate.Value.ToString("MMM d, yyyy");
+                DetailDueDate.Text = task.DueDate.Value.ToString("MMM d, yyyy h:mm tt");
                 DetailDueDatePanel.Visibility = Visibility.Visible;
             }
             else
@@ -251,12 +251,15 @@ namespace QAssistant.Views
                 {
                     DetailSetDueDate.IsChecked = true;
                     DetailDueDatePicker.Date = new DateTimeOffset(task.DueDate.Value);
-                    DetailDueDatePicker.Visibility = Visibility.Visible;
+                    DetailDueTimePicker.Time = task.DueDate.Value.TimeOfDay;
+                    DetailDateTimePicker.Visibility = Visibility.Visible;
                 }
                 else
                 {
                     DetailSetDueDate.IsChecked = false;
-                    DetailDueDatePicker.Visibility = Visibility.Collapsed;
+                    DetailDueDatePicker.Date = DateTimeOffset.Now;
+                    DetailDueTimePicker.Time = DateTime.Now.TimeOfDay;
+                    DetailDateTimePicker.Visibility = Visibility.Collapsed;
                 }
             }
         }
@@ -674,12 +677,12 @@ namespace QAssistant.Views
 
         private void DetailSetDueDate_Checked(object sender, RoutedEventArgs e)
         {
-            DetailDueDatePicker.Visibility = Visibility.Visible;
+            DetailDateTimePicker.Visibility = Visibility.Visible;
         }
 
         private void DetailSetDueDate_Unchecked(object sender, RoutedEventArgs e)
         {
-            DetailDueDatePicker.Visibility = Visibility.Collapsed;
+            DetailDateTimePicker.Visibility = Visibility.Collapsed;
         }
 
         private async void SaveTaskChanges_Click(object sender, RoutedEventArgs e)
@@ -688,12 +691,24 @@ namespace QAssistant.Views
 
             _selectedTask.Status = (Models.TaskStatus)DetailStatusPicker.SelectedItem!;
             _selectedTask.Priority = (TaskPriority)DetailPriorityPicker.SelectedItem!;
-            _selectedTask.DueDate = DetailSetDueDate.IsChecked == true
-                ? DetailDueDatePicker.Date.DateTime : null;
+
+            if (DetailSetDueDate.IsChecked == true)
+            {
+                var d = DetailDueDatePicker.Date.DateTime;
+                var t = DetailDueTimePicker.Time;
+                _selectedTask.DueDate = new DateTime(d.Year, d.Month, d.Day, t.Hours, t.Minutes, 0);
+            }
+            else
+            {
+                _selectedTask.DueDate = null;
+            }
 
             await _vm.SaveAsync();
             RefreshBoard(_vm.SelectedProject.Tasks);
             CloseDetailPanel();
+
+            // Trigger immediate reminder update
+            App.MainWindowInstance?.ReminderService.TriggerCheck();
         }
 
         private async void DeleteTask_Click(object sender, RoutedEventArgs e)
@@ -718,6 +733,9 @@ namespace QAssistant.Views
                 await _vm.SaveAsync();
                 RefreshBoard(_vm.SelectedProject.Tasks);
                 CloseDetailPanel();
+
+                // Trigger immediate reminder update
+                App.MainWindowInstance?.ReminderService.TriggerCheck();
             }
         }
 
@@ -784,20 +802,28 @@ namespace QAssistant.Views
             var ticketBox = new TextBox { PlaceholderText = "Ticket URL (optional)" };
             var dueDatePicker = new DatePicker
             {
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Visibility = Visibility.Collapsed
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
+            var dueTimePicker = new TimePicker
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Time = DateTime.Now.TimeOfDay
+            };
+            var dateStack = new StackPanel { Spacing = 8, Visibility = Visibility.Collapsed };
+            dateStack.Children.Add(dueDatePicker);
+            dateStack.Children.Add(dueTimePicker);
+
             var setDueDate = new CheckBox
             {
                 Content = "Set due date",
                 IsChecked = false,
                 Foreground = new SolidColorBrush(Colors.White)
             };
-            setDueDate.Checked += (s, e) => dueDatePicker.Visibility = Visibility.Visible;
-            setDueDate.Unchecked += (s, e) => dueDatePicker.Visibility = Visibility.Collapsed;
+            setDueDate.Checked += (s, e) => dateStack.Visibility = Visibility.Visible;
+            setDueDate.Unchecked += (s, e) => dateStack.Visibility = Visibility.Collapsed;
 
             var panel = new StackPanel { Spacing = 10 };
-            panel.Children.Add(new TextBlock { Text = "Title", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(new TextBlock { Text = "Task Title", Foreground = new SolidColorBrush(Colors.White) });
             panel.Children.Add(titleBox);
             panel.Children.Add(new TextBlock { Text = "Description", Foreground = new SolidColorBrush(Colors.White) });
             panel.Children.Add(descBox);
@@ -809,15 +835,15 @@ namespace QAssistant.Views
             panel.Children.Add(ticketBox);
             panel.Children.Add(new TextBlock { Text = "Due Date", Foreground = new SolidColorBrush(Colors.White) });
             panel.Children.Add(setDueDate);
-            panel.Children.Add(dueDatePicker);
+            panel.Children.Add(dateStack);
 
             var dialog = new ContentDialog
             {
                 Title = "New Task",
                 Content = panel,
-                PrimaryButtonText = "Add",
+                PrimaryButtonText = "Add Task",
                 CloseButtonText = "Cancel",
-                DefaultButton = ContentDialogButton.Primary,
+                DefaultButton = ContentDialogButton.Close,
                 XamlRoot = this.XamlRoot
             };
             DialogHelper.ApplyDarkTheme(dialog);
@@ -825,6 +851,14 @@ namespace QAssistant.Views
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(titleBox.Text))
             {
+                DateTime? dueDate = null;
+                if (setDueDate.IsChecked == true)
+                {
+                    var d = dueDatePicker.Date.DateTime;
+                    var t = dueTimePicker.Time;
+                    dueDate = new DateTime(d.Year, d.Month, d.Day, t.Hours, t.Minutes, 0);
+                }
+
                 var task = new ProjectTask
                 {
                     Title = titleBox.Text.Trim(),
@@ -832,11 +866,14 @@ namespace QAssistant.Views
                     Status = (Models.TaskStatus)statusPicker.SelectedItem!,
                     Priority = (TaskPriority)priorityPicker.SelectedItem!,
                     TicketUrl = ticketBox.Text.Trim(),
-                    DueDate = setDueDate.IsChecked == true ? dueDatePicker.Date.DateTime : null
+                    DueDate = dueDate
                 };
                 _vm.SelectedProject.Tasks.Add(task);
                 await _vm.SaveAsync();
                 RefreshBoard(_vm.SelectedProject.Tasks);
+
+                // Trigger immediate reminder update
+                App.MainWindowInstance?.ReminderService.TriggerCheck();
             }
         }
 
@@ -1186,6 +1223,9 @@ namespace QAssistant.Views
                     RefreshBoard(_vm.SelectedProject.Tasks);
                 }
             }
+
+            // Trigger immediate reminder update
+            App.MainWindowInstance?.ReminderService.TriggerCheck();
         }
 
         private void ShowRateLimitBanner()

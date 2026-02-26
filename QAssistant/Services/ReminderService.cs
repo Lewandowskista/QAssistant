@@ -9,12 +9,17 @@ namespace QAssistant.Services
 {
     public class ReminderService
     {
-        private Timer? _hourlyTimer;
+        private Timer? _precisionTimer;
         private Timer? _dailySummaryTimer;
         private Func<List<Project>>? _getProjects;
-        private Action<string, string>? _showBanner;
+        private Action<string?, string?>? _showBanner;
+        private readonly HashSet<Guid> _notifiedOverdue = new();
+        private readonly HashSet<Guid> _notifiedUpcoming = new();
 
-        public void Start(Func<List<Project>> getProjects, Action<string, string> showBanner)
+        private string? _lastBannerTitle;
+        private string? _lastBannerMessage;
+
+        public void Start(Func<List<Project>> getProjects, Action<string?, string?> showBanner)
         {
             _getProjects = getProjects;
             _showBanner = showBanner;
@@ -22,9 +27,9 @@ namespace QAssistant.Services
             // Check immediately on start
             CheckDueTasks();
 
-            // Check every hour
-            _hourlyTimer = new Timer(_ => CheckDueTasks(), null,
-                TimeSpan.FromHours(1), TimeSpan.FromHours(1));
+            // Check every minute for precision reminders
+            _precisionTimer = new Timer(_ => CheckDueTasks(), null,
+                TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(1));
 
             // Schedule daily summary at 9am
             ScheduleDailySummary();
@@ -32,40 +37,121 @@ namespace QAssistant.Services
 
         public void Stop()
         {
-            _hourlyTimer?.Dispose();
+            _precisionTimer?.Dispose();
             _dailySummaryTimer?.Dispose();
         }
+
+        public void TriggerCheck() => CheckDueTasks();
 
         private void CheckDueTasks()
         {
             if (_getProjects == null || _showBanner == null) return;
 
-            var today = DateTime.Today;
-            var overdue = new List<string>();
-            var dueToday = new List<string>();
+            var now = DateTime.Now;
+            var currentOverdueTasks = new List<ProjectTask>();
+            var currentUpcomingTasks = new List<ProjectTask>();
 
             foreach (var project in _getProjects())
             {
                 foreach (var task in project.Tasks)
                 {
-                    if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate) continue;
-                    if (task.DueDate == null) continue;
+                    if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate)
+                    {
+                        _notifiedOverdue.Remove(task.Id);
+                        _notifiedUpcoming.Remove(task.Id);
+                        continue;
+                    }
 
-                    var due = task.DueDate.Value.Date;
-                    if (due < today)
-                        overdue.Add(task.Title);
-                    else if (due == today)
-                        dueToday.Add(task.Title);
+                    if (task.DueDate == null)
+                    {
+                        _notifiedOverdue.Remove(task.Id);
+                        _notifiedUpcoming.Remove(task.Id);
+                        continue;
+                    }
+
+                    var due = task.DueDate.Value;
+
+                    if (due < now)
+                    {
+                        currentOverdueTasks.Add(task);
+                        _notifiedUpcoming.Remove(task.Id);
+                    }
+                    else if (due < now.AddMinutes(30))
+                    {
+                        currentUpcomingTasks.Add(task);
+                        _notifiedOverdue.Remove(task.Id);
+                    }
+                    else
+                    {
+                        _notifiedOverdue.Remove(task.Id);
+                        _notifiedUpcoming.Remove(task.Id);
+                    }
                 }
             }
 
-            if (overdue.Count > 0)
-                _showBanner("Overdue Tasks",
-                    $"{overdue.Count} task{(overdue.Count > 1 ? "s are" : " is")} overdue: {string.Join(", ", overdue.Take(3))}{(overdue.Count > 3 ? "..." : "")}");
+            string? newTitle = null;
+            string? newMessage = null;
+            string? tag = null;
 
-            if (dueToday.Count > 0)
-                _showBanner("Due Today",
-                    $"{dueToday.Count} task{(dueToday.Count > 1 ? "s are" : " is")} due today: {string.Join(", ", dueToday.Take(3))}{(dueToday.Count > 3 ? "..." : "")}");
+            if (currentOverdueTasks.Count > 0)
+            {
+                newTitle = "Overdue Tasks";
+                newMessage = $"{currentOverdueTasks.Count} task{(currentOverdueTasks.Count > 1 ? "s are" : " is")} now overdue: {string.Join(", ", currentOverdueTasks.Take(3).Select(t => t.Title))}{(currentOverdueTasks.Count > 3 ? "..." : "")}";
+                tag = "Overdue";
+            }
+            else if (currentUpcomingTasks.Count > 0)
+            {
+                newTitle = "Upcoming Deadline";
+                newMessage = $"{currentUpcomingTasks.Count} task{(currentUpcomingTasks.Count > 1 ? "s are" : " is")} due soon: {string.Join(", ", currentUpcomingTasks.Take(3).Select(t => t.Title))}{(currentUpcomingTasks.Count > 3 ? "..." : "")}";
+                tag = "Upcoming";
+            }
+
+            // Update UI Banner if truth changed
+            if (newTitle != _lastBannerTitle || newMessage != _lastBannerMessage)
+            {
+                _showBanner(newTitle, newMessage);
+                _lastBannerTitle = newTitle;
+                _lastBannerMessage = newMessage;
+            }
+
+            // Show Toast if there are NEWLY notified items
+            if (newTitle != null && newMessage != null)
+            {
+                bool hasNew = false;
+                if (tag == "Overdue")
+                {
+                    foreach (var t in currentOverdueTasks)
+                    {
+                        if (!_notifiedOverdue.Contains(t.Id))
+                        {
+                            hasNew = true;
+                            _notifiedOverdue.Add(t.Id);
+                        }
+                    }
+                }
+                else if (tag == "Upcoming")
+                {
+                    foreach (var t in currentUpcomingTasks)
+                    {
+                        if (!_notifiedUpcoming.Contains(t.Id))
+                        {
+                            hasNew = true;
+                            _notifiedUpcoming.Add(t.Id);
+                        }
+                    }
+                }
+
+                if (hasNew)
+                {
+                    NotificationService.Instance.ShowToast(newTitle, newMessage, tag);
+                }
+            }
+            else
+            {
+                // Clear active toasts if the condition is gone
+                NotificationService.Instance.RemoveToast("Overdue");
+                NotificationService.Instance.RemoveToast("Upcoming");
+            }
         }
 
         private void ScheduleDailySummary()
@@ -84,6 +170,7 @@ namespace QAssistant.Services
             if (_getProjects == null || _showBanner == null) return;
 
             var today = DateTime.Today;
+            var now = DateTime.Now;
             int dueToday = 0, overdue = 0, total = 0;
 
             foreach (var project in _getProjects())
@@ -92,8 +179,12 @@ namespace QAssistant.Services
                 {
                     if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate) continue;
                     total++;
-                    if (task.DueDate?.Date == today) dueToday++;
-                    else if (task.DueDate?.Date < today) overdue++;
+                    
+                    if (task.DueDate.HasValue)
+                    {
+                        if (task.DueDate.Value < now) overdue++;
+                        else if (task.DueDate.Value.Date == today) dueToday++;
+                    }
                 }
             }
 

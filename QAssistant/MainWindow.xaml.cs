@@ -27,7 +27,7 @@ namespace QAssistant
 
         public MainViewModel ViewModel { get; } = new();
         private AppWindow? _appWindow;
-        private readonly ReminderService _reminderService = new();
+        public ReminderService ReminderService { get; } = new();
 
         public MainWindow()
         {
@@ -54,7 +54,7 @@ namespace QAssistant
                 }
                 else
                 {
-                    _reminderService.Stop();
+                    ReminderService.Stop();
                 }
             };
         }
@@ -66,7 +66,7 @@ namespace QAssistant
                 await ViewModel.InitializeAsync();
                 RefreshProjectList();
 
-                _reminderService.Start(
+                ReminderService.Start(
                     () => ViewModel.Projects.ToList(),
                     (title, message) => ShowNotificationBanner(title, message)
                 );
@@ -147,10 +147,16 @@ namespace QAssistant
         }
 
         // ── Notifications ────────────────────────────────────────────
-        private void ShowNotificationBanner(string title, string message)
+        private void ShowNotificationBanner(string? title, string? message)
         {
             DispatcherQueue.TryEnqueue(() =>
             {
+                if (string.IsNullOrEmpty(title))
+                {
+                    NotificationBanner.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
                 NotificationTitle.Text = title;
                 NotificationMessage.Text = message;
                 NotificationBanner.Visibility = Visibility.Visible;
