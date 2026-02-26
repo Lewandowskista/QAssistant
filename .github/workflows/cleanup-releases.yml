@@ -1,0 +1,70 @@
+name: Cleanup Old Releases and Tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: 'Number of most-recent releases to keep'
+        required: false
+        default: '1'
+        type: string
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Delete old releases and their tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          KEEP: ${{ inputs.keep }}
+        run: |
+          # Fetch all releases sorted newest-first (GitHub returns them that way by default)
+          releases=$(gh api "repos/$REPO/releases" --paginate --jq '.[] | .id')
+
+          count=0
+          for id in $releases; do
+            count=$((count + 1))
+            if [ "$count" -le "$KEEP" ]; then
+              echo "Keeping release id=$id (rank $count)"
+              continue
+            fi
+
+            # Get the tag name before deleting the release
+            tag=$(gh api "repos/$REPO/releases/$id" --jq '.tag_name')
+            echo "Deleting release id=$id tag=$tag"
+
+            # Delete the release
+            gh api --method DELETE "repos/$REPO/releases/$id"
+
+            # Delete the tag
+            if ! gh api --method DELETE "repos/$REPO/git/refs/tags/$tag" 2>&1; then
+              echo "Warning: could not delete tag $tag (may already be deleted)"
+            fi
+          done
+
+      - name: Delete orphaned tags (tags with no release)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Collect all tags that still have a release
+          release_tags=$(gh api "repos/$REPO/releases" --paginate --jq '.[] | .tag_name')
+
+          # Collect all tags in the repo
+          all_tags=$(gh api "repos/$REPO/tags" --paginate --jq '.[] | .name')
+
+          for tag in $all_tags; do
+            if echo "$release_tags" | grep -Fqx "$tag"; then
+              echo "Tag $tag has a release, skipping"
+            else
+              echo "Deleting orphaned tag $tag"
+              if ! gh api --method DELETE "repos/$REPO/git/refs/tags/$tag" 2>&1; then
+                echo "Warning: could not delete orphaned tag $tag"
+              fi
+            fi
+          done
