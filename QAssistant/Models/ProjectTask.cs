@@ -10,7 +10,7 @@ namespace QAssistant.Models
     public class ProjectTask
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public string Title { get; set; } = string.Empty;
+        public required string Title { get; set; }
         public string RawDescription { get; set; } = string.Empty;
         public string IssueIdentifier { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
@@ -19,13 +19,12 @@ namespace QAssistant.Models
         public DateTime? DueDate { get; set; }
         public string? TicketUrl { get; set; }
 
-        // Integration fields
         public string? ExternalId { get; set; }
         public TaskSource Source { get; set; } = TaskSource.Manual;
         public string? IssueType { get; set; }
         public string? Assignee { get; set; }
         public string? Reporter { get; set; }
         public string? Labels { get; set; }
-        public List<string> AttachmentUrls { get; set; } = new();
+        public List<string> AttachmentUrls { get; set; } = [];
     }
 }

@@ -61,12 +61,10 @@ namespace QAssistant.Services
                 }
 
                 // Ensure directory exists and is writable
-                if (!Directory.Exists(folder))
-                {
-                    Directory.CreateDirectory(folder);
-                }
+                Directory.CreateDirectory(folder);
 
                 _dataPath = Path.Combine(folder, "projects.json");
+
                 _logPath = Path.Combine(folder, "storage.log");
 
                 var options = new JsonSerializerOptions 
@@ -106,7 +104,8 @@ namespace QAssistant.Services
             try
             {
                 if (!File.Exists(_dataPath))
-                    return new List<Project>();
+                    return [];
+
 
                 var fileContent = await File.ReadAllTextAsync(_dataPath);
                 var normalizedJson = fileContent;
@@ -145,9 +144,10 @@ namespace QAssistant.Services
             {
                 LogMessage($"LoadProjectsAsync error: {ex.GetType().Name}: {ex.Message}");
                 Debug.WriteLine($"StorageService LoadProjectsAsync error: {ex.Message}\n{ex.StackTrace}");
-                return new List<Project>();
+                return [];
             }
         }
+
 
         public async Task SaveProjectsAsync(List<Project> projects)
         {

@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -9,72 +11,63 @@ using QAssistant.Models;
 
 namespace QAssistant.Services
 {
-    public class JiraService
+    public class JiraService(string domain, string email, string apiToken)
     {
-        private readonly HttpClient _client = new();
-        private readonly string _baseUrl;
+        private readonly HttpClient _client = CreateClient(email, apiToken);
+        private readonly string _baseUrl = $"https://{domain}.atlassian.net/rest/api/3";
+        private readonly string _browseUrl = $"https://{domain}.atlassian.net/browse";
 
-        public JiraService(string domain, string email, string apiToken)
+        private static HttpClient CreateClient(string email, string apiToken)
         {
-            _baseUrl = $"https://{domain}.atlassian.net/rest/api/3";
-            var credentials = Convert.ToBase64String(
-                Encoding.UTF8.GetBytes($"{email}:{apiToken}"));
-            _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Basic", credentials);
-            _client.DefaultRequestHeaders.Accept
-                .Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            var client = new HttpClient();
+            var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{email}:{apiToken}"));
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            return client;
         }
 
         public async Task<List<JiraProject>> GetProjectsAsync()
         {
-            var response = await _client.GetStringAsync($"{_baseUrl}/project");
-            var projects = new List<JiraProject>();
-
-            using var doc = JsonDocument.Parse(response);
-            foreach (var node in doc.RootElement.EnumerateArray())
+            var projects = await _client.GetFromJsonAsync<List<JsonElement>>($"{_baseUrl}/project");
+            return projects?.Select(node => new JiraProject
             {
-                projects.Add(new JiraProject
-                {
-                    Id = node.GetProperty("id").GetString() ?? "",
-                    Key = node.GetProperty("key").GetString() ?? "",
-                    Name = node.GetProperty("name").GetString() ?? ""
-                });
-            }
-
-            return projects;
+                Id = node.GetProperty("id").GetString() ?? "",
+                Key = node.GetProperty("key").GetString() ?? "",
+                Name = node.GetProperty("name").GetString() ?? ""
+            }).ToList() ?? [];
         }
 
         public async Task<List<ProjectTask>> GetIssuesAsync(string projectKey)
         {
             var jql = $"project={projectKey} ORDER BY updated DESC";
             var url = $"{_baseUrl}/search?jql={Uri.EscapeDataString(jql)}&maxResults=100&fields=summary,description,status,priority,assignee,reporter,issuetype,duedate,story_points,labels,components,comment";
-            var response = await _client.GetStringAsync(url);
+
+            var response = await _client.GetFromJsonAsync<JsonElement>(url);
             var tasks = new List<ProjectTask>();
 
-            using var doc = JsonDocument.Parse(response);
-            var issues = doc.RootElement.GetProperty("issues");
-
-            foreach (var issue in issues.EnumerateArray())
+            if (response.TryGetProperty("issues", out var issues))
             {
-                var fields = issue.GetProperty("fields");
-                var task = new ProjectTask
+                foreach (var issue in issues.EnumerateArray())
                 {
-                    Id = Guid.NewGuid(),
-                    ExternalId = issue.GetProperty("id").GetString() ?? "",
-                    Title = fields.GetProperty("summary").GetString() ?? "",
-                    Description = GetJiraDescription(fields),
-                    Status = MapJiraStatus(fields.GetProperty("status")
-                        .GetProperty("name").GetString() ?? ""),
-                    Priority = MapJiraPriority(fields),
-                    TicketUrl = $"https://{_baseUrl.Split('/')[2]}/browse/{issue.GetProperty("key").GetString()}",
-                    Source = TaskSource.Jira,
-                    IssueType = GetString(fields, "issuetype", "name"),
-                    Assignee = GetString(fields, "assignee", "displayName"),
-                    Reporter = GetString(fields, "reporter", "displayName"),
-                    Labels = GetLabels(fields),
-                    DueDate = GetDate(fields, "duedate")
-                };
-                tasks.Add(task);
+                    var fields = issue.GetProperty("fields");
+                    var task = new ProjectTask
+                    {
+                        Id = Guid.NewGuid(),
+                        ExternalId = issue.GetProperty("id").GetString() ?? "",
+                        Title = fields.GetProperty("summary").GetString() ?? "",
+                        Description = GetJiraDescription(fields),
+                        Status = MapJiraStatus(fields.GetProperty("status").GetProperty("name").GetString() ?? ""),
+                        Priority = MapJiraPriority(fields),
+                        TicketUrl = $"{_browseUrl}/{issue.GetProperty("key").GetString()}",
+                        Source = TaskSource.Jira,
+                        IssueType = GetString(fields, "issuetype", "name"),
+                        Assignee = GetString(fields, "assignee", "displayName"),
+                        Reporter = GetString(fields, "reporter", "displayName"),
+                        Labels = GetLabels(fields),
+                        DueDate = GetDate(fields, "duedate")
+                    };
+                    tasks.Add(task);
+                }
             }
 
             return tasks;
@@ -83,47 +76,33 @@ namespace QAssistant.Services
         public async Task UpdateIssueStatusAsync(string issueIdOrKey, string transitionId)
         {
             var url = $"{_baseUrl}/issue/{issueIdOrKey}/transitions";
-
-            var payload = new System.Text.Json.Nodes.JsonObject
-            {
-                ["transition"] = new System.Text.Json.Nodes.JsonObject { ["id"] = transitionId }
-            }.ToJsonString();
-
-            var content = new StringContent(payload, Encoding.UTF8, "application/json");
-            await _client.PostAsync(url, content);
+            var payload = new { transition = new { id = transitionId } };
+            await _client.PostAsJsonAsync(url, payload);
         }
 
         public async Task AddCommentAsync(string issueIdOrKey, string body)
         {
             var url = $"{_baseUrl}/issue/{issueIdOrKey}/comment";
-
-            var payload = new System.Text.Json.Nodes.JsonObject
+            var payload = new
             {
-                ["body"] = new System.Text.Json.Nodes.JsonObject
+                body = new
                 {
-                    ["type"] = "doc",
-                    ["version"] = 1,
-                    ["content"] = new System.Text.Json.Nodes.JsonArray
-            {
-                new System.Text.Json.Nodes.JsonObject
-                {
-                    ["type"] = "paragraph",
-                    ["content"] = new System.Text.Json.Nodes.JsonArray
+                    type = "doc",
+                    version = 1,
+                    content = new[]
                     {
-                        new System.Text.Json.Nodes.JsonObject
+                        new
                         {
-                            ["type"] = "text",
-                            ["text"] = body
+                            type = "paragraph",
+                            content = new[] { new { type = "text", text = body } }
                         }
                     }
                 }
-            }
-                }
-            }.ToJsonString();
+            };
 
-            var content = new StringContent(payload, Encoding.UTF8, "application/json");
-            await _client.PostAsync(url, content);
+            await _client.PostAsJsonAsync(url, payload);
         }
+
 
         private static string GetJiraDescription(JsonElement fields)
         {

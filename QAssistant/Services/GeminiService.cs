@@ -12,15 +12,23 @@ using QAssistant.Models;
 
 namespace QAssistant.Services
 {
-    public class GeminiService
+    public class GeminiService(string apiKey)
     {
-        private readonly HttpClient _client = new();
-        private readonly string _apiKey;
+        private readonly HttpClient _client = CreateClient(apiKey);
         private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta";
         private const string FallbackModel = "models/gemini-3-flash";
 
+        private static HttpClient CreateClient(string apiKey)
+        {
+            var client = new HttpClient();
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            client.DefaultRequestHeaders.Add("x-goog-api-key", apiKey);
+            return client;
+        }
+
         /// <summary>
         /// Builds a Token-Oriented Object Notation (TOON) prompt for issue analysis.
+
         /// TOON uses compact key-value pairs and directive-style instructions to
         /// significantly reduce token consumption while preserving semantic quality.
         /// </summary>
@@ -72,15 +80,8 @@ namespace QAssistant.Services
             return sb.ToString();
         }
 
-        public GeminiService(string apiKey)
-        {
-            _apiKey = apiKey;
-            _client.DefaultRequestHeaders.Accept
-                .Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            _client.DefaultRequestHeaders.Add("x-goog-api-key", _apiKey);
-        }
-
         public async Task<List<(string, string[])>> ListModelsAsync()
+
         {
             var url = $"{BaseUrl}/models";
             var resp = await _client.GetAsync(url);

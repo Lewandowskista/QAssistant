@@ -14,7 +14,8 @@ namespace QAssistant.ViewModels
         private readonly StorageService _storage = StorageService.Instance;
 
         [ObservableProperty]
-        public partial ObservableCollection<Project> Projects { get; set; } = new();
+        public partial ObservableCollection<Project> Projects { get; set; } = [];
+
 
         [ObservableProperty]
         public partial Project? SelectedProject { get; set; }

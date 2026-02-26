@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -12,12 +13,11 @@ using QAssistant.Models;
 
 namespace QAssistant.Services
 {
-    public class LinearService
+    public class LinearService(string apiKey)
     {
-        private readonly HttpClient _client;
+        private readonly HttpClient _client = CreateClient(apiKey);
         private const string Endpoint = "https://api.linear.app/graphql";
 
-        // Pre-compiled regex patterns for CleanDescription and ExtractMediaUrls
         private static readonly Regex s_markdownImageRegex = new(@"!\[.*?\]\(.*?\)", RegexOptions.Compiled);
         private static readonly Regex s_markdownLinkRegex = new(@"\[([^\]]+)\]\([^\)]+\)", RegexOptions.Compiled);
         private static readonly Regex s_htmlTagRegex = new(@"<[^>]+>", RegexOptions.Compiled);
@@ -28,15 +28,17 @@ namespace QAssistant.Services
         private static readonly Regex s_excessNewlinesRegex = new(@"\n{3,}", RegexOptions.Compiled);
         private static readonly Regex s_extractMarkdownImageUrlRegex = new(@"!\[.*?\]\((.*?)\)", RegexOptions.Compiled);
         private static readonly Regex s_extractHtmlImgSrcRegex = new(@"<img[^>]+src=""([^""]+)""", RegexOptions.Compiled);
-        private static readonly Regex s_extractPlainImageUrlRegex = new(@"https?://[^\s\)\]""]+\.(?:png|jpe?g|gif|webp|svg|bmp|mp4|webm|mov)(?:\?[^\s\)\]""]*)?" , RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex s_extractPlainImageUrlRegex = new(@"https?://[^\s\)\]""]+\.(?:png|jpe?g|gif|webp|svg|bmp|mp4|webm|mov)(?:\?[^\s\)\]""]*)?", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        public LinearService(string apiKey)
+        private static HttpClient CreateClient(string apiKey)
+
         {
-            _client = new HttpClient();
-            _client.DefaultRequestHeaders.Add("Authorization", apiKey);
-            _client.DefaultRequestHeaders.Accept
-                .Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            var client = new HttpClient();
+            client.DefaultRequestHeaders.Add("Authorization", apiKey);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            return client;
         }
+
 
         public async Task<List<ProjectTask>> GetIssuesAsync(string teamId)
         {
@@ -293,16 +295,14 @@ namespace QAssistant.Services
 
         private async Task<string> PostQueryAsync(string query, JsonObject? variables = null)
         {
-            var payloadObject = new JsonObject { ["query"] = query };
+            var payload = new JsonObject { ["query"] = query };
             if (variables != null)
-                payloadObject["variables"] = variables;
+                payload["variables"] = variables;
 
-            var payload = payloadObject.ToJsonString();
-
-            var content = new StringContent(payload, Encoding.UTF8, "application/json");
-            var response = await _client.PostAsync(Endpoint, content);
+            var response = await _client.PostAsJsonAsync(Endpoint, payload);
             return await response.Content.ReadAsStringAsync();
         }
+
 
         private static string CleanDescription(string? raw)
         {
