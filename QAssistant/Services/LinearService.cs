@@ -496,6 +496,112 @@ namespace QAssistant.Services
 
             return null;
         }
+
+        public async Task<List<WorklogEntry>> GetIssueHistoryAsync(string issueId)
+        {
+            var query = @"
+    query($issueId: String!) {
+        issue(id: $issueId) {
+            history(first: 50) {
+                nodes {
+                    createdAt
+                    actor { name }
+                    fromState { name }
+                    toState { name }
+                    fromPriority
+                    toPriority
+                    fromAssignee { name }
+                    toAssignee { name }
+                }
+            }
+        }
+    }";
+
+            var response = await PostQueryAsync(query, new JsonObject { ["issueId"] = issueId });
+            var entries = new List<WorklogEntry>();
+
+            try
+            {
+                using var doc = JsonDocument.Parse(response);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("data", out var data)) return entries;
+                if (!data.TryGetProperty("issue", out var issue)) return entries;
+                if (!issue.TryGetProperty("history", out var history)) return entries;
+
+                foreach (var node in history.GetProperty("nodes").EnumerateArray())
+                {
+                    string actor = "";
+                    if (node.TryGetProperty("actor", out var actorEl) && actorEl.ValueKind != JsonValueKind.Null)
+                        actor = actorEl.GetProperty("name").GetString() ?? "";
+
+                    DateTime created = DateTime.Now;
+                    if (node.TryGetProperty("createdAt", out var createdEl))
+                        DateTime.TryParse(createdEl.GetString(), out created);
+
+                    // State change
+                    if (node.TryGetProperty("fromState", out var fromState) && fromState.ValueKind != JsonValueKind.Null &&
+                        node.TryGetProperty("toState", out var toState) && toState.ValueKind != JsonValueKind.Null)
+                    {
+                        entries.Add(new WorklogEntry
+                        {
+                            Timestamp = created,
+                            Author = actor,
+                            Field = "Status",
+                            FromValue = fromState.GetProperty("name").GetString() ?? "",
+                            ToValue = toState.GetProperty("name").GetString() ?? ""
+                        });
+                    }
+
+                    // Priority change
+                    if (node.TryGetProperty("fromPriority", out var fromPri) && fromPri.ValueKind != JsonValueKind.Null &&
+                        node.TryGetProperty("toPriority", out var toPri) && toPri.ValueKind != JsonValueKind.Null)
+                    {
+                        entries.Add(new WorklogEntry
+                        {
+                            Timestamp = created,
+                            Author = actor,
+                            Field = "Priority",
+                            FromValue = LinearPriorityName(fromPri.GetInt32()),
+                            ToValue = LinearPriorityName(toPri.GetInt32())
+                        });
+                    }
+
+                    // Assignee change
+                    if (node.TryGetProperty("fromAssignee", out var fromAss) &&
+                        node.TryGetProperty("toAssignee", out var toAss))
+                    {
+                        string from = fromAss.ValueKind != JsonValueKind.Null
+                            ? fromAss.GetProperty("name").GetString() ?? "" : "Unassigned";
+                        string to = toAss.ValueKind != JsonValueKind.Null
+                            ? toAss.GetProperty("name").GetString() ?? "" : "Unassigned";
+                        if (from != to)
+                        {
+                            entries.Add(new WorklogEntry
+                            {
+                                Timestamp = created,
+                                Author = actor,
+                                Field = "Assignee",
+                                FromValue = from,
+                                ToValue = to
+                            });
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return entries;
+        }
+
+        private static string LinearPriorityName(int priority) => priority switch
+        {
+            0 => "No priority",
+            1 => "Urgent",
+            2 => "High",
+            3 => "Medium",
+            4 => "Low",
+            _ => $"Priority {priority}"
+        };
     }
 
     public class LinearTeam

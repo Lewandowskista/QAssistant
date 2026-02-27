@@ -54,8 +54,10 @@ namespace QAssistant.Services
                     {
                         Id = Guid.NewGuid(),
                         ExternalId = issue.GetProperty("id").GetString() ?? "",
+                        IssueIdentifier = issue.GetProperty("key").GetString() ?? "",
                         Title = fields.GetProperty("summary").GetString() ?? "",
                         Description = GetJiraDescription(fields),
+                        RawDescription = GetJiraDescription(fields),
                         Status = MapJiraStatus(fields.GetProperty("status").GetProperty("name").GetString() ?? ""),
                         Priority = MapJiraPriority(fields),
                         TicketUrl = $"{_browseUrl}/{issue.GetProperty("key").GetString()}",
@@ -103,6 +105,151 @@ namespace QAssistant.Services
             await _client.PostAsJsonAsync(url, payload);
         }
 
+        public async Task<List<LinearComment>> GetCommentsAsync(string issueIdOrKey)
+        {
+            var url = $"{_baseUrl}/issue/{issueIdOrKey}/comment?orderBy=-created";
+            var response = await _client.GetFromJsonAsync<JsonElement>(url);
+            var comments = new List<LinearComment>();
+
+            if (response.TryGetProperty("comments", out var commentsArray))
+            {
+                foreach (var comment in commentsArray.EnumerateArray())
+                {
+                    string author = "";
+                    if (comment.TryGetProperty("author", out var authorEl) &&
+                        authorEl.ValueKind != JsonValueKind.Null)
+                        author = authorEl.GetProperty("displayName").GetString() ?? "";
+
+                    DateTime createdAt = DateTime.Now;
+                    if (comment.TryGetProperty("created", out var createdEl))
+                        DateTime.TryParse(createdEl.GetString(), out createdAt);
+
+                    string body = "";
+                    if (comment.TryGetProperty("body", out var bodyEl) &&
+                        bodyEl.ValueKind != JsonValueKind.Null)
+                        body = ExtractAdfText(bodyEl);
+
+                    comments.Add(new LinearComment
+                    {
+                        Body = body,
+                        AuthorName = author,
+                        CreatedAt = createdAt
+                    });
+                }
+            }
+
+            return comments;
+        }
+
+        public async Task<List<JiraTransition>> GetTransitionsAsync(string issueIdOrKey)
+        {
+            var url = $"{_baseUrl}/issue/{issueIdOrKey}/transitions";
+            var response = await _client.GetFromJsonAsync<JsonElement>(url);
+            var transitions = new List<JiraTransition>();
+
+            if (response.TryGetProperty("transitions", out var transitionsArray))
+            {
+                foreach (var t in transitionsArray.EnumerateArray())
+                {
+                    transitions.Add(new JiraTransition
+                    {
+                        Id = t.GetProperty("id").GetString() ?? "",
+                        Name = t.TryGetProperty("to", out var to)
+                            ? to.GetProperty("name").GetString() ?? t.GetProperty("name").GetString() ?? ""
+                            : t.GetProperty("name").GetString() ?? ""
+                    });
+                }
+            }
+
+            return transitions;
+        }
+
+        public async Task<List<WorklogEntry>> GetChangelogAsync(string issueIdOrKey)
+        {
+            var url = $"{_baseUrl}/issue/{issueIdOrKey}?expand=changelog&fields=summary";
+            var response = await _client.GetFromJsonAsync<JsonElement>(url);
+            var entries = new List<WorklogEntry>();
+
+            if (response.TryGetProperty("changelog", out var changelog) &&
+                changelog.TryGetProperty("histories", out var histories))
+            {
+                foreach (var history in histories.EnumerateArray())
+                {
+                    string author = "";
+                    if (history.TryGetProperty("author", out var authorEl) &&
+                        authorEl.ValueKind != JsonValueKind.Null)
+                        author = authorEl.GetProperty("displayName").GetString() ?? "";
+
+                    DateTime created = DateTime.Now;
+                    if (history.TryGetProperty("created", out var createdEl))
+                        DateTime.TryParse(createdEl.GetString(), out created);
+
+                    if (history.TryGetProperty("items", out var items))
+                    {
+                        foreach (var item in items.EnumerateArray())
+                        {
+                            entries.Add(new WorklogEntry
+                            {
+                                Timestamp = created,
+                                Author = author,
+                                Field = item.GetProperty("field").GetString() ?? "",
+                                FromValue = item.TryGetProperty("fromString", out var fromEl)
+                                    ? fromEl.GetString() ?? "" : "",
+                                ToValue = item.TryGetProperty("toString", out var toEl)
+                                    ? toEl.GetString() ?? "" : ""
+                            });
+                        }
+                    }
+                }
+            }
+
+            return entries;
+        }
+
+        public static string? FindMatchingTransitionId(Models.TaskStatus targetStatus, List<JiraTransition> transitions)
+        {
+            var candidateNames = targetStatus switch
+            {
+                Models.TaskStatus.Backlog => new[] { "Backlog", "To Do", "Open", "Reopen" },
+                Models.TaskStatus.Todo => new[] { "To Do", "Open", "Backlog", "Reopen" },
+                Models.TaskStatus.InProgress => new[] { "In Progress", "Start Progress", "In Development" },
+                Models.TaskStatus.InReview => new[] { "In Review", "Code Review", "Testing", "QA" },
+                Models.TaskStatus.Done => new[] { "Done", "Closed", "Resolved", "Close", "Resolve" },
+                Models.TaskStatus.Canceled => new[] { "Canceled", "Cancelled", "Won't Do", "Rejected" },
+                Models.TaskStatus.Duplicate => new[] { "Duplicate", "Won't Do" },
+                _ => Array.Empty<string>()
+            };
+
+            foreach (var candidate in candidateNames)
+            {
+                var match = transitions.FirstOrDefault(t =>
+                    t.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase));
+                if (match != null) return match.Id;
+            }
+
+            return null;
+        }
+
+        private static string ExtractAdfText(JsonElement adfNode)
+        {
+            var sb = new StringBuilder();
+            if (adfNode.TryGetProperty("content", out var content))
+            {
+                foreach (var block in content.EnumerateArray())
+                {
+                    if (block.TryGetProperty("content", out var inline))
+                    {
+                        foreach (var item in inline.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("text", out var text))
+                                sb.Append(text.GetString());
+                        }
+                    }
+                    sb.AppendLine();
+                }
+            }
+            return sb.ToString().Trim();
+        }
 
         private static string GetJiraDescription(JsonElement fields)
         {

@@ -23,7 +23,9 @@ namespace QAssistant.Views
     {
         private MainViewModel? _vm;
         private bool _isLinearMode = false;
+        private bool _isJiraMode = false;
         private List<ProjectTask> _linearTasks = new();
+        private List<ProjectTask> _jiraTasks = new();
         private ProjectTask? _selectedTask;
         private string _activeTab = "Details";
         private string _lightboxUrl = string.Empty;
@@ -161,10 +163,13 @@ namespace QAssistant.Views
         private void ManualMode_Click(object sender, RoutedEventArgs e)
         {
             _isLinearMode = false;
+            _isJiraMode = false;
             ManualModeBtn.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250));
             ManualModeBtn.Foreground = new SolidColorBrush(Colors.White);
             LinearModeBtn.Background = new SolidColorBrush(Colors.Transparent);
             LinearModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            JiraModeBtn.Background = new SolidColorBrush(Colors.Transparent);
+            JiraModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
             AddTaskBtn.Visibility = Visibility.Visible;
             RefreshBtn.Visibility = Visibility.Collapsed;
             StatusText.Visibility = Visibility.Collapsed;
@@ -175,10 +180,13 @@ namespace QAssistant.Views
         private async void LinearMode_Click(object sender, RoutedEventArgs e)
         {
             _isLinearMode = true;
+            _isJiraMode = false;
             LinearModeBtn.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250));
             LinearModeBtn.Foreground = new SolidColorBrush(Colors.White);
             ManualModeBtn.Background = new SolidColorBrush(Colors.Transparent);
             ManualModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            JiraModeBtn.Background = new SolidColorBrush(Colors.Transparent);
+            JiraModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
             AddTaskBtn.Visibility = Visibility.Collapsed;
             RefreshBtn.Visibility = Visibility.Visible;
             StatusText.Visibility = Visibility.Visible;
@@ -196,7 +204,91 @@ namespace QAssistant.Views
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
-            await FetchLinearIssuesAsync();
+            if (_isJiraMode)
+                await FetchJiraIssuesAsync();
+            else
+                await FetchLinearIssuesAsync();
+        }
+
+        private async void JiraMode_Click(object sender, RoutedEventArgs e)
+        {
+            _isJiraMode = true;
+            _isLinearMode = false;
+            JiraModeBtn.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250));
+            JiraModeBtn.Foreground = new SolidColorBrush(Colors.White);
+            ManualModeBtn.Background = new SolidColorBrush(Colors.Transparent);
+            ManualModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            LinearModeBtn.Background = new SolidColorBrush(Colors.Transparent);
+            LinearModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            AddTaskBtn.Visibility = Visibility.Collapsed;
+            RefreshBtn.Visibility = Visibility.Visible;
+            StatusText.Visibility = Visibility.Visible;
+            CloseDetailPanel();
+
+            var domain = LoadProjectCred("JiraDomain");
+            if (string.IsNullOrEmpty(domain))
+            {
+                StatusText.Text = "No Jira credentials found. Go to Settings to connect.";
+                return;
+            }
+
+            await FetchJiraIssuesAsync();
+        }
+
+        private async System.Threading.Tasks.Task FetchJiraIssuesAsync()
+        {
+            StatusText.Visibility = Visibility.Visible;
+            StatusText.Text = "Fetching Jira issues...";
+
+            var service = CreateJiraService();
+            var projectKey = LoadProjectCred("JiraProjectKey");
+
+            if (service == null || string.IsNullOrEmpty(projectKey))
+            {
+                StatusText.Text = "No credentials found. Go to Settings.";
+                return;
+            }
+
+            try
+            {
+                _jiraTasks = await service.GetIssuesAsync(projectKey);
+
+                // Merge persisted analysis history back into freshly fetched tasks
+                if (_vm?.SelectedProject != null)
+                {
+                    var saved = _vm.SelectedProject.JiraAnalysisHistory;
+                    foreach (var task in _jiraTasks)
+                    {
+                        if (!string.IsNullOrEmpty(task.ExternalId) &&
+                            saved.TryGetValue(task.ExternalId, out var history))
+                        {
+                            task.AnalysisHistory = new List<AnalysisEntry>(history);
+                        }
+                    }
+                }
+
+                if (_jiraTasks.Count == 0)
+                    StatusText.Text = "No issues found in this project.";
+                else
+                {
+                    RefreshBoard(_jiraTasks);
+                    StatusText.Text = $"Synced {_jiraTasks.Count} issues · {DateTime.Now:h:mm tt}";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Error: {ex.Message}";
+            }
+        }
+
+        private JiraService? CreateJiraService()
+        {
+            var domain = LoadProjectCred("JiraDomain");
+            var email = LoadProjectCred("JiraEmail");
+            var token = LoadProjectCred("JiraApiToken");
+            if (string.IsNullOrEmpty(domain) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
+                return null;
+            return new JiraService(domain, email, token);
         }
 
         private void Task_Click(object sender, ItemClickEventArgs e)
@@ -259,6 +351,8 @@ namespace QAssistant.Views
             {
                 ManualTaskFields.Visibility = Visibility.Collapsed;
                 ManualActions.Visibility = Visibility.Collapsed;
+                JiraActions.Visibility = Visibility.Collapsed;
+                JiraTaskInfo.Visibility = Visibility.Collapsed;
                 LinearCommentFields.Visibility = Visibility.Visible;
                 LinearActions.Visibility = Visibility.Visible;
                 DetailCommentBox.Text = string.Empty;
@@ -270,11 +364,40 @@ namespace QAssistant.Views
                 LinearDetailPriority.Text = task.Priority.ToString();
                 LinearDetailPriority.Foreground = GetPriorityBrush(task.Priority);
             }
+            else if (_isJiraMode)
+            {
+                ManualTaskFields.Visibility = Visibility.Collapsed;
+                ManualActions.Visibility = Visibility.Collapsed;
+                LinearActions.Visibility = Visibility.Collapsed;
+                LinearTaskInfo.Visibility = Visibility.Collapsed;
+                LinearCommentFields.Visibility = Visibility.Visible;
+                JiraActions.Visibility = Visibility.Visible;
+                DetailCommentBox.Text = string.Empty;
+                CommentsContainer.Children.Clear();
+
+                JiraTaskInfo.Visibility = Visibility.Visible;
+                JiraDetailIdentifier.Text = task.IssueIdentifier;
+                JiraDetailStatus.Text = task.Status.ToString();
+                JiraDetailPriority.Text = task.Priority.ToString();
+                JiraDetailPriority.Foreground = GetPriorityBrush(task.Priority);
+
+                if (!string.IsNullOrEmpty(task.IssueType))
+                {
+                    JiraDetailIssueType.Text = task.IssueType;
+                    JiraIssueTypePanel.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    JiraIssueTypePanel.Visibility = Visibility.Collapsed;
+                }
+            }
             else
             {
                 LinearCommentFields.Visibility = Visibility.Collapsed;
                 LinearActions.Visibility = Visibility.Collapsed;
                 LinearTaskInfo.Visibility = Visibility.Collapsed;
+                JiraActions.Visibility = Visibility.Collapsed;
+                JiraTaskInfo.Visibility = Visibility.Collapsed;
                 ManualTaskFields.Visibility = Visibility.Visible;
                 ManualActions.Visibility = Visibility.Visible;
 
@@ -578,6 +701,7 @@ namespace QAssistant.Views
             DescriptionTab.Visibility = tab == "Description" ? Visibility.Visible : Visibility.Collapsed;
             CommentsTab.Visibility = tab == "Comments" ? Visibility.Visible : Visibility.Collapsed;
             HistoryTab.Visibility = tab == "History" ? Visibility.Visible : Visibility.Collapsed;
+            WorklogTab.Visibility = tab == "Worklog" ? Visibility.Visible : Visibility.Collapsed;
 
             var activeBrush = (SolidColorBrush)Application.Current.Resources["AccentBrush"];
             var inactiveBrush = (SolidColorBrush)Application.Current.Resources["TextSecondaryBrush"];
@@ -603,6 +727,11 @@ namespace QAssistant.Views
             TabHistory.Background = tab == "History" ? activeBgBrush : transparent;
             TabHistory.BorderBrush = tab == "History" ? activeBrush : transparent;
             TabHistory.BorderThickness = new Thickness(0, 0, 0, tab == "History" ? 2 : 0);
+
+            TabWorklog.Foreground = tab == "Worklog" ? activeBrush : inactiveBrush;
+            TabWorklog.Background = tab == "Worklog" ? activeBgBrush : transparent;
+            TabWorklog.BorderBrush = tab == "Worklog" ? activeBrush : transparent;
+            TabWorklog.BorderThickness = new Thickness(0, 0, 0, tab == "Worklog" ? 2 : 0);
         }
 
         private void TabDetails_Click(object sender, RoutedEventArgs e) => SetActiveTab("Details");
@@ -611,9 +740,12 @@ namespace QAssistant.Views
         private async void TabComments_Click(object sender, RoutedEventArgs e)
         {
             SetActiveTab("Comments");
-            if (_isLinearMode && _selectedTask != null && !string.IsNullOrEmpty(_selectedTask.ExternalId))
+            if (_selectedTask != null && !string.IsNullOrEmpty(_selectedTask.ExternalId))
             {
-                await LoadCommentsAsync(_selectedTask.ExternalId);
+                if (_isLinearMode)
+                    await LoadLinearCommentsAsync(_selectedTask.ExternalId);
+                else if (_isJiraMode)
+                    await LoadJiraCommentsAsync(_selectedTask.ExternalId);
             }
         }
 
@@ -623,6 +755,26 @@ namespace QAssistant.Views
             if (_selectedTask != null)
             {
                 RenderAnalysisHistory(_selectedTask);
+            }
+        }
+
+        private async void TabWorklog_Click(object sender, RoutedEventArgs e)
+        {
+            SetActiveTab("Worklog");
+            if (_selectedTask != null && !string.IsNullOrEmpty(_selectedTask.ExternalId))
+            {
+                await LoadWorklogAsync(_selectedTask);
+            }
+            else
+            {
+                WorklogContainer.Children.Clear();
+                WorklogContainer.Children.Add(new TextBlock
+                {
+                    Text = "Worklog is available for Linear and Jira issues.",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap
+                });
             }
         }
 
@@ -1010,7 +1162,7 @@ namespace QAssistant.Views
             return contentStack;
         }
 
-        private async System.Threading.Tasks.Task LoadCommentsAsync(string issueId)
+        private async System.Threading.Tasks.Task LoadLinearCommentsAsync(string issueId)
         {
             CommentsContainer.Children.Clear();
 
@@ -1029,62 +1181,7 @@ namespace QAssistant.Views
 
                 var service = new LinearService(key);
                 var comments = await service.GetCommentsAsync(issueId);
-
-                CommentsContainer.Children.Clear();
-
-                if (comments.Count == 0)
-                {
-                    CommentsContainer.Children.Add(new TextBlock
-                    {
-                        Text = "No comments yet.",
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                        FontSize = 12
-                    });
-                    return;
-                }
-
-                foreach (var comment in comments)
-                {
-                    var commentBorder = new Border
-                    {
-                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36)),
-                        CornerRadius = new CornerRadius(8),
-                        Padding = new Thickness(12),
-                        BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
-                        BorderThickness = new Thickness(1)
-                    };
-
-                    var commentPanel = new StackPanel { Spacing = 6 };
-
-                    var headerPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                    headerPanel.Children.Add(new TextBlock
-                    {
-                        Text = comment.AuthorName,
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
-                        FontSize = 12,
-                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
-                    });
-                    headerPanel.Children.Add(new TextBlock
-                    {
-                        Text = comment.CreatedAt.ToString("MMM d, yyyy · h:mm tt"),
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                        FontSize = 11,
-                        VerticalAlignment = VerticalAlignment.Center
-                    });
-
-                    commentPanel.Children.Add(headerPanel);
-                    commentPanel.Children.Add(new TextBlock
-                    {
-                        Text = comment.Body,
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
-                        FontSize = 13,
-                        TextWrapping = TextWrapping.Wrap,
-                        LineHeight = 20
-                    });
-
-                    commentBorder.Child = commentPanel;
-                    CommentsContainer.Children.Add(commentBorder);
-                }
+                RenderComments(comments);
             }
             catch (Exception ex)
             {
@@ -1096,6 +1193,285 @@ namespace QAssistant.Views
                     FontSize = 12,
                     TextWrapping = TextWrapping.Wrap
                 });
+            }
+        }
+
+        private async System.Threading.Tasks.Task LoadJiraCommentsAsync(string issueId)
+        {
+            CommentsContainer.Children.Clear();
+
+            var loadingText = new TextBlock
+            {
+                Text = "Loading comments...",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                FontSize = 12
+            };
+            CommentsContainer.Children.Add(loadingText);
+
+            try
+            {
+                var service = CreateJiraService();
+                if (service == null) return;
+
+                var comments = await service.GetCommentsAsync(issueId);
+                RenderComments(comments);
+            }
+            catch (Exception ex)
+            {
+                CommentsContainer.Children.Clear();
+                CommentsContainer.Children.Add(new TextBlock
+                {
+                    Text = $"Error loading comments: {ex.Message}",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113)),
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap
+                });
+            }
+        }
+
+        private void RenderComments(List<LinearComment> comments)
+        {
+            CommentsContainer.Children.Clear();
+
+            if (comments.Count == 0)
+            {
+                CommentsContainer.Children.Add(new TextBlock
+                {
+                    Text = "No comments yet.",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 12
+                });
+                return;
+            }
+
+            foreach (var comment in comments)
+            {
+                var commentBorder = new Border
+                {
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36)),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12),
+                    BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                    BorderThickness = new Thickness(1)
+                };
+
+                var commentPanel = new StackPanel { Spacing = 6 };
+
+                var headerPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                headerPanel.Children.Add(new TextBlock
+                {
+                    Text = comment.AuthorName,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    FontSize = 12,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                });
+                headerPanel.Children.Add(new TextBlock
+                {
+                    Text = comment.CreatedAt.ToString("MMM d, yyyy · h:mm tt"),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
+                commentPanel.Children.Add(headerPanel);
+                commentPanel.Children.Add(new TextBlock
+                {
+                    Text = comment.Body,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                    FontSize = 13,
+                    TextWrapping = TextWrapping.Wrap,
+                    LineHeight = 20
+                });
+
+                commentBorder.Child = commentPanel;
+                CommentsContainer.Children.Add(commentBorder);
+            }
+        }
+
+        private async System.Threading.Tasks.Task LoadWorklogAsync(ProjectTask task)
+        {
+            WorklogContainer.Children.Clear();
+
+            if (string.IsNullOrEmpty(task.ExternalId))
+            {
+                WorklogContainer.Children.Add(new TextBlock
+                {
+                    Text = "Worklog is available for Linear and Jira issues.",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap
+                });
+                return;
+            }
+
+            WorklogContainer.Children.Add(new TextBlock
+            {
+                Text = "Loading worklog...",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                FontSize = 12
+            });
+
+            try
+            {
+                List<WorklogEntry> entries;
+
+                if (_isJiraMode)
+                {
+                    var service = CreateJiraService();
+                    if (service == null) return;
+                    entries = await service.GetChangelogAsync(task.ExternalId);
+                }
+                else if (_isLinearMode)
+                {
+                    var key = LoadProjectCred("LinearApiKey");
+                    if (string.IsNullOrEmpty(key)) return;
+                    var service = new LinearService(key);
+                    entries = await service.GetIssueHistoryAsync(task.ExternalId);
+                }
+                else
+                {
+                    return;
+                }
+
+                RenderWorklog(entries);
+            }
+            catch (Exception ex)
+            {
+                WorklogContainer.Children.Clear();
+                WorklogContainer.Children.Add(new TextBlock
+                {
+                    Text = $"Error loading worklog: {ex.Message}",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113)),
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap
+                });
+            }
+        }
+
+        private void RenderWorklog(List<WorklogEntry> entries)
+        {
+            WorklogContainer.Children.Clear();
+
+            if (entries.Count == 0)
+            {
+                WorklogContainer.Children.Add(new TextBlock
+                {
+                    Text = "No changes recorded.",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 12
+                });
+                return;
+            }
+
+            foreach (var entry in entries.OrderByDescending(e => e.Timestamp))
+            {
+                var entryPanel = new StackPanel { Spacing = 0 };
+
+                // Timeline dot + header
+                var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+                headerRow.Children.Add(new Border
+                {
+                    Width = 10,
+                    Height = 10,
+                    CornerRadius = new CornerRadius(5),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 59, 130, 246)),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(2, 0, 0, 0)
+                });
+
+                headerRow.Children.Add(new TextBlock
+                {
+                    Text = entry.Field,
+                    FontSize = 12,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
+                entryPanel.Children.Add(headerRow);
+
+                // Card content
+                var cardContent = new StackPanel { Spacing = 4 };
+
+                // Author + timestamp
+                var metaRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                if (!string.IsNullOrEmpty(entry.Author))
+                {
+                    metaRow.Children.Add(new TextBlock
+                    {
+                        Text = entry.Author,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                        FontSize = 11,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                    });
+                }
+                metaRow.Children.Add(new TextBlock
+                {
+                    Text = entry.Timestamp.ToString("MMM d, yyyy · h:mm tt"),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                cardContent.Children.Add(metaRow);
+
+                // From → To
+                var changeRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+
+                if (!string.IsNullOrEmpty(entry.FromValue))
+                {
+                    changeRow.Children.Add(new Border
+                    {
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(6, 2, 6, 2),
+                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 60, 20, 20)),
+                        Child = new TextBlock
+                        {
+                            Text = entry.FromValue,
+                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113)),
+                            FontSize = 10
+                        }
+                    });
+                }
+
+                changeRow.Children.Add(new TextBlock
+                {
+                    Text = "→",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
+                if (!string.IsNullOrEmpty(entry.ToValue))
+                {
+                    changeRow.Children.Add(new Border
+                    {
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(6, 2, 6, 2),
+                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 50, 30)),
+                        Child = new TextBlock
+                        {
+                            Text = entry.ToValue,
+                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 16, 185, 129)),
+                            FontSize = 10
+                        }
+                    });
+                }
+
+                cardContent.Children.Add(changeRow);
+
+                var cardBorder = new Border
+                {
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36)),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12),
+                    BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                    BorderThickness = new Thickness(1),
+                    Margin = new Thickness(16, 4, 0, 0),
+                    Child = cardContent
+                };
+
+                entryPanel.Children.Add(cardBorder);
+                WorklogContainer.Children.Add(entryPanel);
             }
         }
 
@@ -1188,7 +1564,6 @@ namespace QAssistant.Views
         {
             if (_selectedTask == null || string.IsNullOrWhiteSpace(DetailCommentBox.Text)) return;
 
-            // Ensure the selected task has an ExternalId before calling LinearService.AddCommentAsync
             if (string.IsNullOrEmpty(_selectedTask.ExternalId))
             {
                 StatusText.Visibility = Visibility.Visible;
@@ -1206,7 +1581,35 @@ namespace QAssistant.Views
                 DetailCommentBox.Text = string.Empty;
                 StatusText.Visibility = Visibility.Visible;
                 StatusText.Text = "Comment posted successfully.";
-                await LoadCommentsAsync(_selectedTask.ExternalId);
+                await LoadLinearCommentsAsync(_selectedTask.ExternalId);
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Error posting comment: {ex.Message}";
+            }
+        }
+
+        private async void PostJiraComment_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedTask == null || string.IsNullOrWhiteSpace(DetailCommentBox.Text)) return;
+
+            if (string.IsNullOrEmpty(_selectedTask.ExternalId))
+            {
+                StatusText.Visibility = Visibility.Visible;
+                StatusText.Text = "Cannot post comment: task is not linked to Jira.";
+                return;
+            }
+
+            var service = CreateJiraService();
+            if (service == null) return;
+
+            try
+            {
+                await service.AddCommentAsync(_selectedTask.ExternalId, DetailCommentBox.Text.Trim());
+                DetailCommentBox.Text = string.Empty;
+                StatusText.Visibility = Visibility.Visible;
+                StatusText.Text = "Comment posted successfully.";
+                await LoadJiraCommentsAsync(_selectedTask.ExternalId);
             }
             catch (Exception ex)
             {
@@ -1215,6 +1618,12 @@ namespace QAssistant.Views
         }
 
         private async void OpenInLinear_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedTask == null || !Helpers.UriSecurity.IsHttpUrl(_selectedTask.TicketUrl)) return;
+            await Windows.System.Launcher.LaunchUriAsync(new Uri(_selectedTask.TicketUrl!));
+        }
+
+        private async void OpenInJira_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedTask == null || !Helpers.UriSecurity.IsHttpUrl(_selectedTask.TicketUrl)) return;
             await Windows.System.Launcher.LaunchUriAsync(new Uri(_selectedTask.TicketUrl!));
@@ -1341,19 +1750,32 @@ namespace QAssistant.Views
                 return;
             }
 
-            // Fetch Linear comments if applicable (needed before building the prompt)
+            // Fetch comments if applicable (needed before building the prompt)
             System.Collections.Generic.List<Models.LinearComment>? linearComments = null;
-            if (_isLinearMode && !string.IsNullOrEmpty(_selectedTask.ExternalId))
+            if ((_isLinearMode || _isJiraMode) && !string.IsNullOrEmpty(_selectedTask.ExternalId))
             {
                 try
                 {
-                    var linearKey = LoadProjectCred("LinearApiKey");
-                    if (!string.IsNullOrEmpty(linearKey))
+                    if (_isLinearMode)
                     {
-                        var linearService = new LinearService(linearKey);
-                        linearComments = await linearService.GetCommentsAsync(_selectedTask.ExternalId);
-                        if (linearComments.Count == 0)
-                            linearComments = null;
+                        var linearKey = LoadProjectCred("LinearApiKey");
+                        if (!string.IsNullOrEmpty(linearKey))
+                        {
+                            var linearService = new LinearService(linearKey);
+                            linearComments = await linearService.GetCommentsAsync(_selectedTask.ExternalId);
+                            if (linearComments.Count == 0)
+                                linearComments = null;
+                        }
+                    }
+                    else if (_isJiraMode)
+                    {
+                        var jiraService = CreateJiraService();
+                        if (jiraService != null)
+                        {
+                            linearComments = await jiraService.GetCommentsAsync(_selectedTask.ExternalId);
+                            if (linearComments.Count == 0)
+                                linearComments = null;
+                        }
                     }
                 }
                 catch { }
@@ -1436,6 +1858,13 @@ namespace QAssistant.Views
                 if (_isLinearMode && !string.IsNullOrEmpty(_selectedTask.ExternalId) && _vm?.SelectedProject != null)
                 {
                     _vm.SelectedProject.LinearAnalysisHistory[_selectedTask.ExternalId] =
+                        new List<AnalysisEntry>(_selectedTask.AnalysisHistory);
+                }
+
+                // For Jira tasks, also persist to the project-level dictionary
+                if (_isJiraMode && !string.IsNullOrEmpty(_selectedTask.ExternalId) && _vm?.SelectedProject != null)
+                {
+                    _vm.SelectedProject.JiraAnalysisHistory[_selectedTask.ExternalId] =
                         new List<AnalysisEntry>(_selectedTask.AnalysisHistory);
                 }
 

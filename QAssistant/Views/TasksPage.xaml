@@ -28,6 +28,9 @@
                     <Button x:Name="LinearModeBtn" Content="Linear" Click="LinearMode_Click"
                             Background="Transparent" Foreground="#6B7280"
                             CornerRadius="6" Padding="12,6"/>
+                    <Button x:Name="JiraModeBtn" Content="Jira" Click="JiraMode_Click"
+                            Background="Transparent" Foreground="#6B7280"
+                            CornerRadius="6" Padding="12,6"/>
                     <Button x:Name="RefreshBtn" Content="Refresh" Click="Refresh_Click"
                             Visibility="Collapsed"
                             Background="#252535" Foreground="#6B7280"
@@ -444,6 +447,11 @@
                                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                                     BorderThickness="0" CornerRadius="0"
                                     Padding="16,10" FontSize="12"/>
+                            <Button x:Name="TabWorklog" Content="Worklog"
+                                    Click="TabWorklog_Click"
+                                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                    BorderThickness="0" CornerRadius="0"
+                                    Padding="16,10" FontSize="12"/>
                         </StackPanel>
                     </Border>
 
@@ -491,6 +499,33 @@
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBlock Text="Priority" Foreground="#6B7280" FontSize="12" Width="80"/>
                                         <TextBlock x:Name="LinearDetailPriority" Foreground="#F59E0B" FontSize="12"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Jira task info -->
+                                <StackPanel x:Name="JiraTaskInfo" Spacing="12" Visibility="Collapsed">
+                                    <Border Height="1" Background="#2A2A3A"/>
+                                    <TextBlock Text="ISSUE DETAILS" Foreground="#6B7280"
+                                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Source" Foreground="#6B7280" FontSize="12" Width="80"/>
+                                        <TextBlock Text="Jira" Foreground="#E2E8F0" FontSize="12"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Identifier" Foreground="#6B7280" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="JiraDetailIdentifier" Foreground="#E2E8F0" FontSize="12"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Status" Foreground="#6B7280" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="JiraDetailStatus" Foreground="#E2E8F0" FontSize="12"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Priority" Foreground="#6B7280" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="JiraDetailPriority" Foreground="#F59E0B" FontSize="12"/>
+                                    </StackPanel>
+                                    <StackPanel x:Name="JiraIssueTypePanel" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                                        <TextBlock Text="Type" Foreground="#6B7280" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="JiraDetailIssueType" Foreground="#E2E8F0" FontSize="12"/>
                                     </StackPanel>
                                 </StackPanel>
 
@@ -570,6 +605,12 @@
                                 <StackPanel x:Name="HistoryContainer" Spacing="12"/>
                             </StackPanel>
 
+                            <!-- Worklog Tab -->
+                            <StackPanel x:Name="WorklogTab" Spacing="12"
+                                        Padding="20,16" Visibility="Collapsed">
+                                <StackPanel x:Name="WorklogContainer" Spacing="12"/>
+                            </StackPanel>
+
                         </Grid>
                     </ScrollViewer>
 
@@ -605,6 +646,22 @@
                                         Background="#A78BFA" Foreground="White"
                                         CornerRadius="8" Padding="14,8" Margin="0,0,4,0"/>
                                 <Button Grid.Column="2" Content="Open in Linear" Click="OpenInLinear_Click"
+                                        HorizontalAlignment="Stretch"
+                                        Background="#252535" Foreground="#6B7280"
+                                        CornerRadius="8" Padding="14,8" Margin="4,0,0,0"/>
+                            </Grid>
+                            <!-- Jira actions -->
+                            <Grid x:Name="JiraActions" HorizontalAlignment="Stretch" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="Post Comment" Click="PostJiraComment_Click"
+                                        HorizontalAlignment="Stretch"
+                                        Background="#A78BFA" Foreground="White"
+                                        CornerRadius="8" Padding="14,8" Margin="0,0,4,0"/>
+                                <Button Grid.Column="2" Content="Open in Jira" Click="OpenInJira_Click"
                                         HorizontalAlignment="Stretch"
                                         Background="#252535" Foreground="#6B7280"
                                         CornerRadius="8" Padding="14,8" Margin="4,0,0,0"/>
@@ -766,6 +823,7 @@
                                     <RowDefinition/>
                                     <RowDefinition/>
                                     <RowDefinition/>
+                                    <RowDefinition/>
                                 </Grid.RowDefinitions>
 
                                 <Border Grid.Row="0" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
@@ -785,11 +843,19 @@
                                            Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
 
                                 <Border Grid.Row="2" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                        Padding="8,4" Margin="0,0,16,8" HorizontalAlignment="Left"
+                                        BorderBrush="#2A2A3A" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + 3" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                </Border>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="Switch to Jira mode"
+                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
+
+                                <Border Grid.Row="3" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,0" HorizontalAlignment="Left"
                                         BorderBrush="#2A2A3A" BorderThickness="1">
                                     <TextBlock Text="Ctrl + R" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
                                 </Border>
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text="Refresh Linear issues"
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="Refresh issues"
                                            Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center"/>
                             </Grid>
                         </StackPanel>

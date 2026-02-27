@@ -38,6 +38,11 @@ namespace QAssistant.Models
         /// </summary>
         public Dictionary<string, List<AnalysisEntry>> LinearAnalysisHistory { get; set; } = new();
 
+        /// <summary>
+        /// Persisted analysis history for Jira tasks, keyed by ExternalId.
+        /// </summary>
+        public Dictionary<string, List<AnalysisEntry>> JiraAnalysisHistory { get; set; } = new();
+
         [JsonIgnore]
         private SolidColorBrush? _cachedBrush;
 
