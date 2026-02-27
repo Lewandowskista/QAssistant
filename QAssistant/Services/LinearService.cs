@@ -13,10 +13,12 @@ using QAssistant.Models;
 
 namespace QAssistant.Services
 {
-    public class LinearService(string apiKey)
+    public class LinearService(string apiKey) : IDisposable
     {
         private readonly HttpClient _client = CreateClient(apiKey);
         private const string Endpoint = "https://api.linear.app/graphql";
+
+        public void Dispose() => _client.Dispose();
 
         private static readonly Regex s_markdownImageRegex = new(@"!\[.*?\]\(.*?\)", RegexOptions.Compiled);
         private static readonly Regex s_markdownLinkRegex = new(@"\[([^\]]+)\]\([^\)]+\)", RegexOptions.Compiled);

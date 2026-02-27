@@ -12,12 +12,14 @@ using QAssistant.Models;
 
 namespace QAssistant.Services
 {
-    public class GeminiService(string apiKey)
+    public class GeminiService(string apiKey) : IDisposable
     {
         private readonly HttpClient _client = CreateClient(apiKey);
         private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta";
         private const string PrimaryModel = "models/gemini-2.5-flash";
         private const string FallbackModel = "models/gemini-3-flash";
+
+        public void Dispose() => _client.Dispose();
 
         private static HttpClient CreateClient(string apiKey)
         {
@@ -74,24 +76,24 @@ namespace QAssistant.Services
 
             // Issue data in TOON object notation
             sb.AppendLine("issue{");
-            sb.AppendLine($" t:{task.Title}");
+            sb.AppendLine($" t:{SanitizeToonValue(task.Title, 300)}");
 
             if (!string.IsNullOrEmpty(task.IssueIdentifier))
-                sb.AppendLine($" id:{task.IssueIdentifier}");
+                sb.AppendLine($" id:{SanitizeToonValue(task.IssueIdentifier, 100)}");
 
             sb.AppendLine($" status:{task.Status}");
             sb.AppendLine($" priority:{task.Priority}");
 
             if (!string.IsNullOrEmpty(task.Assignee))
-                sb.AppendLine($" assignee:{task.Assignee}");
+                sb.AppendLine($" assignee:{SanitizeToonValue(task.Assignee, 200)}");
 
             if (!string.IsNullOrEmpty(task.Labels))
-                sb.AppendLine($" labels:{task.Labels}");
+                sb.AppendLine($" labels:{SanitizeToonValue(task.Labels, 200)}");
 
             if (task.DueDate.HasValue)
                 sb.AppendLine($" due:{task.DueDate.Value:yyyy-MM-dd}");
 
-            sb.AppendLine($" desc:{(string.IsNullOrWhiteSpace(task.Description) ? "(none—infer from title+metadata)" : task.Description)}");
+            sb.AppendLine($" desc:{(string.IsNullOrWhiteSpace(task.Description) ? "(none—infer from title+metadata)" : SanitizeToonValue(task.Description))}");
             sb.AppendLine("}");
 
             // Comments in TOON array notation
@@ -99,7 +101,7 @@ namespace QAssistant.Services
             {
                 sb.AppendLine("comments[");
                 foreach (var c in comments)
-                    sb.AppendLine($" {{author:{c.AuthorName},date:{c.CreatedAt:yyyy-MM-dd},body:{c.Body}}}");
+                    sb.AppendLine($" {{author:{SanitizeToonValue(c.AuthorName, 200)},date:{c.CreatedAt:yyyy-MM-dd},body:{SanitizeToonValue(c.Body)}}}");
                 sb.AppendLine("]");
             }
 

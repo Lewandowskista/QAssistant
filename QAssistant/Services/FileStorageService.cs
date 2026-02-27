@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using QAssistant.Models;
@@ -10,6 +11,15 @@ namespace QAssistant.Services
     public class FileStorageService
     {
         private readonly string _filesFolder;
+
+        // Executable/script extensions that should never be stored or launched.
+        private static readonly HashSet<string> s_blockedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".exe", ".dll", ".bat", ".cmd", ".com", ".msi", ".msp",
+            ".ps1", ".psm1", ".psd1", ".vbs", ".vbe", ".js", ".jse",
+            ".wsf", ".wsh", ".scr", ".pif", ".hta", ".cpl", ".inf",
+            ".reg", ".lnk", ".url", ".appref-ms"
+        };
 
         public FileStorageService()
         {
@@ -25,6 +35,10 @@ namespace QAssistant.Services
             {
                 var fileName = Path.GetFileName(sourcePath);
                 var ext = Path.GetExtension(sourcePath).ToLower();
+
+                if (s_blockedExtensions.Contains(ext))
+                    return null;
+
                 var uniqueName = $"{Guid.NewGuid()}{ext}";
                 var destPath = Path.Combine(_filesFolder, uniqueName);
 
@@ -48,6 +62,10 @@ namespace QAssistant.Services
             try
             {
                 var ext = Path.GetExtension(fileName).ToLower();
+
+                if (s_blockedExtensions.Contains(ext))
+                    return null;
+
                 var uniqueName = $"{Guid.NewGuid()}{ext}";
                 var destPath = Path.Combine(_filesFolder, uniqueName);
 

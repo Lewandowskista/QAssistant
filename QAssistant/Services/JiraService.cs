@@ -6,16 +6,32 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using QAssistant.Models;
 
 namespace QAssistant.Services
 {
-    public class JiraService(string domain, string email, string apiToken)
+    public class JiraService : IDisposable
     {
-        private readonly HttpClient _client = CreateClient(email, apiToken);
-        private readonly string _baseUrl = $"https://{domain}.atlassian.net/rest/api/3";
-        private readonly string _browseUrl = $"https://{domain}.atlassian.net/browse";
+        private readonly HttpClient _client;
+        private readonly string _baseUrl;
+        private readonly string _browseUrl;
+
+        // Only allow valid Atlassian subdomain characters (alphanumeric + hyphens).
+        private static readonly Regex s_safeDomainRegex = new(@"^[a-zA-Z0-9][a-zA-Z0-9\-]*$", RegexOptions.Compiled);
+
+        public JiraService(string domain, string email, string apiToken)
+        {
+            if (!s_safeDomainRegex.IsMatch(domain))
+                throw new ArgumentException("Invalid Jira domain. Use only your Atlassian subdomain (e.g. 'mycompany').", nameof(domain));
+
+            _client = CreateClient(email, apiToken);
+            _baseUrl = $"https://{domain}.atlassian.net/rest/api/3";
+            _browseUrl = $"https://{domain}.atlassian.net/browse";
+        }
+
+        public void Dispose() => _client.Dispose();
 
         private static HttpClient CreateClient(string email, string apiToken)
         {
