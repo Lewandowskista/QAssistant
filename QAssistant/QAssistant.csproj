@@ -126,6 +126,7 @@
 		<StartupObject>QAssistant.Program</StartupObject>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageProjectUrl>https://github.com/Lewandowskista/QAssistant</PackageProjectUrl>
+		<PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
 		<Description>QA focused workbook application</Description>
 		<Title>QAssistant</Title>
 	</PropertyGroup>
