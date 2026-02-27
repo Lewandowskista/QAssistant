@@ -1217,7 +1217,7 @@ namespace QAssistant.Views
         private async void OpenInLinear_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedTask == null || !Helpers.UriSecurity.IsHttpUrl(_selectedTask.TicketUrl)) return;
-            await Windows.System.Launcher.LaunchUriAsync(new Uri(_selectedTask.TicketUrl));
+            await Windows.System.Launcher.LaunchUriAsync(new Uri(_selectedTask.TicketUrl!));
         }
 
         private async void AddTask_Click(object sender, RoutedEventArgs e)
