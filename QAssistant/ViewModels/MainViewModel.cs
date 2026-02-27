@@ -23,6 +23,11 @@ namespace QAssistant.ViewModels
         [ObservableProperty]
         public partial string ActiveTab { get; set; } = "Links";
 
+        /// <summary>
+        /// Set by notification click to signal TasksPage to auto-open this task's sidebar.
+        /// </summary>
+        public Guid? PendingTaskId { get; set; }
+
         public async Task InitializeAsync()
         {
             try

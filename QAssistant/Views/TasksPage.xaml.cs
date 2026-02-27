@@ -43,7 +43,21 @@ namespace QAssistant.Views
             {
                 _vm = vm;
                 if (_vm.SelectedProject != null)
+                {
                     RefreshBoard(_vm.SelectedProject.Tasks);
+
+                    // If a notification was clicked, open the sidebar for that task
+                    if (_vm.PendingTaskId is Guid taskId && taskId != Guid.Empty)
+                    {
+                        _vm.PendingTaskId = null;
+                        var task = _vm.SelectedProject.Tasks.FirstOrDefault(t => t.Id == taskId);
+                        if (task != null)
+                        {
+                            _selectedTask = task;
+                            ShowDetailPanel(task);
+                        }
+                    }
+                }
             }
         }
 
@@ -108,6 +122,20 @@ namespace QAssistant.Views
                     _linearStates = await service.GetWorkflowStatesAsync();
                 }
                 catch { _linearStates = new(); }
+
+                // Merge persisted analysis history back into freshly fetched tasks
+                if (_vm?.SelectedProject != null)
+                {
+                    var saved = _vm.SelectedProject.LinearAnalysisHistory;
+                    foreach (var task in _linearTasks)
+                    {
+                        if (!string.IsNullOrEmpty(task.ExternalId) &&
+                            saved.TryGetValue(task.ExternalId, out var history))
+                        {
+                            task.AnalysisHistory = new List<AnalysisEntry>(history);
+                        }
+                    }
+                }
 
                 if (_linearTasks.Count == 0)
                     StatusText.Text = "No issues found in this team.";
@@ -370,6 +398,9 @@ namespace QAssistant.Views
 
             foreach (var url in urls)
             {
+                if (!Helpers.UriSecurity.IsSafeHttpUrl(url))
+                    continue;
+
                 var lower = url.ToLower();
                 if (lower.EndsWith(".mp4") || lower.EndsWith(".webm") ||
                     lower.Contains("youtube") || lower.Contains("loom"))
@@ -418,6 +449,9 @@ namespace QAssistant.Views
 
         private async System.Threading.Tasks.Task LoadImageWithAuthAsync(Image img, string url)
         {
+            if (!Helpers.UriSecurity.IsSafeHttpUrl(url))
+                return;
+
             try
             {
                 using var httpClient = new HttpClient();
@@ -468,6 +502,9 @@ namespace QAssistant.Views
 
                 try
                 {
+                    if (!Helpers.UriSecurity.IsSafeHttpUrl(url))
+                        continue;
+
                     using var httpClient = new HttpClient();
                     if (url.Contains("linear.app", StringComparison.OrdinalIgnoreCase))
                     {
@@ -511,7 +548,7 @@ namespace QAssistant.Views
 
         private async void LightboxOpenBrowser_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(_lightboxUrl))
+            if (Helpers.UriSecurity.IsHttpUrl(_lightboxUrl))
                 await Windows.System.Launcher.LaunchUriAsync(new Uri(_lightboxUrl));
         }
 
@@ -533,6 +570,7 @@ namespace QAssistant.Views
             DetailsTab.Visibility = tab == "Details" ? Visibility.Visible : Visibility.Collapsed;
             DescriptionTab.Visibility = tab == "Description" ? Visibility.Visible : Visibility.Collapsed;
             CommentsTab.Visibility = tab == "Comments" ? Visibility.Visible : Visibility.Collapsed;
+            HistoryTab.Visibility = tab == "History" ? Visibility.Visible : Visibility.Collapsed;
 
             var activeBrush = (SolidColorBrush)Application.Current.Resources["AccentBrush"];
             var inactiveBrush = (SolidColorBrush)Application.Current.Resources["TextSecondaryBrush"];
@@ -553,6 +591,11 @@ namespace QAssistant.Views
             TabComments.Background = tab == "Comments" ? activeBgBrush : transparent;
             TabComments.BorderBrush = tab == "Comments" ? activeBrush : transparent;
             TabComments.BorderThickness = new Thickness(0, 0, 0, tab == "Comments" ? 2 : 0);
+
+            TabHistory.Foreground = tab == "History" ? activeBrush : inactiveBrush;
+            TabHistory.Background = tab == "History" ? activeBgBrush : transparent;
+            TabHistory.BorderBrush = tab == "History" ? activeBrush : transparent;
+            TabHistory.BorderThickness = new Thickness(0, 0, 0, tab == "History" ? 2 : 0);
         }
 
         private void TabDetails_Click(object sender, RoutedEventArgs e) => SetActiveTab("Details");
@@ -565,6 +608,399 @@ namespace QAssistant.Views
             {
                 await LoadCommentsAsync(_selectedTask.ExternalId);
             }
+        }
+
+        private void TabHistory_Click(object sender, RoutedEventArgs e)
+        {
+            SetActiveTab("History");
+            if (_selectedTask != null)
+            {
+                RenderAnalysisHistory(_selectedTask);
+            }
+        }
+
+        private void RenderAnalysisHistory(ProjectTask task)
+        {
+            HistoryContainer.Children.Clear();
+
+            if (task.AnalysisHistory.Count == 0)
+            {
+                HistoryContainer.Children.Add(new TextBlock
+                {
+                    Text = "No analyses yet. Use the Analyze button to generate one.",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap
+                });
+                return;
+            }
+
+            foreach (var entry in task.AnalysisHistory.OrderByDescending(e => e.Version))
+            {
+                var entryPanel = new StackPanel { Spacing = 0 };
+
+                // Timeline dot + connector row
+                var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+
+                // Git-style dot
+                var dot = new Border
+                {
+                    Width = 10,
+                    Height = 10,
+                    CornerRadius = new CornerRadius(5),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(2, 0, 0, 0)
+                };
+                headerRow.Children.Add(dot);
+
+                // Version + hash label (like "v3 · a1b2c3d")
+                var versionText = new TextBlock
+                {
+                    Text = $"v{entry.Version} · {entry.Hash}",
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize = 12,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                headerRow.Children.Add(versionText);
+
+                entryPanel.Children.Add(headerRow);
+
+                // Card content area with left border (timeline connector)
+                var cardContent = new StackPanel { Spacing = 6 };
+
+                // Top row: timestamp + delete button
+                var topRow = new Grid();
+                topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var timestampText = new TextBlock
+                {
+                    Text = entry.Timestamp.ToString("MMM d, yyyy · h:mm:ss tt"),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(timestampText, 0);
+                topRow.Children.Add(timestampText);
+
+                var capturedEntry = entry;
+                var capturedTask = task;
+                var deleteBtn = new Button
+                {
+                    Background = new SolidColorBrush(Colors.Transparent),
+                    BorderThickness = new Thickness(0),
+                    Padding = new Thickness(4, 2, 4, 2),
+                    CornerRadius = new CornerRadius(4),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Content = new FontIcon
+                    {
+                        Glyph = "\uE74D",
+                        FontSize = 11,
+                        FontFamily = new FontFamily("Segoe Fluent Icons"),
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+                    }
+                };
+                deleteBtn.PointerEntered += (s, e) =>
+                {
+                    if (deleteBtn.Content is FontIcon icon)
+                        icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113));
+                };
+                deleteBtn.PointerExited += (s, e) =>
+                {
+                    if (deleteBtn.Content is FontIcon icon)
+                        icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+                };
+                deleteBtn.Click += async (s, e) => await DeleteAnalysisEntryAsync(capturedTask, capturedEntry);
+                Grid.SetColumn(deleteBtn, 1);
+                topRow.Children.Add(deleteBtn);
+
+                cardContent.Children.Add(topRow);
+
+                // Status + Priority tags
+                var tagsRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                tagsRow.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 2, 6, 2),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 30, 58, 138)),
+                    Child = new TextBlock
+                    {
+                        Text = entry.TaskStatus,
+                        Foreground = new SolidColorBrush(Colors.White),
+                        FontSize = 10
+                    }
+                });
+                tagsRow.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 2, 6, 2),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 45, 32, 16)),
+                    Child = new TextBlock
+                    {
+                        Text = entry.TaskPriority,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 245, 158, 11)),
+                        FontSize = 10
+                    }
+                });
+                cardContent.Children.Add(tagsRow);
+
+                // Summary / first meaningful line
+                if (!string.IsNullOrWhiteSpace(entry.Summary))
+                {
+                    cardContent.Children.Add(new TextBlock
+                    {
+                        Text = entry.Summary,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                        FontSize = 12,
+                        TextWrapping = TextWrapping.Wrap,
+                        MaxLines = 3
+                    });
+                }
+
+                // "View full analysis" expander button
+                var expandBtn = new Button
+                {
+                    Content = "View full analysis",
+                    Background = new SolidColorBrush(Colors.Transparent),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    BorderThickness = new Thickness(0),
+                    Padding = new Thickness(0, 4, 0, 4),
+                    FontSize = 11
+                };
+                var fullPanel = BuildFormattedAnalysisPanel(entry.FullResult);
+                fullPanel.Visibility = Visibility.Collapsed;
+                fullPanel.Margin = new Thickness(0, 4, 0, 0);
+                expandBtn.Click += (s, e) =>
+                {
+                    if (fullPanel.Visibility == Visibility.Collapsed)
+                    {
+                        fullPanel.Visibility = Visibility.Visible;
+                        expandBtn.Content = "Collapse";
+                    }
+                    else
+                    {
+                        fullPanel.Visibility = Visibility.Collapsed;
+                        expandBtn.Content = "View full analysis";
+                    }
+                };
+
+                cardContent.Children.Add(expandBtn);
+                cardContent.Children.Add(fullPanel);
+
+                var cardBorder = new Border
+                {
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36)),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12),
+                    BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                    BorderThickness = new Thickness(1),
+                    Margin = new Thickness(16, 4, 0, 0),
+                    Child = cardContent
+                };
+
+                entryPanel.Children.Add(cardBorder);
+                HistoryContainer.Children.Add(entryPanel);
+            }
+        }
+
+        private async System.Threading.Tasks.Task DeleteAnalysisEntryAsync(ProjectTask task, AnalysisEntry entry)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Delete Analysis",
+                Content = $"Delete analysis v{entry.Version} ({entry.Hash})?\nThis cannot be undone.",
+                PrimaryButtonText = "Delete",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            task.AnalysisHistory.Remove(entry);
+
+            // Sync to persisted Linear history dictionary
+            if (_isLinearMode && !string.IsNullOrEmpty(task.ExternalId) && _vm?.SelectedProject != null)
+            {
+                if (task.AnalysisHistory.Count > 0)
+                    _vm.SelectedProject.LinearAnalysisHistory[task.ExternalId] =
+                        new List<AnalysisEntry>(task.AnalysisHistory);
+                else
+                    _vm.SelectedProject.LinearAnalysisHistory.Remove(task.ExternalId);
+            }
+
+            if (_vm != null)
+                await _vm.SaveAsync();
+
+            RenderAnalysisHistory(task);
+        }
+
+        private static StackPanel BuildFormattedAnalysisPanel(string analysisResult)
+        {
+            var contentStack = new StackPanel { Spacing = 8 };
+
+            var sections = new[] { "Root Cause Analysis", "Impact Assessment", "Suggested Fix", "Prevention Recommendations" };
+            var resultLines = analysisResult.Split('\n');
+            int sectionIndex = 0;
+
+            foreach (var section in sections)
+            {
+                var sectionStartIndex = Array.FindIndex(resultLines, r => r.Contains(section, StringComparison.OrdinalIgnoreCase));
+                if (sectionStartIndex < 0) continue;
+
+                int sectionEndIndex = resultLines.Length;
+                for (int i = sectionStartIndex + 1; i < resultLines.Length; i++)
+                {
+                    if (sections.Any(s => resultLines[i].Contains(s, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        sectionEndIndex = i;
+                        break;
+                    }
+                }
+
+                var headerLine = resultLines[sectionStartIndex];
+                var nameIdx = headerLine.IndexOf(section, StringComparison.OrdinalIgnoreCase);
+                var inlineContent = headerLine.Substring(nameIdx + section.Length).TrimStart(':', ' ', '*', '#').Trim();
+
+                var bodyLines = resultLines.Skip(sectionStartIndex + 1).Take(sectionEndIndex - sectionStartIndex - 1);
+                var contentParts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(inlineContent))
+                    contentParts.Add(inlineContent);
+                contentParts.AddRange(bodyLines);
+
+                var rawContent = string.Join("\n", contentParts).Trim();
+
+                var cleanedLines = rawContent.Split('\n').Select(line =>
+                {
+                    var trimmed = line.TrimStart();
+                    if (trimmed.StartsWith("### ")) return trimmed[4..];
+                    if (trimmed.StartsWith("## ")) return trimmed[3..];
+                    if (trimmed.StartsWith("# ")) return trimmed[2..];
+                    if (trimmed.StartsWith("- ")) return "\u2022 " + trimmed[2..];
+                    if (trimmed.StartsWith("* ") && !trimmed.StartsWith("**")) return "\u2022 " + trimmed[2..];
+                    return line;
+                });
+                var sectionContent = string.Join("\n", cleanedLines).Trim();
+
+                if (string.IsNullOrWhiteSpace(sectionContent)) continue;
+
+                var sectionHeader = new TextBlock
+                {
+                    Text = section,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    FontFamily = new FontFamily("Segoe UI, Segoe UI Symbol, Segoe UI Emoji"),
+                    FontSize = 12,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Margin = new Thickness(0, 4, 0, 2),
+                    IsTextSelectionEnabled = true
+                };
+
+                var sectionBodyBlock = new TextBlock
+                {
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                    FontFamily = new FontFamily("Segoe UI, Segoe UI Symbol, Segoe UI Emoji"),
+                    FontSize = 11,
+                    TextWrapping = TextWrapping.Wrap,
+                    LineHeight = 18,
+                    IsTextSelectionEnabled = true
+                };
+
+                var inlinePattern = new System.Text.RegularExpressions.Regex(@"(\*\*.*?\*\*|`[^`]+`)");
+                var segments = inlinePattern.Split(sectionContent);
+                foreach (var segment in segments)
+                {
+                    if (string.IsNullOrEmpty(segment)) continue;
+
+                    if (segment.StartsWith("**") && segment.EndsWith("**") && segment.Length > 4)
+                    {
+                        sectionBodyBlock.Inlines.Add(new Run
+                        {
+                            Text = segment[2..^2],
+                            FontWeight = Microsoft.UI.Text.FontWeights.Bold
+                        });
+                    }
+                    else if (segment.StartsWith('`') && segment.EndsWith('`') && segment.Length > 2)
+                    {
+                        sectionBodyBlock.Inlines.Add(new Run
+                        {
+                            Text = segment[1..^1],
+                            FontFamily = new FontFamily("Consolas"),
+                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
+                        });
+                    }
+                    else
+                    {
+                        sectionBodyBlock.Inlines.Add(new Run { Text = segment });
+                    }
+                }
+
+                contentStack.Children.Add(sectionHeader);
+                contentStack.Children.Add(sectionBodyBlock);
+
+                if (sectionIndex < sections.Length - 1)
+                {
+                    contentStack.Children.Add(new Border
+                    {
+                        Height = 1,
+                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                        Margin = new Thickness(0, 4, 0, 0)
+                    });
+                }
+
+                sectionIndex++;
+            }
+
+            // Fallback: if no known sections were found, render the raw text with inline formatting
+            if (contentStack.Children.Count == 0)
+            {
+                var fallbackBlock = new TextBlock
+                {
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                    FontFamily = new FontFamily("Segoe UI, Segoe UI Symbol, Segoe UI Emoji"),
+                    FontSize = 11,
+                    TextWrapping = TextWrapping.Wrap,
+                    LineHeight = 18,
+                    IsTextSelectionEnabled = true
+                };
+
+                var inlinePattern = new System.Text.RegularExpressions.Regex(@"(\*\*.*?\*\*|`[^`]+`)");
+                var segments = inlinePattern.Split(analysisResult);
+                foreach (var segment in segments)
+                {
+                    if (string.IsNullOrEmpty(segment)) continue;
+
+                    if (segment.StartsWith("**") && segment.EndsWith("**") && segment.Length > 4)
+                    {
+                        fallbackBlock.Inlines.Add(new Run
+                        {
+                            Text = segment[2..^2],
+                            FontWeight = Microsoft.UI.Text.FontWeights.Bold
+                        });
+                    }
+                    else if (segment.StartsWith('`') && segment.EndsWith('`') && segment.Length > 2)
+                    {
+                        fallbackBlock.Inlines.Add(new Run
+                        {
+                            Text = segment[1..^1],
+                            FontFamily = new FontFamily("Consolas"),
+                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
+                        });
+                    }
+                    else
+                    {
+                        fallbackBlock.Inlines.Add(new Run { Text = segment });
+                    }
+                }
+
+                contentStack.Children.Add(fallbackBlock);
+            }
+
+            return contentStack;
         }
 
         private async System.Threading.Tasks.Task LoadCommentsAsync(string issueId)
@@ -773,7 +1209,7 @@ namespace QAssistant.Views
 
         private async void OpenInLinear_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedTask == null || string.IsNullOrEmpty(_selectedTask.TicketUrl)) return;
+            if (_selectedTask == null || !Helpers.UriSecurity.IsHttpUrl(_selectedTask.TicketUrl)) return;
             await Windows.System.Launcher.LaunchUriAsync(new Uri(_selectedTask.TicketUrl));
         }
 
@@ -964,123 +1400,44 @@ namespace QAssistant.Views
                 await System.Threading.Tasks.Task.Delay(50);
             }
 
-            var contentStack = new StackPanel { Spacing = 16 };
-
-            var sections = new[] { "Root Cause Analysis", "Impact Assessment", "Suggested Fix", "Prevention Recommendations" };
-
-            var resultLines = analysisResult.Split('\n');
-            int sectionIndex = 0;
-
-            foreach (var section in sections)
+            // Save analysis to history
+            if (!string.IsNullOrEmpty(analysisResult) && !analysisResult.StartsWith("Analysis failed:"))
             {
-                var sectionStartIndex = Array.FindIndex(resultLines, r => r.Contains(section, StringComparison.OrdinalIgnoreCase));
-                if (sectionStartIndex < 0) continue;
+                var nextVersion = _selectedTask.AnalysisHistory.Count > 0
+                    ? _selectedTask.AnalysisHistory.Max(a => a.Version) + 1
+                    : 1;
 
-                int sectionEndIndex = resultLines.Length;
-                for (int i = sectionStartIndex + 1; i < resultLines.Length; i++)
+                var summaryLine = analysisResult.Split('\n')
+                    .Select(l => l.Trim().TrimStart('#', '*', ' '))
+                    .FirstOrDefault(l => l.Length > 10) ?? "Analysis result";
+                if (summaryLine.Length > 120)
+                    summaryLine = summaryLine[..117] + "...";
+
+                var historyEntry = new AnalysisEntry
                 {
-                    if (sections.Any(s => resultLines[i].Contains(s, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        sectionEndIndex = i;
-                        break;
-                    }
-                }
-
-                // Check if the header line itself contains inline content after the section name
-                var headerLine = resultLines[sectionStartIndex];
-                var nameIdx = headerLine.IndexOf(section, StringComparison.OrdinalIgnoreCase);
-                var inlineContent = headerLine.Substring(nameIdx + section.Length).TrimStart(':', ' ', '*', '#').Trim();
-
-                var bodyLines = resultLines.Skip(sectionStartIndex + 1).Take(sectionEndIndex - sectionStartIndex - 1);
-                var contentParts = new List<string>();
-                if (!string.IsNullOrWhiteSpace(inlineContent))
-                    contentParts.Add(inlineContent);
-                contentParts.AddRange(bodyLines);
-
-                var rawContent = string.Join("\n", contentParts).Trim();
-
-                // Clean markdown artifacts for better display and normalize bullets
-                var cleanedLines = rawContent.Split('\n').Select(line =>
-                {
-                    var trimmed = line.TrimStart();
-                    if (trimmed.StartsWith("### ")) return trimmed[4..];
-                    if (trimmed.StartsWith("## ")) return trimmed[3..];
-                    if (trimmed.StartsWith("# ")) return trimmed[2..];
-                    if (trimmed.StartsWith("- ")) return "\u2022 " + trimmed[2..];
-                    if (trimmed.StartsWith("* ") && !trimmed.StartsWith("**")) return "\u2022 " + trimmed[2..];
-                    return line;
-                });
-                var sectionContent = string.Join("\n", cleanedLines).Trim();
-
-                if (string.IsNullOrWhiteSpace(sectionContent)) continue;
-
-                var sectionHeader = new TextBlock
-                {
-                    Text = section,
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
-                    FontFamily = new FontFamily("Segoe UI, Segoe UI Symbol, Segoe UI Emoji"),
-                    FontSize = 13,
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    Margin = new Thickness(0, 8, 0, 4),
-                    IsTextSelectionEnabled = true
+                    Version = nextVersion,
+                    Hash = AnalysisEntry.ComputeHash(analysisResult),
+                    Timestamp = DateTime.Now,
+                    TaskStatus = _selectedTask.Status.ToString(),
+                    TaskPriority = _selectedTask.Priority.ToString(),
+                    Summary = summaryLine,
+                    FullResult = analysisResult
                 };
+                _selectedTask.AnalysisHistory.Add(historyEntry);
 
-                var sectionBodyBlock = new TextBlock
+                // For Linear tasks, also persist to the project-level dictionary
+                if (_isLinearMode && !string.IsNullOrEmpty(_selectedTask.ExternalId) && _vm?.SelectedProject != null)
                 {
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
-                    FontFamily = new FontFamily("Segoe UI, Segoe UI Symbol, Segoe UI Emoji"),
-                    FontSize = 12,
-                    TextWrapping = TextWrapping.Wrap,
-                    LineHeight = 20,
-                    IsTextSelectionEnabled = true
-                };
-
-                // Parse inline formatting: **bold** and `code`
-                var inlinePattern = new System.Text.RegularExpressions.Regex(@"(\*\*.*?\*\*|`[^`]+`)");
-                var segments = inlinePattern.Split(sectionContent);
-                foreach (var segment in segments)
-                {
-                    if (string.IsNullOrEmpty(segment)) continue;
-
-                    if (segment.StartsWith("**") && segment.EndsWith("**") && segment.Length > 4)
-                    {
-                        sectionBodyBlock.Inlines.Add(new Run
-                        {
-                            Text = segment[2..^2],
-                            FontWeight = Microsoft.UI.Text.FontWeights.Bold
-                        });
-                    }
-                    else if (segment.StartsWith('`') && segment.EndsWith('`') && segment.Length > 2)
-                    {
-                        sectionBodyBlock.Inlines.Add(new Run
-                        {
-                            Text = segment[1..^1],
-                            FontFamily = new FontFamily("Consolas"),
-                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
-                        });
-                    }
-                    else
-                    {
-                        sectionBodyBlock.Inlines.Add(new Run { Text = segment });
-                    }
+                    _vm.SelectedProject.LinearAnalysisHistory[_selectedTask.ExternalId] =
+                        new List<AnalysisEntry>(_selectedTask.AnalysisHistory);
                 }
 
-                contentStack.Children.Add(sectionHeader);
-                contentStack.Children.Add(sectionBodyBlock);
-
-                if (sectionIndex < sections.Length - 1)
-                {
-                    var divider = new Border
-                    {
-                        Height = 1,
-                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
-                        Margin = new Thickness(0, 8, 0, 0)
-                    };
-                    contentStack.Children.Add(divider);
-                }
-
-                sectionIndex++;
+                if (_vm != null)
+                    await _vm.SaveAsync();
             }
+
+            var contentStack = BuildFormattedAnalysisPanel(analysisResult);
+            contentStack.Spacing = 16;
 
             var scrollContent = new ScrollViewer
             {

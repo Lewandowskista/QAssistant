@@ -44,9 +44,7 @@ namespace QAssistant.Views
 
         private bool IsValidUri(string url)
         {
-            if (string.IsNullOrWhiteSpace(url))
-                return false;
-            return Uri.TryCreate(url, UriKind.Absolute, out _);
+            return Helpers.UriSecurity.IsHttpUrl(url);
         }
 
         private async void LinksList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -157,8 +155,9 @@ namespace QAssistant.Views
 
             await EmbedWebView.EnsureCoreWebView2Async(environment);
 
-            EmbedWebView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
-            EmbedWebView.CoreWebView2.Settings.IsWebMessageEnabled = true;
+            EmbedWebView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = false;
+            EmbedWebView.CoreWebView2.Settings.IsWebMessageEnabled = false;
+            EmbedWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
 
             EmbedWebView.CoreWebView2.AddWebResourceRequestedFilter("*",
                 Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All);

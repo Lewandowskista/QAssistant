@@ -5,10 +5,12 @@ using System.Threading.Tasks;
 using QAssistant.ViewModels;
 using QAssistant.Views;
 using Microsoft.UI;
+using Microsoft.UI.Text;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using QAssistant.Models;
 using QAssistant.Services;
 using WinRT.Interop;
@@ -28,6 +30,8 @@ namespace QAssistant
         public MainViewModel ViewModel { get; } = new();
         private AppWindow? _appWindow;
         public ReminderService ReminderService { get; } = new();
+        private DispatcherTimer? _autoDismissTimer;
+        private DispatcherTimer? _countdownTimer;
 
         public MainWindow()
         {
@@ -56,6 +60,8 @@ namespace QAssistant
                 }
                 else
                 {
+                    _countdownTimer?.Stop();
+                    _autoDismissTimer?.Stop();
                     ReminderService.Stop();
                     NotificationService.Instance.Unregister();
                     ((App)Application.Current).RemoveTrayIcon();
@@ -73,7 +79,7 @@ namespace QAssistant
 
                 ReminderService.Start(
                     () => ViewModel.Projects.ToList(),
-                    (title, message) => ShowNotificationBanner(title, message)
+                    items => ShowNotificationBanners(items)
                 );
             }
             catch (Exception ex)
@@ -152,53 +158,257 @@ namespace QAssistant
         }
 
         // ── Notifications ────────────────────────────────────────────
-        private void ShowNotificationBanner(string? title, string? message)
+        private void ShowNotificationBanners(List<NotificationItem> items)
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                if (string.IsNullOrEmpty(title))
+                _autoDismissTimer?.Stop();
+                _countdownTimer?.Stop();
+                NotificationStack.Children.Clear();
+
+                if (items.Count == 0) return;
+
+                bool hasGreen = false;
+
+                foreach (var item in items)
                 {
-                    NotificationBanner.Visibility = Visibility.Collapsed;
-                    return;
+                    SolidColorBrush bg, border, titleFg;
+
+                    if (item.Category == "Overdue")
+                    {
+                        bg = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 60, 20, 20));
+                        border = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113));
+                        titleFg = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113));
+                    }
+                    else if (item.Category == "DueToday")
+                    {
+                        bg = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 50, 35, 10));
+                        border = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36));
+                        titleFg = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36));
+                    }
+                    else
+                    {
+                        bg = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 50, 30));
+                        border = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 52, 211, 153));
+                        titleFg = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 52, 211, 153));
+                        hasGreen = true;
+                    }
+
+                    var titleBlock = new TextBlock
+                    {
+                        Text = item.Title,
+                        Foreground = titleFg,
+                        FontSize = 12,
+                        FontWeight = FontWeights.SemiBold,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 12, 0)
+                    };
+
+                    var messageBlock = new TextBlock
+                    {
+                        Text = item.Message,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                        FontSize = 12,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap
+                    };
+
+                    // Live countdown/countup timer label
+                    var timerBlock = new TextBlock
+                    {
+                        Foreground = titleFg,
+                        FontSize = 11,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(8, 0, 8, 0),
+                        Tag = item // store item for timer updates
+                    };
+                    UpdateTimerText(timerBlock, item);
+
+                    var dismissBtn = new Button
+                    {
+                        Background = new SolidColorBrush(Colors.Transparent),
+                        BorderThickness = new Thickness(0),
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                        Padding = new Thickness(8, 4, 8, 4),
+                        Content = new FontIcon
+                        {
+                            Glyph = "\uE711",
+                            FontSize = 10,
+                            FontFamily = new FontFamily("Segoe Fluent Icons")
+                        }
+                    };
+
+                    var grid = new Grid();
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                    Grid.SetColumn(titleBlock, 0);
+                    Grid.SetColumn(messageBlock, 1);
+                    Grid.SetColumn(timerBlock, 2);
+                    Grid.SetColumn(dismissBtn, 3);
+
+                    grid.Children.Add(titleBlock);
+                    grid.Children.Add(messageBlock);
+                    grid.Children.Add(timerBlock);
+                    grid.Children.Add(dismissBtn);
+
+                    var translate = new TranslateTransform();
+                    var banner = new Border
+                    {
+                        Background = bg,
+                        BorderBrush = border,
+                        BorderThickness = new Thickness(0, 0, 0, 1),
+                        Padding = new Thickness(16, 8, 16, 8),
+                        Child = grid,
+                        RenderTransform = translate,
+                        Tag = item
+                    };
+
+                    banner.Tapped += NotificationBanner_Tapped;
+
+                    dismissBtn.Click += (s, e) =>
+                    {
+                        NotificationStack.Children.Remove(banner);
+                    };
+
+                    NotificationStack.Children.Add(banner);
                 }
 
-                NotificationTitle.Text = title;
-                NotificationMessage.Text = message;
-                NotificationBanner.Visibility = Visibility.Visible;
+                // Start a 1-second timer to update all live countdown/countup labels
+                _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                _countdownTimer.Tick += (s, e) => UpdateAllTimers();
+                _countdownTimer.Start();
 
-                if (title.Contains("Overdue"))
+                // Auto-dismiss green (Upcoming) notifications after 5 seconds
+                if (hasGreen)
                 {
-                    NotificationBanner.Background = new SolidColorBrush(
-                        Windows.UI.Color.FromArgb(255, 60, 20, 20));
-                    NotificationBanner.BorderBrush = new SolidColorBrush(
-                        Windows.UI.Color.FromArgb(255, 248, 113, 113));
-                    NotificationTitle.Foreground = new SolidColorBrush(
-                        Windows.UI.Color.FromArgb(255, 248, 113, 113));
-                }
-                else if (title.Contains("Due Today"))
-                {
-                    NotificationBanner.Background = new SolidColorBrush(
-                        Windows.UI.Color.FromArgb(255, 50, 35, 10));
-                    NotificationBanner.BorderBrush = new SolidColorBrush(
-                        Windows.UI.Color.FromArgb(255, 251, 191, 36));
-                    NotificationTitle.Foreground = new SolidColorBrush(
-                        Windows.UI.Color.FromArgb(255, 251, 191, 36));
-                }
-                else
-                {
-                    NotificationBanner.Background = new SolidColorBrush(
-                        Windows.UI.Color.FromArgb(255, 20, 50, 30));
-                    NotificationBanner.BorderBrush = new SolidColorBrush(
-                        Windows.UI.Color.FromArgb(255, 52, 211, 153));
-                    NotificationTitle.Foreground = new SolidColorBrush(
-                        Windows.UI.Color.FromArgb(255, 52, 211, 153));
+                    _autoDismissTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+                    _autoDismissTimer.Tick += (s, e) =>
+                    {
+                        _autoDismissTimer.Stop();
+                        SlideUpGreenBanners();
+                    };
+                    _autoDismissTimer.Start();
                 }
             });
         }
 
-        private void DismissNotification_Click(object sender, RoutedEventArgs e)
+        private void UpdateAllTimers()
         {
-            NotificationBanner.Visibility = Visibility.Collapsed;
+            foreach (var banner in NotificationStack.Children.OfType<Border>())
+            {
+                if (banner.Child is not Grid grid) continue;
+
+                foreach (var child in grid.Children)
+                {
+                    if (child is TextBlock tb && tb.Tag is NotificationItem item)
+                    {
+                        UpdateTimerText(tb, item);
+                    }
+                }
+            }
+        }
+
+        private static void UpdateTimerText(TextBlock timerBlock, NotificationItem item)
+        {
+            if (item.DueDate is not DateTime due) return;
+
+            var now = DateTime.Now;
+
+            if (item.Category == "Overdue")
+            {
+                // Countup: time elapsed since due
+                var elapsed = now - due;
+                timerBlock.Text = $"+{FormatDuration(elapsed)} overdue";
+            }
+            else if (item.Category == "DueToday")
+            {
+                // Countdown: time remaining until due
+                var remaining = due - now;
+                if (remaining.TotalSeconds <= 0)
+                    timerBlock.Text = "now";
+                else
+                    timerBlock.Text = $"in {FormatDuration(remaining)}";
+            }
+        }
+
+        private static string FormatDuration(TimeSpan ts)
+        {
+            if (ts.TotalDays >= 1)
+                return $"{(int)ts.TotalDays}d {ts.Hours}h {ts.Minutes}m";
+            if (ts.TotalHours >= 1)
+                return $"{(int)ts.TotalHours}h {ts.Minutes}m {ts.Seconds}s";
+            if (ts.TotalMinutes >= 1)
+                return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+            return $"{ts.Seconds}s";
+        }
+
+        private void NotificationBanner_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        {
+            if (sender is not Border border || border.Tag is not NotificationItem item) return;
+            if (item.ProjectId == Guid.Empty) return;
+
+            var project = ViewModel.Projects.FirstOrDefault(p => p.Id == item.ProjectId);
+            if (project == null) return;
+
+            ViewModel.SelectedProject = project;
+            ViewModel.PendingTaskId = item.TaskId;
+            RefreshProjectList();
+
+            ViewModel.ActiveTab = "Tasks";
+            UpdateTabStyles();
+            ContentFrame.Navigate(typeof(TasksPage), ViewModel);
+        }
+
+        private void SlideUpGreenBanners()
+        {
+            var greenBanners = NotificationStack.Children
+                .OfType<Border>()
+                .Where(b => b.Tag is NotificationItem n && n.Category == "Later")
+                .ToList();
+
+            if (greenBanners.Count == 0) return;
+
+            foreach (var banner in greenBanners)
+            {
+                var translate = banner.RenderTransform as TranslateTransform ?? new TranslateTransform();
+                banner.RenderTransform = translate;
+
+                var storyboard = new Storyboard();
+
+                var translateAnim = new DoubleAnimation
+                {
+                    From = 0,
+                    To = -30,
+                    Duration = new Duration(TimeSpan.FromMilliseconds(300)),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+                };
+                Storyboard.SetTarget(translateAnim, translate);
+                Storyboard.SetTargetProperty(translateAnim, "Y");
+
+                var opacityAnim = new DoubleAnimation
+                {
+                    From = 1,
+                    To = 0,
+                    Duration = new Duration(TimeSpan.FromMilliseconds(300)),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+                };
+                Storyboard.SetTarget(opacityAnim, banner);
+                Storyboard.SetTargetProperty(opacityAnim, "Opacity");
+
+                storyboard.Children.Add(translateAnim);
+                storyboard.Children.Add(opacityAnim);
+
+                var capturedBanner = banner;
+                storyboard.Completed += (s, e) =>
+                {
+                    NotificationStack.Children.Remove(capturedBanner);
+                };
+
+                storyboard.Begin();
+            }
         }
 
         private void OnViewModelSaveFailed(Exception ex)

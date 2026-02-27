@@ -5,6 +5,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using QAssistant.Models;
 using Windows.Security.Cryptography;
@@ -16,6 +17,8 @@ namespace QAssistant.Services
     [JsonSerializable(typeof(Project))]
     [JsonSerializable(typeof(Note))]
     [JsonSerializable(typeof(ProjectTask))]
+    [JsonSerializable(typeof(AnalysisEntry))]
+    [JsonSerializable(typeof(Dictionary<string, List<AnalysisEntry>>))]
     [JsonSerializable(typeof(EmbedLink))]
     [JsonSerializable(typeof(FileAttachment))]
     [JsonSerializable(typeof(LinkType))]
@@ -39,6 +42,7 @@ namespace QAssistant.Services
         private readonly string _logPath;
         private readonly AppJsonContext _jsonContext;
         private const string EncryptedPrefix = "ENC1:";
+        private static readonly SemaphoreSlim s_fileLock = new(1, 1);
 
         public StorageService()
         {
@@ -101,6 +105,7 @@ namespace QAssistant.Services
 
         public async Task<List<Project>> LoadProjectsAsync()
         {
+            await s_fileLock.WaitAsync();
             try
             {
                 if (!File.Exists(_dataPath))
@@ -149,11 +154,16 @@ namespace QAssistant.Services
                 Debug.WriteLine($"StorageService LoadProjectsAsync error: {ex.Message}\n{ex.StackTrace}");
                 return [];
             }
+            finally
+            {
+                s_fileLock.Release();
+            }
         }
 
 
         public async Task SaveProjectsAsync(List<Project> projects)
         {
+            await s_fileLock.WaitAsync();
             try
             {
                 // Ensure directory exists before writing
@@ -188,6 +198,10 @@ namespace QAssistant.Services
                 LogMessage($"SaveProjectsAsync error: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                 Debug.WriteLine($"StorageService SaveProjectsAsync error: {ex.Message}\n{ex.StackTrace}");
                 throw;
+            }
+            finally
+            {
+                s_fileLock.Release();
             }
         }
 

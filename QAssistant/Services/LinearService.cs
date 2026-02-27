@@ -360,7 +360,12 @@ namespace QAssistant.Services
                 payload["variables"] = variables;
 
             var response = await _client.PostAsJsonAsync(Endpoint, payload);
-            return await response.Content.ReadAsStringAsync();
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Linear API HTTP {(int)response.StatusCode}: {body}");
+
+            return body;
         }
 
 

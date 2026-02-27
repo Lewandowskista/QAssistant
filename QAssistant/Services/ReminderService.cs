@@ -7,22 +7,24 @@ using QAssistant.Models;
 
 namespace QAssistant.Services
 {
+    public record NotificationItem(string Title, string Message, string Category, Guid ProjectId, Guid TaskId, DateTime? DueDate);
+
     public class ReminderService
     {
         private Timer? _precisionTimer;
         private Timer? _dailySummaryTimer;
         private Func<List<Project>>? _getProjects;
-        private Action<string?, string?>? _showBanner;
+        private Action<List<NotificationItem>>? _showBanners;
         private readonly HashSet<Guid> _notifiedOverdue = new();
         private readonly HashSet<Guid> _notifiedUpcoming = new();
+        private readonly HashSet<Guid> _notifiedLater = new();
 
-        private string? _lastBannerTitle;
-        private string? _lastBannerMessage;
+        private string _lastBannerState = string.Empty;
 
-        public void Start(Func<List<Project>> getProjects, Action<string?, string?> showBanner)
+        public void Start(Func<List<Project>> getProjects, Action<List<NotificationItem>> showBanners)
         {
             _getProjects = getProjects;
-            _showBanner = showBanner;
+            _showBanners = showBanners;
 
             // Check immediately on start
             CheckDueTasks();
@@ -45,34 +47,34 @@ namespace QAssistant.Services
 
         private void CheckDueTasks()
         {
-            if (_getProjects == null || _showBanner == null) return;
+            if (_getProjects == null || _showBanners == null) return;
 
             // Snapshot project/task data to avoid cross-thread InvalidOperationException.
-            // The timer callback runs on a thread-pool thread while the UI thread may
-            // modify the ObservableCollection<Project> or List<ProjectTask> concurrently.
-            List<ProjectTask> allTasks;
+            List<(ProjectTask Task, Project Project)> taskPairs;
             try
             {
-                allTasks = _getProjects()
-                    .SelectMany(p => p.Tasks.ToList())
+                taskPairs = _getProjects()
+                    .SelectMany(p => p.Tasks.ToList().Select(t => (Task: t, Project: p)))
                     .ToList();
             }
             catch
             {
-                // Collection was modified during enumeration; skip this tick.
                 return;
             }
 
             var now = DateTime.Now;
-            var currentOverdueTasks = new List<ProjectTask>();
-            var currentUpcomingTasks = new List<ProjectTask>();
+            var today = DateTime.Today;
+            var overdueItems = new List<NotificationItem>();
+            var todayItems = new List<NotificationItem>();
+            var laterItems = new List<NotificationItem>();
 
-            foreach (var task in allTasks)
+            foreach (var (task, project) in taskPairs)
             {
                 if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate)
                 {
                     _notifiedOverdue.Remove(task.Id);
                     _notifiedUpcoming.Remove(task.Id);
+                    _notifiedLater.Remove(task.Id);
                     continue;
                 }
 
@@ -80,91 +82,82 @@ namespace QAssistant.Services
                 {
                     _notifiedOverdue.Remove(task.Id);
                     _notifiedUpcoming.Remove(task.Id);
+                    _notifiedLater.Remove(task.Id);
                     continue;
                 }
 
                 var due = task.DueDate.Value;
 
-                if (due < now)
+                if (due <= now)
                 {
-                    currentOverdueTasks.Add(task);
+                    overdueItems.Add(new("Overdue", task.Title, "Overdue", project.Id, task.Id, due));
                     _notifiedUpcoming.Remove(task.Id);
+                    _notifiedLater.Remove(task.Id);
                 }
-                else if (due < now.AddMinutes(30))
+                else if (due.Date == today)
                 {
-                    currentUpcomingTasks.Add(task);
+                    todayItems.Add(new("Due Today", $"{task.Title} — {due:HH:mm}", "DueToday", project.Id, task.Id, due));
                     _notifiedOverdue.Remove(task.Id);
+                    _notifiedLater.Remove(task.Id);
                 }
                 else
                 {
+                    laterItems.Add(new("Upcoming", task.Title, "Later", project.Id, task.Id, due));
                     _notifiedOverdue.Remove(task.Id);
                     _notifiedUpcoming.Remove(task.Id);
                 }
             }
 
-            string? newTitle = null;
-            string? newMessage = null;
-            string? tag = null;
+            // Combine all categories, prioritized, limit to 5
+            var allItems = overdueItems
+                .Concat(todayItems)
+                .Concat(laterItems)
+                .Take(5)
+                .ToList();
 
-            if (currentOverdueTasks.Count > 0)
+            // Update UI banners if state changed
+            var stateKey = string.Join("|", allItems.Select(i => $"{i.TaskId}:{i.Category}"));
+            if (stateKey != _lastBannerState)
             {
-                newTitle = "Overdue Tasks";
-                newMessage = $"{currentOverdueTasks.Count} task{(currentOverdueTasks.Count > 1 ? "s are" : " is")} now overdue: {string.Join(", ", currentOverdueTasks.Take(3).Select(t => t.Title))}{(currentOverdueTasks.Count > 3 ? "..." : "")}";
-                tag = "Overdue";
-            }
-            else if (currentUpcomingTasks.Count > 0)
-            {
-                newTitle = "Upcoming Deadline";
-                newMessage = $"{currentUpcomingTasks.Count} task{(currentUpcomingTasks.Count > 1 ? "s are" : " is")} due soon: {string.Join(", ", currentUpcomingTasks.Take(3).Select(t => t.Title))}{(currentUpcomingTasks.Count > 3 ? "..." : "")}";
-                tag = "Upcoming";
+                _showBanners(allItems);
+                _lastBannerState = stateKey;
             }
 
-            // Update UI Banner if truth changed
-            if (newTitle != _lastBannerTitle || newMessage != _lastBannerMessage)
+            // Show Toast for NEWLY notified items (one per category)
+            bool hasNewOverdue = false, hasNewToday = false, hasNewLater = false;
+
+            foreach (var item in overdueItems)
             {
-                _showBanner(newTitle, newMessage);
-                _lastBannerTitle = newTitle;
-                _lastBannerMessage = newMessage;
+                if (_notifiedOverdue.Add(item.TaskId)) hasNewOverdue = true;
+            }
+            foreach (var item in todayItems)
+            {
+                if (_notifiedUpcoming.Add(item.TaskId)) hasNewToday = true;
+            }
+            foreach (var item in laterItems)
+            {
+                if (_notifiedLater.Add(item.TaskId)) hasNewLater = true;
             }
 
-            // Show Toast if there are NEWLY notified items
-            if (newTitle != null && newMessage != null)
+            if (hasNewOverdue && overdueItems.Count > 0)
             {
-                bool hasNew = false;
-                if (tag == "Overdue")
-                {
-                    foreach (var t in currentOverdueTasks)
-                    {
-                        if (!_notifiedOverdue.Contains(t.Id))
-                        {
-                            hasNew = true;
-                            _notifiedOverdue.Add(t.Id);
-                        }
-                    }
-                }
-                else if (tag == "Upcoming")
-                {
-                    foreach (var t in currentUpcomingTasks)
-                    {
-                        if (!_notifiedUpcoming.Contains(t.Id))
-                        {
-                            hasNew = true;
-                            _notifiedUpcoming.Add(t.Id);
-                        }
-                    }
-                }
+                NotificationService.Instance.ShowToast("Overdue Tasks",
+                    $"{overdueItems.Count} task{(overdueItems.Count > 1 ? "s are" : " is")} overdue", "Overdue");
+            }
+            if (hasNewToday && todayItems.Count > 0)
+            {
+                NotificationService.Instance.ShowToast("Due Today",
+                    $"{todayItems.Count} task{(todayItems.Count > 1 ? "s are" : " is")} due today", "DueToday");
+            }
+            if (hasNewLater && laterItems.Count > 0)
+            {
+                NotificationService.Instance.ShowToast("Upcoming Tasks",
+                    $"{laterItems.Count} upcoming deadline{(laterItems.Count > 1 ? "s" : "")}", "Later");
+            }
 
-                if (hasNew)
-                {
-                    NotificationService.Instance.ShowToast(newTitle, newMessage, tag);
-                }
-            }
-            else
-            {
-                // Clear active toasts if the condition is gone
-                NotificationService.Instance.RemoveToast("Overdue");
-                NotificationService.Instance.RemoveToast("Upcoming");
-            }
+            if (overdueItems.Count == 0) NotificationService.Instance.RemoveToast("Overdue");
+            if (todayItems.Count == 0) NotificationService.Instance.RemoveToast("DueToday");
+            if (laterItems.Count == 0) NotificationService.Instance.RemoveToast("Later");
         }
 
         private void ScheduleDailySummary()
@@ -180,7 +173,7 @@ namespace QAssistant.Services
 
         private void ShowDailySummary()
         {
-            if (_getProjects == null || _showBanner == null) return;
+            if (_getProjects == null || _showBanners == null) return;
 
             var today = DateTime.Today;
             var now = DateTime.Now;
@@ -217,7 +210,7 @@ namespace QAssistant.Services
             if (overdue > 0) parts.Add($"{overdue} overdue");
             if (total > 0) parts.Add($"{total} total pending");
 
-            _showBanner("Daily Summary", string.Join(" · ", parts));
+            _showBanners([new("Daily Summary", string.Join(" · ", parts), "Summary", Guid.Empty, Guid.Empty, null)]);
         }
     }
 }

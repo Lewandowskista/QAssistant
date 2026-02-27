@@ -439,6 +439,11 @@
                                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                                     BorderThickness="0" CornerRadius="0"
                                     Padding="16,10" FontSize="12"/>
+                            <Button x:Name="TabHistory" Content="History"
+                                    Click="TabHistory_Click"
+                                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                    BorderThickness="0" CornerRadius="0"
+                                    Padding="16,10" FontSize="12"/>
                         </StackPanel>
                     </Border>
 
@@ -557,6 +562,12 @@
                                              CornerRadius="8"
                                              Padding="12"/>
                                 </StackPanel>
+                            </StackPanel>
+
+                            <!-- History Tab -->
+                            <StackPanel x:Name="HistoryTab" Spacing="12"
+                                        Padding="20,16" Visibility="Collapsed">
+                                <StackPanel x:Name="HistoryContainer" Spacing="12"/>
                             </StackPanel>
 
                         </Grid>

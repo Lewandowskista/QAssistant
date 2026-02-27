@@ -26,5 +26,6 @@ namespace QAssistant.Models
         public string? Reporter { get; set; }
         public string? Labels { get; set; }
         public List<string> AttachmentUrls { get; set; } = [];
+        public List<AnalysisEntry> AnalysisHistory { get; set; } = [];
     }
 }

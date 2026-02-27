@@ -28,6 +28,13 @@ namespace QAssistant.Models
         public List<EmbedLink> Links { get; set; } = new();
         public List<FileAttachment> Attachments { get; set; } = new();
 
+        /// <summary>
+        /// Persisted analysis history for Linear tasks, keyed by ExternalId.
+        /// Linear issues are fetched fresh each session, so their AnalysisHistory
+        /// is stored here and merged back after fetching.
+        /// </summary>
+        public Dictionary<string, List<AnalysisEntry>> LinearAnalysisHistory { get; set; } = new();
+
         [JsonIgnore]
         private SolidColorBrush? _cachedBrush;
 

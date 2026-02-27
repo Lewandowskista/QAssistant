@@ -70,8 +70,12 @@ namespace QAssistant.Services
         {
             try
             {
-                if (File.Exists(attachment.FilePath))
-                    File.Delete(attachment.FilePath);
+                var fullPath = Path.GetFullPath(attachment.FilePath);
+                if (!fullPath.StartsWith(_filesFolder, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                if (File.Exists(fullPath))
+                    File.Delete(fullPath);
             }
             catch { }
         }
@@ -80,8 +84,12 @@ namespace QAssistant.Services
         {
             try
             {
-                if (!File.Exists(attachment.FilePath)) return;
-                await Launcher.LaunchUriAsync(new Uri("file:///" + attachment.FilePath.Replace("\\", "/")));
+                var fullPath = Path.GetFullPath(attachment.FilePath);
+                if (!fullPath.StartsWith(_filesFolder, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                if (!File.Exists(fullPath)) return;
+                await Launcher.LaunchUriAsync(new Uri("file:///" + fullPath.Replace("\\", "/")));
             }
             catch { }
         }

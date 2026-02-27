@@ -257,41 +257,8 @@
                 </Grid>
             </Border>
 
-            <!-- Notification Banner -->
-            <Border x:Name="NotificationBanner"
-        Grid.Row="1"
-        Visibility="Collapsed"
-        Background="#1E3A2F"
-        BorderBrush="#34D399" BorderThickness="0,0,0,2"
-        Padding="16,10">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="NotificationTitle"
-                   Grid.Column="0"
-                   Foreground="#34D399"
-                   FontSize="12" FontWeight="SemiBold"
-                   VerticalAlignment="Center"
-                   Margin="0,0,12,0"/>
-                    <TextBlock x:Name="NotificationMessage"
-                   Grid.Column="1"
-                   Foreground="#E2E8F0"
-                   FontSize="12"
-                   VerticalAlignment="Center"
-                   TextWrapping="Wrap"/>
-                    <Button Grid.Column="2"
-                Click="DismissNotification_Click"
-                Background="Transparent"
-                BorderThickness="0"
-                Foreground="#6B7280"
-                Padding="8,4">
-                        <FontIcon Glyph="&#xE711;" FontSize="10" FontFamily="Segoe Fluent Icons"/>
-                    </Button>
-                </Grid>
-            </Border>
+            <!-- Notification Banners -->
+            <StackPanel x:Name="NotificationStack" Grid.Row="1"/>
 
             <!-- Content frame -->
             <Frame Grid.Row="2" x:Name="ContentFrame" Background="{ThemeResource ApplicationBackgroundBrush}"/>
