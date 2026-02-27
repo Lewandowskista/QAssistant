@@ -405,12 +405,25 @@
                                    TextWrapping="Wrap" FontFamily="Consolas"/>
                             </StackPanel>
 
-                            <Button x:Name="OpenLogButton" Content="Open Log File"
-                            Click="OpenLogFile_Click"
-                            Background="#252535" Foreground="#A78BFA"
-                            CornerRadius="8" Padding="12,8"/>
+                    <Button x:Name="OpenLogButton" Content="Open Log File"
+                    Click="OpenLogFile_Click"
+                    Background="#252535" Foreground="#A78BFA"
+                    CornerRadius="8" Padding="12,8"/>
                         </StackPanel>
                     </Border>
+
+                    <!-- Footer watermark -->
+                    <StackPanel HorizontalAlignment="Stretch" Margin="0,8,0,0">
+                        <Border Background="Transparent" Padding="8,6" HorizontalAlignment="Stretch">
+                            <TextBlock x:Name="CopyrightText"
+                                       Text="© 2026 Lewandowskista · QAssistant"
+                                       Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="11"
+                                       HorizontalAlignment="Center"
+                                       Opacity="0.75"
+                                       FontStyle="Italic"/>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Page>

@@ -1,3 +1,18 @@
+﻿// Copyright (C) 2026 Lewandowskista
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -110,7 +125,7 @@ namespace QAssistant.Services
             }
         }
 
-        // ── Request router ───────────────────────────────────────
+        // â”€â”€ Request router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async Task HandleRequest(HttpListenerContext ctx)
         {
@@ -252,7 +267,7 @@ namespace QAssistant.Services
                 Encoding.UTF8.GetBytes(providedKey));
         }
 
-        // ── Handlers ─────────────────────────────────────────────
+        // â”€â”€ Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async Task HandleGetProjects(HttpListenerResponse res)
         {
@@ -457,7 +472,7 @@ namespace QAssistant.Services
             await WriteJson(res, 201, results);
         }
 
-        // ── Helpers ──────────────────────────────────────────────
+        // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private static object MapTestCase(TestCase tc, Project project)
         {
@@ -539,7 +554,7 @@ namespace QAssistant.Services
             res.Close();
         }
 
-        // ── DTO for execution submissions ────────────────────────
+        // â”€â”€ DTO for execution submissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private sealed class ExecutionSubmission
         {

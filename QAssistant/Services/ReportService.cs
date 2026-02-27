@@ -1,3 +1,18 @@
+﻿// Copyright (C) 2026 Lewandowskista
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -10,7 +25,7 @@ namespace QAssistant.Services
 {
     public static class ReportService
     {
-        // ── CSV Generation ───────────────────────────────────────
+        // â”€â”€ CSV Generation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         public static string GenerateTestCasesCsv(
             Project project,
@@ -90,7 +105,7 @@ namespace QAssistant.Services
             return sanitized;
         }
 
-        // ── PDF Generation ───────────────────────────────────────
+        // â”€â”€ PDF Generation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         public static byte[] GenerateTestSummaryPdf(Project project, List<TestPlan>? filterPlans = null, List<TestExecution>? filterExecutions = null, string? criticalityAssessment = null)
         {
@@ -100,7 +115,7 @@ namespace QAssistant.Services
 
             var pdf = new PdfBuilder();
 
-            // ── Page 1: Cover / Summary ──
+            // â”€â”€ Page 1: Cover / Summary â”€â”€
             var page = pdf.AddPage();
             float y = 760;
             float margin = 50;
@@ -116,7 +131,7 @@ namespace QAssistant.Services
             page.SetColor(0.4f, 0.4f, 0.45f);
             page.DrawText($"Project: {project.Name}", margin, y);
             y -= 16;
-            page.DrawText($"Generated: {DateTime.Now:MMMM d, yyyy · h:mm tt}", margin, y);
+            page.DrawText($"Generated: {DateTime.Now:MMMM d, yyyy Â· h:mm tt}", margin, y);
             y -= 8;
 
             // Separator
@@ -162,7 +177,7 @@ namespace QAssistant.Services
                 passed, failed, blocked, skipped, notRun, totalCases);
             y -= 28;
 
-            // ── Test Plans detail ──
+            // â”€â”€ Test Plans detail â”€â”€
             page.SetFont("Helvetica-Bold", 14);
             page.SetColor(0.1f, 0.1f, 0.15f);
             page.DrawText("Test Plans", margin, y);
@@ -195,7 +210,7 @@ namespace QAssistant.Services
 
                 page.SetFont("Helvetica", 10);
                 page.SetColor(0.4f, 0.4f, 0.45f);
-                page.DrawTextRight($"{casesInPlan.Count} cases · {planRate:F0}% pass", margin + contentWidth - 8, y);
+                page.DrawTextRight($"{casesInPlan.Count} cases Â· {planRate:F0}% pass", margin + contentWidth - 8, y);
                 y -= 22;
 
                 // Test cases in this plan
@@ -227,7 +242,7 @@ namespace QAssistant.Services
                 y -= 10;
             }
 
-            // ── Execution History (last 30) ──
+            // â”€â”€ Execution History (last 30) â”€â”€
             var recentExecs = allExecs.OrderByDescending(e => e.ExecutedAt).Take(30).ToList();
             if (recentExecs.Count > 0)
             {
@@ -270,7 +285,7 @@ namespace QAssistant.Services
                     page.SetFont("Helvetica", 8);
                     page.SetColor(0.2f, 0.2f, 0.25f);
                     string tcLabel = tc != null
-                        ? $"{tc.TestCaseId} · {(tc.Title.Length > 30 ? tc.Title[..27] + "..." : tc.Title)}"
+                        ? $"{tc.TestCaseId} Â· {(tc.Title.Length > 30 ? tc.Title[..27] + "..." : tc.Title)}"
                         : "Deleted";
                     page.DrawText(tcLabel, margin + 80, y);
 
@@ -287,7 +302,7 @@ namespace QAssistant.Services
                 }
             }
 
-            // ── Criticality Assessment ──
+            // â”€â”€ Criticality Assessment â”€â”€
             if (!string.IsNullOrWhiteSpace(criticalityAssessment))
             {
                 if (y < 300)
@@ -429,7 +444,7 @@ namespace QAssistant.Services
 
                     page.SetColor(0.2f, 0.2f, 0.25f);
 
-                    // Empty line → small vertical gap
+                    // Empty line â†’ small vertical gap
                     if (string.IsNullOrWhiteSpace(line))
                     {
                         y -= 8;
@@ -471,7 +486,7 @@ namespace QAssistant.Services
             // Footer on last page
             page.SetFont("Helvetica", 8);
             page.SetColor(0.6f, 0.6f, 0.65f);
-            page.DrawText($"QAssistant · {project.Name} · {DateTime.Now:yyyy-MM-dd}", margin, 30);
+            page.DrawText($"QAssistant Â· {project.Name} Â· {DateTime.Now:yyyy-MM-dd}", margin, 30);
 
             return pdf.Build();
         }
@@ -551,7 +566,7 @@ namespace QAssistant.Services
             _ => ("NOT RUN", 0.55f, 0.55f, 0.6f)
         };
 
-        // ── Minimal PDF Builder ──────────────────────────────────
+        // â”€â”€ Minimal PDF Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Generates a valid PDF 1.4 document without external libraries.
         // Uses a two-pass approach: build all objects in memory, then
         // write them sequentially with correct byte offsets.
@@ -569,11 +584,11 @@ namespace QAssistant.Services
 
             public byte[] Build()
             {
-                // Phase 1 – Assign object numbers and build byte representations.
+                // Phase 1 â€“ Assign object numbers and build byte representations.
                 //
                 // Fixed objects:
                 //   1  Catalog
-                //   2  Pages  (needs page obj refs → built last)
+                //   2  Pages  (needs page obj refs â†’ built last)
                 //   3  Font Helvetica
                 //   4  Font Helvetica-Bold
                 //   5  Font Courier
@@ -584,8 +599,8 @@ namespace QAssistant.Services
 
                 var objects = new List<byte[]?>
                 {
-                    null, // index 0 → obj 1 (Catalog) – filled below
-                    null, // index 1 → obj 2 (Pages)   – filled after pages
+                    null, // index 0 â†’ obj 1 (Catalog) â€“ filled below
+                    null, // index 1 â†’ obj 2 (Pages)   â€“ filled after pages
                     Encoding.UTF8.GetBytes("3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n"),
                     Encoding.UTF8.GetBytes("4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n"),
                     Encoding.UTF8.GetBytes("5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>\nendobj\n"),
@@ -625,7 +640,7 @@ namespace QAssistant.Services
                     string.Join(" ", pageObjNumbers.Select(n => $"{n} 0 R")) +
                     $"] /Count {_pages.Count} >>\nendobj\n");
 
-                // Phase 2 – Write sequentially, recording byte offsets.
+                // Phase 2 â€“ Write sequentially, recording byte offsets.
                 using var ms = new MemoryStream();
 
                 // Header
@@ -667,61 +682,61 @@ namespace QAssistant.Services
             private string _currentFont = "/F1";
             private float _currentSize = 12;
 
-            // Unicode → WinAnsi byte for the special 0x80–0x9F range
+            // Unicode â†’ WinAnsi byte for the special 0x80â€“0x9F range
             private static readonly Dictionary<char, byte> s_winAnsiSpecial = new()
             {
-                { '\u20AC', 0x80 }, // €
-                { '\u201A', 0x82 }, // ‚
-                { '\u0192', 0x83 }, // ƒ
-                { '\u201E', 0x84 }, // „
-                { '\u2026', 0x85 }, // …
-                { '\u2020', 0x86 }, // †
-                { '\u2021', 0x87 }, // ‡
-                { '\u02C6', 0x88 }, // ˆ
-                { '\u2030', 0x89 }, // ‰
-                { '\u0160', 0x8A }, // Š
-                { '\u2039', 0x8B }, // ‹
-                { '\u0152', 0x8C }, // Œ
-                { '\u017D', 0x8E }, // Ž
+                { '\u20AC', 0x80 }, // â‚¬
+                { '\u201A', 0x82 }, // â€š
+                { '\u0192', 0x83 }, // Æ’
+                { '\u201E', 0x84 }, // â€ž
+                { '\u2026', 0x85 }, // â€¦
+                { '\u2020', 0x86 }, // â€ 
+                { '\u2021', 0x87 }, // â€¡
+                { '\u02C6', 0x88 }, // Ë†
+                { '\u2030', 0x89 }, // â€°
+                { '\u0160', 0x8A }, // Å 
+                { '\u2039', 0x8B }, // â€¹
+                { '\u0152', 0x8C }, // Å’
+                { '\u017D', 0x8E }, // Å½
                 { '\u2018', 0x91 }, // '
                 { '\u2019', 0x92 }, // '
                 { '\u201C', 0x93 }, // "
                 { '\u201D', 0x94 }, // "
-                { '\u2022', 0x95 }, // •
-                { '\u2013', 0x96 }, // –
-                { '\u2014', 0x97 }, // —
-                { '\u02DC', 0x98 }, // ˜
-                { '\u2122', 0x99 }, // ™
-                { '\u0161', 0x9A }, // š
-                { '\u203A', 0x9B }, // ›
-                { '\u0153', 0x9C }, // œ
-                { '\u017E', 0x9E }, // ž
-                { '\u0178', 0x9F }, // Ÿ
+                { '\u2022', 0x95 }, // â€¢
+                { '\u2013', 0x96 }, // â€“
+                { '\u2014', 0x97 }, // â€”
+                { '\u02DC', 0x98 }, // Ëœ
+                { '\u2122', 0x99 }, // â„¢
+                { '\u0161', 0x9A }, // Å¡
+                { '\u203A', 0x9B }, // â€º
+                { '\u0153', 0x9C }, // Å“
+                { '\u017E', 0x9E }, // Å¾
+                { '\u0178', 0x9F }, // Å¸
             };
 
             // Fallback ASCII substitutions for characters outside WinAnsi
             private static readonly Dictionary<char, string> s_fallbacks = new()
             {
-                { '\u2192', "->" },  // →
-                { '\u2190', "<-" },  // ←
-                { '\u2194', "<->" }, // ↔
-                { '\u2191', "^" },   // ↑
-                { '\u2193', "v" },   // ↓
-                { '\u2713', "+" },   // ✓
-                { '\u2714', "+" },   // ✔
-                { '\u2716', "x" },   // ✖
-                { '\u2717', "x" },   // ✗
-                { '\u2500', "-" },   // ─
-                { '\u2502', "|" },   // │
-                { '\u25A0', "#" },   // ■
-                { '\u25CF', "*" },   // ●
-                { '\u2605', "*" },   // ★
-                { '\u2610', "[ ]" }, // ☐
-                { '\u2611', "[x]" }, // ☑
-                { '\u2612', "[x]" }, // ☒
+                { '\u2192', "->" },  // â†’
+                { '\u2190', "<-" },  // â†
+                { '\u2194', "<->" }, // â†”
+                { '\u2191', "^" },   // â†‘
+                { '\u2193', "v" },   // â†“
+                { '\u2713', "+" },   // âœ“
+                { '\u2714', "+" },   // âœ”
+                { '\u2716', "x" },   // âœ–
+                { '\u2717', "x" },   // âœ—
+                { '\u2500', "-" },   // â”€
+                { '\u2502', "|" },   // â”‚
+                { '\u25A0', "#" },   // â– 
+                { '\u25CF', "*" },   // â—
+                { '\u2605', "*" },   // â˜…
+                { '\u2610', "[ ]" }, // â˜
+                { '\u2611', "[x]" }, // â˜‘
+                { '\u2612', "[x]" }, // â˜’
                 { '\u2003', " " },   // em space
                 { '\u2002', " " },   // en space
-                { '\u00A0', " " },   // non-breaking space → regular space
+                { '\u00A0', " " },   // non-breaking space â†’ regular space
             };
 
             public void SetFont(string fontName, float size)
@@ -776,7 +791,7 @@ namespace QAssistant.Services
             /// <summary>
             /// Converts a Unicode string to a Windows-1252 byte sequence.
             /// Characters in the standard ASCII/Latin-1 ranges map directly.
-            /// Characters in the WinAnsi special range (0x80–0x9F) are looked up.
+            /// Characters in the WinAnsi special range (0x80â€“0x9F) are looked up.
             /// Everything else is substituted with an ASCII fallback or '?'.
             /// </summary>
             private static byte[] EncodeWinAnsi(string text)
@@ -789,7 +804,7 @@ namespace QAssistant.Services
                     {
                         bytes.Add((byte)c);
                     }
-                    // Latin-1 Supplement (U+00A0–U+00FF maps 1:1 in WinAnsi)
+                    // Latin-1 Supplement (U+00A0â€“U+00FF maps 1:1 in WinAnsi)
                     else if (c >= 0xA0 && c <= 0xFF)
                     {
                         bytes.Add((byte)c);
@@ -810,17 +825,17 @@ namespace QAssistant.Services
                                 bytes.Add((byte)sc);
                         }
                     }
-                    // Tab → space
+                    // Tab â†’ space
                     else if (c == '\t')
                     {
                         bytes.Add((byte)' ');
                     }
-                    // Newlines → space (PDF text operators don't handle line breaks)
+                    // Newlines â†’ space (PDF text operators don't handle line breaks)
                     else if (c == '\n' || c == '\r')
                     {
                         bytes.Add((byte)' ');
                     }
-                    // Unknown → ?
+                    // Unknown â†’ ?
                     else
                     {
                         bytes.Add((byte)'?');
@@ -830,7 +845,7 @@ namespace QAssistant.Services
             }
 
             /// <summary>
-            /// Formats a WinAnsi byte array as a PDF hex string: &lt;4865…&gt;
+            /// Formats a WinAnsi byte array as a PDF hex string: &lt;4865â€¦&gt;
             /// This notation is binary-safe and avoids all escaping issues.
             /// </summary>
             private static string ToHexString(byte[] data)

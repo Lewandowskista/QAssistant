@@ -1,3 +1,18 @@
+﻿// Copyright (C) 2026 Lewandowskista
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -51,7 +66,7 @@ namespace QAssistant.Views
             }
         }
 
-        // ── Sub-tab navigation ───────────────────────────────────
+        // â”€â”€ Sub-tab navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private void SubTab_Click(object sender, RoutedEventArgs e)
         {
@@ -96,7 +111,7 @@ namespace QAssistant.Views
             RenderTestPlans();
         }
 
-        // ── Backward compatibility ───────────────────────────────
+        // â”€â”€ Backward compatibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private void MigrateOrphanedTestCases()
         {
@@ -123,7 +138,7 @@ namespace QAssistant.Views
             _ = _vm.SaveAsync();
         }
 
-        // ── ID helpers ───────────────────────────────────────────
+        // â”€â”€ ID helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private string NextTestPlanId()
         {
@@ -149,7 +164,7 @@ namespace QAssistant.Views
             return $"TE-{max + 1:D3}";
         }
 
-        // ── Generate test cases ──────────────────────────────────
+        // â”€â”€ Generate test cases â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async void GenerateTestCases_Click(object sender, RoutedEventArgs e)
         {
@@ -244,7 +259,7 @@ namespace QAssistant.Views
                 var plan = new TestPlan
                 {
                     TestPlanId = NextTestPlanId(),
-                    Name = $"{selectedSource} · {DateTime.Now:MMM d, yyyy h:mm tt}",
+                    Name = $"{selectedSource} Â· {DateTime.Now:MMM d, yyyy h:mm tt}",
                     Description = $"Auto-generated from {tasks.Count} {selectedSource} issue(s).",
                     Source = source
                 };
@@ -260,7 +275,7 @@ namespace QAssistant.Views
 
                 await _vm.SaveAsync();
 
-                GenerationStatusText.Text = $"Generated {generatedCases.Count} test cases in {plan.TestPlanId} · {DateTime.Now:h:mm tt}";
+                GenerationStatusText.Text = $"Generated {generatedCases.Count} test cases in {plan.TestPlanId} Â· {DateTime.Now:h:mm tt}";
                 RenderTestPlans();
             }
             catch (Exception ex)
@@ -298,7 +313,7 @@ namespace QAssistant.Views
             }
         }
 
-        // ── Render: Test Plans (collapsible) ─────────────────────
+        // â”€â”€ Render: Test Plans (collapsible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private void RenderTestPlans()
         {
@@ -328,8 +343,8 @@ namespace QAssistant.Views
                 ? plans.OrderByDescending(p => p.CreatedAt).ToList()
                 : plans.Where(p => !p.IsArchived).OrderByDescending(p => p.CreatedAt).ToList();
 
-            var archiveInfo = archivedCount > 0 ? $" · {archivedCount} archived" : "";
-            TestCaseCountText.Text = $"{activeCount} plan(s) · {allCases.Count} case(s){archiveInfo}";
+            var archiveInfo = archivedCount > 0 ? $" Â· {archivedCount} archived" : "";
+            TestCaseCountText.Text = $"{activeCount} plan(s) Â· {allCases.Count} case(s){archiveInfo}";
 
             foreach (var plan in visiblePlans)
             {
@@ -345,7 +360,7 @@ namespace QAssistant.Views
 
             var outerStack = new StackPanel { Spacing = 0 };
 
-            // ── Plan header (click to collapse/expand) ──
+            // â”€â”€ Plan header (click to collapse/expand) â”€â”€
             var headerGrid = new Grid { Padding = new Thickness(0, 0, 0, 8) };
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -483,7 +498,7 @@ namespace QAssistant.Views
 
             outerStack.Children.Add(headerButton);
 
-            // ── Collapsible body: test case cards ──
+            // â”€â”€ Collapsible body: test case cards â”€â”€
             var bodyStack = new StackPanel
             {
                 Spacing = 10,
@@ -569,13 +584,13 @@ namespace QAssistant.Views
             return panel;
         }
 
-        // ── Render: single test case card ────────────────────────
+        // â”€â”€ Render: single test case card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private Border BuildTestCaseCard(TestCase tc, TestPlan plan)
         {
             var cardStack = new StackPanel { Spacing = 10 };
 
-            // ── Header row: ID + Title + Run + Status + Delete ──
+            // â”€â”€ Header row: ID + Title + Run + Status + Delete â”€â”€
             var headerGrid = new Grid();
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -695,11 +710,11 @@ namespace QAssistant.Views
 
             cardStack.Children.Add(headerGrid);
 
-            // ── Traceability label ──
-            var traceText = $"{tc.TestCaseId} → {plan.TestPlanId}";
+            // â”€â”€ Traceability label â”€â”€
+            var traceText = $"{tc.TestCaseId} â†’ {plan.TestPlanId}";
             var execCount = _vm?.SelectedProject?.TestExecutions.Count(te => te.TestCaseId == tc.Id) ?? 0;
             if (execCount > 0)
-                traceText += $" · {execCount} execution(s)";
+                traceText += $" Â· {execCount} execution(s)";
 
             cardStack.Children.Add(new TextBlock
             {
@@ -709,7 +724,7 @@ namespace QAssistant.Views
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
             });
 
-            // ── Separator ──
+            // â”€â”€ Separator â”€â”€
             cardStack.Children.Add(new Border
             {
                 Height = 1,
@@ -717,17 +732,17 @@ namespace QAssistant.Views
                 Margin = new Thickness(0, 2, 0, 2)
             });
 
-            // ── Field rows ──
+            // â”€â”€ Field rows â”€â”€
             AddFieldSection(cardStack, "PRE-CONDITIONS", tc.PreConditions);
             AddFieldSection(cardStack, "TEST STEPS", tc.TestSteps);
             AddFieldSection(cardStack, "TEST DATA", tc.TestData);
             AddFieldSection(cardStack, "EXPECTED RESULT", tc.ExpectedResult);
 
-            // ── Actual Result ──
+            // â”€â”€ Actual Result â”€â”€
             if (!string.IsNullOrWhiteSpace(tc.ActualResult))
                 AddFieldSection(cardStack, "ACTUAL RESULT", tc.ActualResult);
 
-            // ── Footer: source + timestamp ──
+            // â”€â”€ Footer: source + timestamp â”€â”€
             var footerPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -748,7 +763,7 @@ namespace QAssistant.Views
             });
             footerPanel.Children.Add(new TextBlock
             {
-                Text = tc.GeneratedAt.ToString("MMM d, yyyy · h:mm tt"),
+                Text = tc.GeneratedAt.ToString("MMM d, yyyy Â· h:mm tt"),
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
                 FontSize = 10,
                 VerticalAlignment = VerticalAlignment.Center
@@ -766,7 +781,7 @@ namespace QAssistant.Views
             };
         }
 
-        // ── Execute test case (dialog) ───────────────────────────
+        // â”€â”€ Execute test case (dialog) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async System.Threading.Tasks.Task ExecuteTestCaseAsync(TestCase tc, TestPlan plan)
         {
@@ -798,7 +813,7 @@ namespace QAssistant.Views
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(new TextBlock
             {
-                Text = $"{tc.TestCaseId} → {plan.TestPlanId}",
+                Text = $"{tc.TestCaseId} â†’ {plan.TestPlanId}",
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 12,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
@@ -866,7 +881,7 @@ namespace QAssistant.Views
             RenderTestPlans();
         }
 
-        // ── Render: Test Runs (execution history) ────────────────
+        // â”€â”€ Render: Test Runs (execution history) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private void RenderExecutionHistory()
         {
@@ -893,7 +908,7 @@ namespace QAssistant.Views
                 ExecutionsContainer.Children.Add(card);
             }
 
-            // ── Criticality Assessment expandable section ──
+            // â”€â”€ Criticality Assessment expandable section â”€â”€
             var criticalityCard = BuildCriticalityAssessmentCard();
             ExecutionsContainer.Children.Add(criticalityCard);
         }
@@ -902,7 +917,7 @@ namespace QAssistant.Views
         {
             var outerStack = new StackPanel { Spacing = 0 };
 
-            // ── Expand/Collapse button ──
+            // â”€â”€ Expand/Collapse button â”€â”€
             var expandBtnContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             expandBtnContent.Children.Add(new FontIcon
             {
@@ -933,7 +948,7 @@ namespace QAssistant.Views
 
             outerStack.Children.Add(expandBtn);
 
-            // ── Collapsible body ──
+            // â”€â”€ Collapsible body â”€â”€
             var bodyStack = new StackPanel
             {
                 Spacing = 12,
@@ -1147,12 +1162,12 @@ namespace QAssistant.Views
 
             var cardStack = new StackPanel { Spacing = 6 };
 
-            // ── Traceability header: TE → TC → TP ──
+            // â”€â”€ Traceability header: TE â†’ TC â†’ TP â”€â”€
             var traceRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             traceRow.Children.Add(MakeTraceBadge(exec.ExecutionId, GetStatusBrush(exec.Result)));
             traceRow.Children.Add(new TextBlock
             {
-                Text = "→",
+                Text = "â†’",
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center
@@ -1162,7 +1177,7 @@ namespace QAssistant.Views
                 new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))));
             traceRow.Children.Add(new TextBlock
             {
-                Text = "→",
+                Text = "â†’",
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center
@@ -1218,7 +1233,7 @@ namespace QAssistant.Views
             }
             resultRow.Children.Add(new TextBlock
             {
-                Text = exec.ExecutedAt.ToString("MMM d, yyyy · h:mm:ss tt"),
+                Text = exec.ExecutedAt.ToString("MMM d, yyyy Â· h:mm:ss tt"),
                 FontSize = 11,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
                 VerticalAlignment = VerticalAlignment.Center
@@ -1266,7 +1281,7 @@ namespace QAssistant.Views
             };
         }
 
-        // ── Plan action helpers ──────────────────────────────────
+        // â”€â”€ Plan action helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private static Button BuildPlanActionButton(string glyph, string tooltip)
         {
@@ -1339,7 +1354,7 @@ namespace QAssistant.Views
             }
 
             await _vm.SaveAsync();
-            GenerationStatusText.Text = $"Duplicated {sourcePlan.TestPlanId} → {newPlan.TestPlanId} ({sourceCases.Count} case(s))";
+            GenerationStatusText.Text = $"Duplicated {sourcePlan.TestPlanId} â†’ {newPlan.TestPlanId} ({sourceCases.Count} case(s))";
             RenderTestPlans();
         }
 
@@ -1399,7 +1414,7 @@ namespace QAssistant.Views
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(new TextBlock
             {
-                Text = $"{plan.TestPlanId} · {cases.Count} test case(s)",
+                Text = $"{plan.TestPlanId} Â· {cases.Count} test case(s)",
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 12,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
@@ -1459,7 +1474,7 @@ namespace QAssistant.Views
             RenderTestPlans();
         }
 
-        // ── Delete helpers ───────────────────────────────────────
+        // â”€â”€ Delete helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async System.Threading.Tasks.Task DeleteTestPlanAsync(TestPlan plan)
         {
@@ -1535,7 +1550,7 @@ namespace QAssistant.Views
             RenderTestPlans();
         }
 
-        // ── Reports: Dashboard rendering ─────────────────────────
+        // â”€â”€ Reports: Dashboard rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private void ReportTypePicker_Changed(object sender, SelectionChangedEventArgs e)
         {
@@ -1583,7 +1598,7 @@ namespace QAssistant.Views
                 RenderExecutionsCsvPreview(project, filteredExecs, filteredCases, filteredPlans);
         }
 
-        // ── Reports: Plan filter ─────────────────────────────────
+        // â”€â”€ Reports: Plan filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private (List<TestPlan> plans, List<TestCase> cases, List<TestExecution> execs) GetFilteredData()
         {
@@ -1712,7 +1727,7 @@ namespace QAssistant.Views
             RenderReportsDashboard();
         }
 
-        // ── Reports: Dashboard cards ─────────────────────────────
+        // â”€â”€ Reports: Dashboard cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private void RenderSummaryDashboard(Project project, List<TestPlan> plans, List<TestCase> cases, List<TestExecution> execs)
         {
@@ -1726,7 +1741,7 @@ namespace QAssistant.Views
             int notRun = cases.Count(c => c.Status == TestCaseStatus.NotRun);
             double passRate = totalCases > 0 ? (double)passed / totalCases * 100 : 0;
 
-            // ── Metric cards row ──
+            // â”€â”€ Metric cards row â”€â”€
             var metricsGrid = new Grid();
             metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1741,7 +1756,7 @@ namespace QAssistant.Views
 
             ReportsContainer.Children.Add(metricsGrid);
 
-            // ── Status Breakdown ──
+            // â”€â”€ Status Breakdown â”€â”€
             var breakdownCard = new Border
             {
                 Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
@@ -1770,7 +1785,7 @@ namespace QAssistant.Views
             breakdownCard.Child = breakdownStack;
             ReportsContainer.Children.Add(breakdownCard);
 
-            // ── Plan-level summary table ──
+            // â”€â”€ Plan-level summary table â”€â”€
             if (plans.Count > 0)
             {
                 var planCard = new Border
@@ -1816,7 +1831,7 @@ namespace QAssistant.Views
                 ReportsContainer.Children.Add(planCard);
             }
 
-            ReportStatusText.Text = $"Summary · {totalPlans} plan(s) · {totalCases} case(s)";
+            ReportStatusText.Text = $"Summary Â· {totalPlans} plan(s) Â· {totalCases} case(s)";
         }
 
         private void RenderTestCasesCsvPreview(Project project, List<TestPlan> filteredPlans, List<TestCase> filteredCases)
@@ -1887,7 +1902,7 @@ namespace QAssistant.Views
             previewCard.Child = stack;
             ReportsContainer.Children.Add(previewCard);
 
-            ReportStatusText.Text = $"CSV · {filteredCases.Count} case(s) ready to export";
+            ReportStatusText.Text = $"CSV Â· {filteredCases.Count} case(s) ready to export";
         }
 
         private void RenderExecutionsCsvPreview(Project project, List<TestExecution> filteredExecs, List<TestCase> filteredCases, List<TestPlan> filteredPlans)
@@ -1958,10 +1973,10 @@ namespace QAssistant.Views
             previewCard.Child = stack;
             ReportsContainer.Children.Add(previewCard);
 
-            ReportStatusText.Text = $"CSV · {filteredExecs.Count} execution(s) ready to export";
+            ReportStatusText.Text = $"CSV Â· {filteredExecs.Count} execution(s) ready to export";
         }
 
-        // ── Reports: Export ──────────────────────────────────────
+        // â”€â”€ Reports: Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async void ExportReport_Click(object sender, RoutedEventArgs e)
         {
@@ -2055,7 +2070,7 @@ namespace QAssistant.Views
             ReportStatusText.Text = $"Exported to {file.Name}";
         }
 
-        // ── Reports: UI helper widgets ───────────────────────────
+        // â”€â”€ Reports: UI helper widgets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private static void AddMetricCard(Grid parent, int column, string label, string value, string glyph, string colorHex)
         {
@@ -2228,7 +2243,7 @@ namespace QAssistant.Views
             return string.IsNullOrWhiteSpace(sanitized) ? "Export" : sanitized;
         }
 
-        // ── Shared UI helpers ────────────────────────────────────
+        // â”€â”€ Shared UI helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private static void AddFieldSection(StackPanel parent, string label, string content)
         {

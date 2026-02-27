@@ -1,3 +1,18 @@
+﻿// Copyright (C) 2026 Lewandowskista
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -11,14 +26,14 @@ namespace QAssistant.Helpers
         {
             dialog.RequestedTheme = ElementTheme.Dark;
 
-            // ── Dialog chrome ────────────────────────────────────────
+            // â”€â”€ Dialog chrome â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             dialog.Resources["ContentDialogBackground"]               = Brush(19, 19, 26);
             dialog.Resources["ContentDialogForeground"]               = Brush(226, 232, 240);
             dialog.Resources["ContentDialogBorderBrush"]              = Brush(42, 42, 58);
             dialog.Resources["ContentDialogTitleForeground"]          = Brush(226, 232, 240);
             dialog.Resources["ContentDialogButtonAreaSeparatorBrush"] = Brush(42, 42, 58);
 
-            // ── Default/accent button (whichever button is marked DefaultButton) ─
+            // â”€â”€ Default/accent button (whichever button is marked DefaultButton) â”€
             //    Uses AccentButton* theme resources in the Button template.
             dialog.Resources["AccentButtonBackground"]             = Brush(167, 139, 250);  // #A78BFA
             dialog.Resources["AccentButtonBackgroundPointerOver"]  = Brush(139,  92, 246);  // #8B5CF6
@@ -31,7 +46,7 @@ namespace QAssistant.Helpers
             dialog.Resources["AccentButtonBorderBrushPointerOver"] = Brush(139,  92, 246);
             dialog.Resources["AccentButtonBorderBrushPressed"]     = Brush(109,  40, 217);
 
-            // ── Non-default buttons (Secondary & Close) ──────────────
+            // â”€â”€ Non-default buttons (Secondary & Close) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             //    Uses Button* theme resources in the Button template.
             dialog.Resources["ButtonBackground"]             = Brush( 37,  37,  53);  // #252535
             dialog.Resources["ButtonBackgroundPointerOver"]  = Brush( 45,  45,  65);

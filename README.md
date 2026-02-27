@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20v1809%2B-A78BFA?style=flat-square)
 ![Framework](https://img.shields.io/badge/framework-.NET%2010-60A5FA?style=flat-square)
 ![UI](https://img.shields.io/badge/UI-WinUI%203-34D399?style=flat-square)
-![License](https://img.shields.io/badge/license-MPL--2.0-F472B6?style=flat-square)
+![License](https://img.shields.io/badge/license-AGPL--3.0-F472B6?style=flat-square)
 
 ---
 
@@ -343,7 +343,7 @@ Contributions, issues, and feature requests are welcome. Please open an issue fi
 
 ## License
 
-This project is licensed under the **Mozilla Public License 2.0**.  
+This project is licensed under the **GNU Affero General Public License v3.0**.  
 See the [LICENSE](LICENSE) file for details.
 
 ---

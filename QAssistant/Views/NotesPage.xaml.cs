@@ -1,3 +1,18 @@
+﻿// Copyright (C) 2026 Lewandowskista
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 using QAssistant.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -347,7 +362,7 @@ namespace QAssistant.Views
             });
             info.Children.Add(new TextBlock
             {
-                Text = $"{file.FileSizeDisplay} · {file.AddedAt:MMM d, yyyy}",
+                Text = $"{file.FileSizeDisplay} Â· {file.AddedAt:MMM d, yyyy}",
                 Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
                     Windows.UI.Color.FromArgb(255, 107, 114, 128)),
                 FontSize = 11
@@ -457,15 +472,15 @@ namespace QAssistant.Views
 
         private static string GetFileIcon(string mimeType) => mimeType switch
         {
-            var m when m.StartsWith("image/") => "🖼",
-            var m when m.StartsWith("video/") => "🎬",
-            var m when m.StartsWith("audio/") => "🎵",
-            "application/pdf" => "📄",
-            var m when m.Contains("word") => "📝",
-            var m when m.Contains("sheet") => "📊",
-            "text/plain" => "📃",
-            "application/zip" => "🗜",
-            _ => "📎"
+            var m when m.StartsWith("image/") => "ðŸ–¼",
+            var m when m.StartsWith("video/") => "ðŸŽ¬",
+            var m when m.StartsWith("audio/") => "ðŸŽµ",
+            "application/pdf" => "ðŸ“„",
+            var m when m.Contains("word") => "ðŸ“",
+            var m when m.Contains("sheet") => "ðŸ“Š",
+            "text/plain" => "ðŸ“ƒ",
+            "application/zip" => "ðŸ—œ",
+            _ => "ðŸ“Ž"
         };
 
         private async System.Threading.Tasks.Task ShowImagePreviewAsync(FileAttachment file)
