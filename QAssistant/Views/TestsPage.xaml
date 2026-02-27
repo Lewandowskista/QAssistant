@@ -74,6 +74,11 @@
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8"
                                     HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <ToggleButton x:Name="ShowArchivedToggle" Content="Show Archived"
+                                          Click="ShowArchivedToggle_Click"
+                                          Background="Transparent" Foreground="#6B7280"
+                                          BorderBrush="#2A2A3A" CornerRadius="6"
+                                          Padding="10,5" FontSize="11"/>
                             <TextBlock x:Name="TestCaseCountText"
                                        Foreground="{ThemeResource TextSecondaryBrush}"
                                        FontSize="12" VerticalAlignment="Center"/>

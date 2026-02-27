@@ -9,6 +9,7 @@ using QAssistant.ViewModels;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Windows.ApplicationModel.DataTransfer;
@@ -25,6 +26,7 @@ namespace QAssistant.Views
         private readonly HashSet<Guid> _selectedPlanIds = [];
         private bool _criticalityExpanded;
         private string? _criticalityAssessmentText;
+        private bool _showArchived;
 
         private Guid ProjectId => _vm?.SelectedProject?.Id ?? Guid.Empty;
 
@@ -86,6 +88,12 @@ namespace QAssistant.Views
                 RenderExecutionHistory();
             if (_activeSubTab == "Reports")
                 RenderReportsDashboard();
+        }
+
+        private void ShowArchivedToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _showArchived = ShowArchivedToggle.IsChecked == true;
+            RenderTestPlans();
         }
 
         // ── Backward compatibility ───────────────────────────────
@@ -313,9 +321,17 @@ namespace QAssistant.Views
 
             TestCaseEmptyState.Visibility = Visibility.Collapsed;
             ClearAllBtn.Visibility = Visibility.Visible;
-            TestCaseCountText.Text = $"{plans.Count} plan(s) · {allCases.Count} case(s)";
 
-            foreach (var plan in plans.OrderByDescending(p => p.CreatedAt))
+            int archivedCount = plans.Count(p => p.IsArchived);
+            int activeCount = plans.Count - archivedCount;
+            var visiblePlans = _showArchived
+                ? plans.OrderByDescending(p => p.CreatedAt).ToList()
+                : plans.Where(p => !p.IsArchived).OrderByDescending(p => p.CreatedAt).ToList();
+
+            var archiveInfo = archivedCount > 0 ? $" · {archivedCount} archived" : "";
+            TestCaseCountText.Text = $"{activeCount} plan(s) · {allCases.Count} case(s){archiveInfo}";
+
+            foreach (var plan in visiblePlans)
             {
                 var casesInPlan = allCases.Where(tc => tc.TestPlanId == plan.Id).ToList();
                 var planCard = BuildTestPlanCard(plan, casesInPlan);
@@ -381,6 +397,27 @@ namespace QAssistant.Views
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175))
                 }
             });
+
+            // Archived badge
+            if (plan.IsArchived)
+            {
+                titleRow.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 2, 6, 2),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 45, 32, 16)),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Child = new TextBlock
+                    {
+                        Text = "ARCHIVED",
+                        FontSize = 9,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+                        CharacterSpacing = 100
+                    }
+                });
+            }
+
             titleStack.Children.Add(titleRow);
 
             // Status summary
@@ -390,22 +427,33 @@ namespace QAssistant.Views
             Grid.SetColumn(titleStack, 1);
             headerGrid.Children.Add(titleStack);
 
+            // Action buttons panel
+            var capturedPlan = plan;
+            var actionPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+
+            // Run All button
+            var runAllBtn = BuildPlanActionButton("\uE768", "Run all test cases");
+            runAllBtn.Click += async (s, _) => await RunAllTestCasesAsync(capturedPlan);
+            actionPanel.Children.Add(runAllBtn);
+
+            // Reset button
+            var resetBtn = BuildPlanActionButton("\uE72C", "Reset all statuses to Not Run");
+            resetBtn.Click += async (s, _) => await ResetTestPlanStatusesAsync(capturedPlan);
+            actionPanel.Children.Add(resetBtn);
+
+            // Duplicate button
+            var duplicateBtn = BuildPlanActionButton("\uE8C8", "Duplicate plan for re-execution");
+            duplicateBtn.Click += async (s, _) => await DuplicateTestPlanAsync(capturedPlan);
+            actionPanel.Children.Add(duplicateBtn);
+
+            // Archive/Unarchive button
+            var archiveBtn = BuildPlanActionButton(plan.IsArchived ? "\uE7A7" : "\uE7B8",
+                plan.IsArchived ? "Unarchive plan" : "Archive plan");
+            archiveBtn.Click += async (s, _) => await ToggleArchiveTestPlanAsync(capturedPlan);
+            actionPanel.Children.Add(archiveBtn);
+
             // Delete plan button
-            var deletePlanBtn = new Button
-            {
-                Background = new SolidColorBrush(Colors.Transparent),
-                BorderThickness = new Thickness(0),
-                Padding = new Thickness(6, 4, 6, 4),
-                CornerRadius = new CornerRadius(4),
-                VerticalAlignment = VerticalAlignment.Center,
-                Content = new FontIcon
-                {
-                    Glyph = "\uE74D",
-                    FontSize = 12,
-                    FontFamily = new FontFamily("Segoe Fluent Icons"),
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
-                }
-            };
+            var deletePlanBtn = BuildPlanActionButton("\uE74D", "Delete plan");
             deletePlanBtn.PointerEntered += (s, _) =>
             {
                 if (deletePlanBtn.Content is FontIcon icon)
@@ -416,10 +464,11 @@ namespace QAssistant.Views
                 if (deletePlanBtn.Content is FontIcon icon)
                     icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
             };
-            var capturedPlan = plan;
             deletePlanBtn.Click += async (s, _) => await DeleteTestPlanAsync(capturedPlan);
-            Grid.SetColumn(deletePlanBtn, 2);
-            headerGrid.Children.Add(deletePlanBtn);
+            actionPanel.Children.Add(deletePlanBtn);
+
+            Grid.SetColumn(actionPanel, 2);
+            headerGrid.Children.Add(actionPanel);
 
             // Make header clickable for collapse/expand
             var headerButton = new Button
@@ -474,6 +523,7 @@ namespace QAssistant.Views
                 Padding = new Thickness(16),
                 BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
                 BorderThickness = new Thickness(1),
+                Opacity = plan.IsArchived ? 0.6 : 1.0,
                 Child = outerStack
             };
         }
@@ -1214,6 +1264,199 @@ namespace QAssistant.Views
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                 }
             };
+        }
+
+        // ── Plan action helpers ──────────────────────────────────
+
+        private static Button BuildPlanActionButton(string glyph, string tooltip)
+        {
+            var btn = new Button
+            {
+                Background = new SolidColorBrush(Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(6, 4, 6, 4),
+                CornerRadius = new CornerRadius(4),
+                VerticalAlignment = VerticalAlignment.Center,
+                Content = new FontIcon
+                {
+                    Glyph = glyph,
+                    FontSize = 12,
+                    FontFamily = new FontFamily("Segoe Fluent Icons"),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+                }
+            };
+            ToolTipService.SetToolTip(btn, tooltip);
+            return btn;
+        }
+
+        private async System.Threading.Tasks.Task ToggleArchiveTestPlanAsync(TestPlan plan)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            plan.IsArchived = !plan.IsArchived;
+            await _vm.SaveAsync();
+            GenerationStatusText.Text = plan.IsArchived
+                ? $"Archived {plan.TestPlanId}."
+                : $"Unarchived {plan.TestPlanId}.";
+            RenderTestPlans();
+        }
+
+        private async System.Threading.Tasks.Task DuplicateTestPlanAsync(TestPlan sourcePlan)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var project = _vm.SelectedProject;
+            var sourceCases = project.TestCases.Where(tc => tc.TestPlanId == sourcePlan.Id).ToList();
+
+            var newPlan = new TestPlan
+            {
+                TestPlanId = NextTestPlanId(),
+                Name = $"{sourcePlan.Name} (copy)",
+                Description = $"Duplicated from {sourcePlan.TestPlanId} for re-execution.",
+                Source = sourcePlan.Source
+            };
+            project.TestPlans.Add(newPlan);
+
+            foreach (var tc in sourceCases)
+            {
+                var copy = new TestCase
+                {
+                    TestCaseId = NextTestCaseId(),
+                    Title = tc.Title,
+                    PreConditions = tc.PreConditions,
+                    TestSteps = tc.TestSteps,
+                    TestData = tc.TestData,
+                    ExpectedResult = tc.ExpectedResult,
+                    ActualResult = string.Empty,
+                    Status = TestCaseStatus.NotRun,
+                    Priority = tc.Priority,
+                    GeneratedAt = DateTime.Now,
+                    SourceIssueId = tc.SourceIssueId,
+                    Source = tc.Source,
+                    TestPlanId = newPlan.Id
+                };
+                project.TestCases.Add(copy);
+            }
+
+            await _vm.SaveAsync();
+            GenerationStatusText.Text = $"Duplicated {sourcePlan.TestPlanId} → {newPlan.TestPlanId} ({sourceCases.Count} case(s))";
+            RenderTestPlans();
+        }
+
+        private async System.Threading.Tasks.Task ResetTestPlanStatusesAsync(TestPlan plan)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var dialog = new ContentDialog
+            {
+                Title = "Reset Statuses",
+                Content = $"Reset all test case statuses in {plan.TestPlanId} to Not Run?\nThis will clear actual results. Execution history is preserved.",
+                PrimaryButtonText = "Reset",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            var cases = _vm.SelectedProject.TestCases.Where(tc => tc.TestPlanId == plan.Id).ToList();
+            foreach (var tc in cases)
+            {
+                tc.Status = TestCaseStatus.NotRun;
+                tc.ActualResult = string.Empty;
+            }
+
+            await _vm.SaveAsync();
+            GenerationStatusText.Text = $"Reset {cases.Count} case(s) in {plan.TestPlanId}.";
+            RenderTestPlans();
+        }
+
+        private async System.Threading.Tasks.Task RunAllTestCasesAsync(TestPlan plan)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var cases = _vm.SelectedProject.TestCases.Where(tc => tc.TestPlanId == plan.Id).ToList();
+            if (cases.Count == 0) return;
+
+            var statusPicker = new ComboBox
+            {
+                ItemsSource = Enum.GetValues(typeof(TestCaseStatus)),
+                SelectedItem = TestCaseStatus.Passed,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            var notesBox = new TextBox
+            {
+                PlaceholderText = "Batch notes (optional)",
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 40
+            };
+
+            var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(new TextBlock
+            {
+                Text = $"{plan.TestPlanId} · {cases.Count} test case(s)",
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
+            });
+            panel.Children.Add(new TextBlock
+            {
+                Text = "This will record an execution for every test case in this plan with the selected result.",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 8)
+            });
+            panel.Children.Add(new TextBlock { Text = "Result for all", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(statusPicker);
+            panel.Children.Add(new TextBlock { Text = "Notes", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(notesBox);
+
+            var dialog = new ContentDialog
+            {
+                Title = "Run All Test Cases",
+                Content = panel,
+                PrimaryButtonText = "Record All",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            var selectedStatus = (TestCaseStatus)statusPicker.SelectedItem!;
+            const int MaxFieldLength = 10_000;
+            var notesText = notesBox.Text.Trim();
+            if (notesText.Length > MaxFieldLength)
+                notesText = notesText[..MaxFieldLength];
+
+            foreach (var tc in cases)
+            {
+                var execution = new TestExecution
+                {
+                    ExecutionId = NextExecutionId(),
+                    TestCaseId = tc.Id,
+                    TestPlanId = plan.Id,
+                    Result = selectedStatus,
+                    ActualResult = string.Empty,
+                    Notes = notesText,
+                    ExecutedAt = DateTime.Now
+                };
+                _vm.SelectedProject.TestExecutions.Add(execution);
+
+                tc.Status = selectedStatus;
+            }
+
+            await _vm.SaveAsync();
+            GenerationStatusText.Text = $"Recorded {cases.Count} execution(s) in {plan.TestPlanId}.";
+            RenderTestPlans();
         }
 
         // ── Delete helpers ───────────────────────────────────────

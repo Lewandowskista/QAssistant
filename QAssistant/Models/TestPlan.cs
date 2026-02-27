@@ -10,5 +10,6 @@ namespace QAssistant.Models
         public string Description { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public TaskSource Source { get; set; } = TaskSource.Manual;
+        public bool IsArchived { get; set; }
     }
 }
