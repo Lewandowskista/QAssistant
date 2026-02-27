@@ -61,6 +61,13 @@ namespace QAssistant.Views
             else
                 ProjectContextText.Text = "No project selected — keys will be saved globally.";
 
+            // ── Automation API (global, not per-project) ──
+            var apiEnabled = CredentialService.LoadCredential("AutomationApiEnabled");
+            AutomationApiToggle.IsOn = apiEnabled == "true";
+
+            var apiPort = CredentialService.LoadCredential("AutomationApiPort");
+            AutomationApiPortBox.Text = string.IsNullOrEmpty(apiPort) ? "5248" : apiPort;
+
             var linearKey = LoadProjectCred("LinearApiKey");
             if (!string.IsNullOrEmpty(linearKey))
                 LinearApiKeyBox.Password = linearKey;
@@ -182,6 +189,44 @@ namespace QAssistant.Views
                 DialogHelper.ApplyDarkTheme(dialog);
                 _ = dialog.ShowAsync();
             }
+        }
+
+        // ── Automation API ────────────────────────────────────────────
+        private void AutomationApiToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            var enabled = AutomationApiToggle.IsOn;
+            CredentialService.SaveCredential("AutomationApiEnabled", enabled ? "true" : "false");
+
+            if (enabled)
+            {
+                var portStr = CredentialService.LoadCredential("AutomationApiPort");
+                int port = int.TryParse(portStr, out var p) && p is > 0 and < 65536 ? p : 5248;
+                App.AutomationApi.Start(port);
+                ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
+                    $"Automation API started on http://localhost:{port}/", true);
+            }
+            else
+            {
+                App.AutomationApi.Stop();
+                ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
+                    "Automation API stopped.", true);
+            }
+        }
+
+        private void SaveAutomationPort_Click(object sender, RoutedEventArgs e)
+        {
+            var portText = AutomationApiPortBox.Text.Trim();
+            if (!int.TryParse(portText, out var port) || port is <= 0 or >= 65536)
+            {
+                ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
+                    "Invalid port number. Use a value between 1 and 65535.", false);
+                return;
+            }
+
+            CredentialService.SaveCredential("AutomationApiPort", port.ToString());
+            ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
+                $"Port saved ({port}). Toggle the API off and on to apply.", true);
         }
 
         // ── Linear ───────────────────────────────────────────────────

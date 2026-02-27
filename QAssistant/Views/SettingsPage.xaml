@@ -57,6 +57,80 @@
                 </StackPanel>
             </Border>
 
+            <!-- Automation API Section -->
+            <Border Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="12"
+                    BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" Padding="24">
+                <StackPanel Spacing="16">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Automation API" Foreground="{ThemeResource TextPrimaryBrush}"
+                                   FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Text="Expose a local REST API so automation suites (Playwright, Cypress, etc.) can query test cases and submit execution results."/>
+                    </StackPanel>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,16,0">
+                            <TextBlock Text="Enable Automation API"
+                                       Foreground="{ThemeResource TextPrimaryBrush}" FontSize="14"/>
+                            <TextBlock Text="Starts a local HTTP server your test runners can call"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Name="AutomationApiToggle"
+                                      Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                      Toggled="AutomationApiToggle_Toggled"
+                                      OnContent="" OffContent=""/>
+                    </Grid>
+
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Port" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                        <TextBox x:Name="AutomationApiPortBox"
+                                 PlaceholderText="5248"
+                                 Background="{ThemeResource ApplicationBackgroundBrush}"
+                                 Foreground="{ThemeResource TextPrimaryBrush}"
+                                 BorderBrush="{ThemeResource BorderBrush}"
+                                 CornerRadius="8"
+                                 Padding="12,10"
+                                 MaxWidth="120"
+                                 HorizontalAlignment="Left"/>
+                        <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                   Text="Default: 5248 · Changes take effect on next toggle or restart"/>
+                    </StackPanel>
+
+                    <Button Content="Save Port" Click="SaveAutomationPort_Click"
+                            Background="{ThemeResource HoverBrush}"
+                            Foreground="{ThemeResource AccentBrush}"
+                            CornerRadius="8"
+                            Padding="16,8"/>
+
+                    <Border x:Name="AutomationApiStatusBorder" Visibility="Collapsed"
+                            CornerRadius="8" Padding="12,8">
+                        <TextBlock x:Name="AutomationApiStatusText" FontSize="12"/>
+                    </Border>
+
+                    <Border Background="{ThemeResource ApplicationBackgroundBrush}"
+                            CornerRadius="8" Padding="16,12"
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="ENDPOINTS" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                            <TextBlock FontFamily="Consolas" FontSize="11" Foreground="{ThemeResource TextPrimaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="GET  /api/projects&#x0a;GET  /api/projects/{id}/testplans&#x0a;GET  /api/projects/{id}/testcases&#x0a;GET  /api/projects/{id}/testcases?planId={guid}&#x0a;GET  /api/projects/{id}/testcases/{tcId}&#x0a;GET  /api/projects/{id}/executions&#x0a;POST /api/projects/{id}/executions&#x0a;POST /api/projects/{id}/executions/batch"/>
+                            <TextBlock FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap" Margin="0,4,0,0"
+                                       Text="POST body: { &quot;testCaseDisplayId&quot;: &quot;TC-001&quot;, &quot;result&quot;: &quot;passed&quot;, &quot;actualResult&quot;: &quot;...&quot;, &quot;notes&quot;: &quot;...&quot; }"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
             <!-- Linear Section -->
             <Border Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="12"
                     BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" Padding="24">

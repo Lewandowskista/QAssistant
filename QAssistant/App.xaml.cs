@@ -15,6 +15,7 @@ namespace QAssistant
         public static IntPtr MainWindowHandle { get; private set; }
         public static MainWindow? MainWindowInstance { get; private set; }
         public static bool MinimizeToTray { get; set; } = false;
+        public static AutomationApiService AutomationApi { get; } = new();
 
         // Win32 tray constants
         private const int WM_APP = 0x8000;
@@ -107,6 +108,15 @@ namespace QAssistant
             // Load tray setting immediately so it's ready before window activates
             var trayEnabled = CredentialService.LoadCredential("MinimizeToTray");
             MinimizeToTray = trayEnabled == "true";
+
+            // Start automation API if enabled
+            var apiEnabled = CredentialService.LoadCredential("AutomationApiEnabled");
+            if (apiEnabled == "true")
+            {
+                var portStr = CredentialService.LoadCredential("AutomationApiPort");
+                int port = int.TryParse(portStr, out var p) && p is > 0 and < 65536 ? p : 5248;
+                AutomationApi.Start(port);
+            }
         }
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
@@ -227,11 +237,13 @@ namespace QAssistant
 
         public static void ExitApp()
         {
+            AutomationApi.Dispose();
+
             if (MainWindowInstance != null)
                 ((App)Application.Current).RemoveTrayIcon();
-            
+
             NotificationService.Instance.Unregister();
-            
+
             System.Diagnostics.Process.GetCurrentProcess().Kill();
         }
 
