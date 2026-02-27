@@ -3,6 +3,7 @@ using System;
 namespace QAssistant.Models
 {
     public enum TestCaseStatus { NotRun, Passed, Failed, Blocked, Skipped }
+    public enum TestCasePriority { Low, Medium, Major, Blocker }
 
     public class TestCase
     {
@@ -15,6 +16,7 @@ namespace QAssistant.Models
         public string ExpectedResult { get; set; } = string.Empty;
         public string ActualResult { get; set; } = string.Empty;
         public TestCaseStatus Status { get; set; } = TestCaseStatus.NotRun;
+        public TestCasePriority Priority { get; set; } = TestCasePriority.Medium;
         public DateTime GeneratedAt { get; set; } = DateTime.Now;
         public string SourceIssueId { get; set; } = string.Empty;
         public TaskSource Source { get; set; } = TaskSource.Manual;

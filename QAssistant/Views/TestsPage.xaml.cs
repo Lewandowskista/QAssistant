@@ -23,6 +23,8 @@ namespace QAssistant.Views
         private string _activeSubTab = "TestCaseGeneration";
         private readonly HashSet<Guid> _collapsedPlans = [];
         private readonly HashSet<Guid> _selectedPlanIds = [];
+        private bool _criticalityExpanded;
+        private string? _criticalityAssessmentText;
 
         private Guid ProjectId => _vm?.SelectedProject?.Id ?? Guid.Empty;
 
@@ -529,6 +531,7 @@ namespace QAssistant.Views
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var titlePanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             titlePanel.Children.Add(new TextBlock
@@ -571,6 +574,25 @@ namespace QAssistant.Views
             Grid.SetColumn(runBtn, 1);
             headerGrid.Children.Add(runBtn);
 
+            // Priority badge
+            var priorityBadge = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(8, 4, 8, 4),
+                Background = GetPriorityBadgeBackground(tc.Priority),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Child = new TextBlock
+                {
+                    Text = tc.Priority.ToString(),
+                    FontSize = 11,
+                    Foreground = GetPriorityForeground(tc.Priority),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            };
+            Grid.SetColumn(priorityBadge, 2);
+            headerGrid.Children.Add(priorityBadge);
+
             // Status badge (read-only)
             var statusBadge = new Border
             {
@@ -587,7 +609,7 @@ namespace QAssistant.Views
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                 }
             };
-            Grid.SetColumn(statusBadge, 2);
+            Grid.SetColumn(statusBadge, 3);
             headerGrid.Children.Add(statusBadge);
 
             // Delete button
@@ -618,7 +640,7 @@ namespace QAssistant.Views
                     icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
             };
             deleteBtn.Click += async (s, _) => await DeleteTestCaseAsync(capturedTc);
-            Grid.SetColumn(deleteBtn, 3);
+            Grid.SetColumn(deleteBtn, 4);
             headerGrid.Children.Add(deleteBtn);
 
             cardStack.Children.Add(headerGrid);
@@ -820,6 +842,251 @@ namespace QAssistant.Views
                 var card = BuildExecutionCard(exec);
                 ExecutionsContainer.Children.Add(card);
             }
+
+            // ── Criticality Assessment expandable section ──
+            var criticalityCard = BuildCriticalityAssessmentCard();
+            ExecutionsContainer.Children.Add(criticalityCard);
+        }
+
+        private Border BuildCriticalityAssessmentCard()
+        {
+            var outerStack = new StackPanel { Spacing = 0 };
+
+            // ── Expand/Collapse button ──
+            var expandBtnContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            expandBtnContent.Children.Add(new FontIcon
+            {
+                Glyph = _criticalityExpanded ? "\uE70D" : "\uE76C",
+                FontSize = 12,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            expandBtnContent.Children.Add(new TextBlock
+            {
+                Text = "Expand for detailed view",
+                FontSize = 13,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            var expandBtn = new Button
+            {
+                Background = new SolidColorBrush(Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                Content = expandBtnContent
+            };
+
+            outerStack.Children.Add(expandBtn);
+
+            // ── Collapsible body ──
+            var bodyStack = new StackPanel
+            {
+                Spacing = 12,
+                Visibility = _criticalityExpanded ? Visibility.Visible : Visibility.Collapsed,
+                Margin = new Thickness(0, 12, 0, 0)
+            };
+
+            // Priority failure summary (always shown when expanded)
+            var project = _vm!.SelectedProject!;
+            var failedCases = project.TestCases.Where(tc => tc.Status == TestCaseStatus.Failed).ToList();
+
+            var summaryTitle = new TextBlock
+            {
+                Text = "CRITICALITY ASSESSMENT",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+                FontSize = 10,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                CharacterSpacing = 150
+            };
+            bodyStack.Children.Add(summaryTitle);
+
+            // Priority breakdown bars
+            var priorityBreakdown = new StackPanel { Spacing = 8 };
+            var blockerFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Blocker);
+            var majorFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Major);
+            var mediumFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Medium);
+            var lowFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Low);
+            int totalFailed = failedCases.Count;
+
+            AddPriorityBar(priorityBreakdown, "Blocker", blockerFailed, totalFailed, Windows.UI.Color.FromArgb(255, 220, 38, 38));
+            AddPriorityBar(priorityBreakdown, "Major", majorFailed, totalFailed, Windows.UI.Color.FromArgb(255, 249, 115, 22));
+            AddPriorityBar(priorityBreakdown, "Medium", mediumFailed, totalFailed, Windows.UI.Color.FromArgb(255, 251, 191, 36));
+            AddPriorityBar(priorityBreakdown, "Low", lowFailed, totalFailed, Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            bodyStack.Children.Add(priorityBreakdown);
+
+            // Separator
+            bodyStack.Children.Add(new Border
+            {
+                Height = 1,
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                Margin = new Thickness(0, 4, 0, 4)
+            });
+
+            // AI-generated assessment area
+            if (!string.IsNullOrWhiteSpace(_criticalityAssessmentText))
+            {
+                AddFieldSection(bodyStack, "AI ANALYSIS", _criticalityAssessmentText);
+            }
+            else
+            {
+                var generateBtn = new Button
+                {
+                    Content = "Generate AI Criticality Assessment",
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53)),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+                    BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(16, 8, 16, 8),
+                    FontSize = 12
+                };
+                generateBtn.Click += async (s, _) => await GenerateCriticalityAssessmentAsync();
+                bodyStack.Children.Add(generateBtn);
+            }
+
+            outerStack.Children.Add(bodyStack);
+
+            // Wire expand/collapse
+            expandBtn.Click += (s, _) =>
+            {
+                _criticalityExpanded = !_criticalityExpanded;
+                bodyStack.Visibility = _criticalityExpanded ? Visibility.Visible : Visibility.Collapsed;
+                if (expandBtnContent.Children[0] is FontIcon chevron)
+                    chevron.Glyph = _criticalityExpanded ? "\uE70D" : "\uE76C";
+            };
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(16),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 0, 8),
+                Child = outerStack
+            };
+        }
+
+        private async System.Threading.Tasks.Task GenerateCriticalityAssessmentAsync()
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+
+            var geminiKey = LoadProjectCred("GeminiApiKey");
+            if (string.IsNullOrEmpty(geminiKey))
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "API Key Missing",
+                    Content = "Please add your Google AI Studio API key in Settings.",
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                DialogHelper.ApplyDarkTheme(dialog);
+                await dialog.ShowAsync();
+                return;
+            }
+
+            var prompt = GeminiService.BuildCriticalityAssessmentPrompt(
+                project.Tasks,
+                project.TestCases,
+                project.TestExecutions,
+                project.TestPlans);
+
+            try
+            {
+                _criticalityAssessmentText = "Generating assessment...";
+                RenderExecutionHistory();
+
+                var service = new GeminiService(geminiKey);
+                var response = await service.AnalyzeIssueAsync(prompt);
+
+                // Cap stored response length to prevent unbounded memory use
+                const int MaxAssessmentLength = 20_000;
+                _criticalityAssessmentText = response.Length > MaxAssessmentLength
+                    ? response[..MaxAssessmentLength] + "\n\n(truncated)"
+                    : response;
+                RenderExecutionHistory();
+            }
+            catch (GeminiAllModelsRateLimitedException)
+            {
+                _criticalityAssessmentText = "Rate limit exceeded. Please try again later.";
+                RenderExecutionHistory();
+            }
+            catch (Exception)
+            {
+                _criticalityAssessmentText = "Failed to generate assessment. Please check your API key and try again.";
+                RenderExecutionHistory();
+            }
+        }
+
+        private static void AddPriorityBar(StackPanel parent, string label, int count, int total, Windows.UI.Color color)
+        {
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
+
+            var labelText = new TextBlock
+            {
+                Text = label,
+                FontSize = 12,
+                Foreground = new SolidColorBrush(color),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(labelText, 0);
+            row.Children.Add(labelText);
+
+            double pct = total > 0 ? (double)count / total * 100 : 0;
+
+            var barBg = new Border
+            {
+                Height = 8,
+                CornerRadius = new CornerRadius(4),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53)),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var barGrid = new Grid();
+            barGrid.Children.Add(barBg);
+
+            if (pct > 0)
+            {
+                var barFill = new Border
+                {
+                    Height = 8,
+                    CornerRadius = new CornerRadius(4),
+                    Background = new SolidColorBrush(color),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Width = 0
+                };
+                barGrid.Children.Add(barFill);
+                barGrid.SizeChanged += (s, e) =>
+                {
+                    barFill.Width = e.NewSize.Width * pct / 100;
+                };
+            }
+
+            Grid.SetColumn(barGrid, 1);
+            barGrid.Margin = new Thickness(8, 0, 8, 0);
+            row.Children.Add(barGrid);
+
+            var valueText = new TextBlock
+            {
+                Text = count.ToString(),
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+                HorizontalTextAlignment = TextAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(valueText, 2);
+            row.Children.Add(valueText);
+
+            parent.Children.Add(row);
         }
 
         private Border BuildExecutionCard(TestExecution exec)
@@ -883,6 +1150,22 @@ namespace QAssistant.Views
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                 }
             });
+            if (tc != null)
+            {
+                resultRow.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(8, 3, 8, 3),
+                    Background = GetPriorityBadgeBackground(tc.Priority),
+                    Child = new TextBlock
+                    {
+                        Text = tc.Priority.ToString(),
+                        FontSize = 11,
+                        Foreground = GetPriorityForeground(tc.Priority),
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                    }
+                });
+            }
             resultRow.Children.Add(new TextBlock
             {
                 Text = exec.ExecutedAt.ToString("MMM d, yyyy · h:mm:ss tt"),
@@ -1484,8 +1767,9 @@ namespace QAssistant.Views
             {
                 var plans = filteredPlans;
                 var execs = filteredExecs;
+                var assessment = _criticalityAssessmentText;
                 var pdfBytes = await System.Threading.Tasks.Task.Run(() =>
-                    ReportService.GenerateTestSummaryPdf(project, plans, execs));
+                    ReportService.GenerateTestSummaryPdf(project, plans, execs, assessment));
 
                 await File.WriteAllBytesAsync(file.Path, pdfBytes);
                 ReportStatusText.Text = $"Exported to {file.Name}";
@@ -1751,6 +2035,24 @@ namespace QAssistant.Views
             TestCaseStatus.Failed => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 127, 29, 29)),
             TestCaseStatus.Blocked => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 45, 32, 16)),
             TestCaseStatus.Skipped => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 40, 40, 55)),
+            _ => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53))
+        };
+
+        private static SolidColorBrush GetPriorityForeground(TestCasePriority priority) => priority switch
+        {
+            TestCasePriority.Blocker => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113)),
+            TestCasePriority.Major => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 146, 60)),
+            TestCasePriority.Medium => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+            TestCasePriority.Low => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+            _ => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175))
+        };
+
+        private static SolidColorBrush GetPriorityBadgeBackground(TestCasePriority priority) => priority switch
+        {
+            TestCasePriority.Blocker => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 127, 29, 29)),
+            TestCasePriority.Major => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 67, 30, 10)),
+            TestCasePriority.Medium => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 45, 32, 16)),
+            TestCasePriority.Low => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53)),
             _ => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53))
         };
     }

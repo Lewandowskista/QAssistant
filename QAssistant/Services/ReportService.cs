@@ -92,7 +92,7 @@ namespace QAssistant.Services
 
         // ── PDF Generation ───────────────────────────────────────
 
-        public static byte[] GenerateTestSummaryPdf(Project project, List<TestPlan>? filterPlans = null, List<TestExecution>? filterExecutions = null)
+        public static byte[] GenerateTestSummaryPdf(Project project, List<TestPlan>? filterPlans = null, List<TestExecution>? filterExecutions = null, string? criticalityAssessment = null)
         {
             var plans = filterPlans ?? project.TestPlans;
             var allCases = project.TestCases;
@@ -284,6 +284,187 @@ namespace QAssistant.Services
                     page.DrawText(exec.ExecutedAt.ToString("MMM d, yyyy HH:mm"), margin + 380, y);
 
                     y -= 15;
+                }
+            }
+
+            // ── Criticality Assessment ──
+            if (!string.IsNullOrWhiteSpace(criticalityAssessment))
+            {
+                if (y < 300)
+                {
+                    page = pdf.AddPage();
+                    y = 760;
+                }
+
+                // Section separator
+                y -= 8;
+                page.SetColor(0.85f, 0.85f, 0.88f);
+                page.DrawLine(margin, y, margin + contentWidth, y, 1);
+                y -= 24;
+
+                // Section title
+                page.SetFont("Helvetica-Bold", 14);
+                page.SetColor(0.1f, 0.1f, 0.15f);
+                page.DrawText("Criticality Assessment", margin, y);
+                y -= 8;
+
+                // Subtitle
+                page.SetFont("Helvetica", 9);
+                page.SetColor(0.45f, 0.45f, 0.5f);
+                y -= 14;
+                page.DrawText("AI-generated analysis based on project data, test cases, and execution results", margin, y);
+                y -= 20;
+
+                // Priority failure breakdown
+                var failedCases = relevantCases.Where(c => c.Status == TestCaseStatus.Failed).ToList();
+                int blockerFailed = failedCases.Count(c => c.Priority == TestCasePriority.Blocker);
+                int majorFailed = failedCases.Count(c => c.Priority == TestCasePriority.Major);
+                int mediumFailed = failedCases.Count(c => c.Priority == TestCasePriority.Medium);
+                int lowFailed = failedCases.Count(c => c.Priority == TestCasePriority.Low);
+                int totalFailed = failedCases.Count;
+
+                page.SetFont("Helvetica-Bold", 11);
+                page.SetColor(0.15f, 0.15f, 0.2f);
+                page.DrawText("Failures by Priority", margin, y);
+                y -= 22;
+
+                (string label, int count, float r, float g, float b)[] priorityRows =
+                [
+                    ("Blocker", blockerFailed, 0.86f, 0.15f, 0.15f),
+                    ("Major",   majorFailed,   0.98f, 0.45f, 0.09f),
+                    ("Medium",  mediumFailed,  0.98f, 0.75f, 0.14f),
+                    ("Low",     lowFailed,     0.42f, 0.45f, 0.50f)
+                ];
+
+                foreach (var (label, count, r, g, b) in priorityRows)
+                {
+                    double pct = totalFailed > 0 ? (double)count / totalFailed * 100 : 0;
+
+                    page.SetFillColor(0.94f, 0.94f, 0.96f);
+                    page.DrawRect(margin + 80, y - 2, contentWidth - 150, 12);
+
+                    if (pct > 0)
+                    {
+                        float barWidth = (float)((contentWidth - 150) * pct / 100);
+                        page.SetFillColor(r, g, b);
+                        page.DrawRect(margin + 80, y - 2, Math.Max(barWidth, 2), 12);
+                    }
+
+                    page.SetFont("Helvetica-Bold", 10);
+                    page.SetColor(r, g, b);
+                    page.DrawText(label, margin + 4, y);
+
+                    page.SetFont("Helvetica", 10);
+                    page.SetColor(0.2f, 0.2f, 0.25f);
+                    page.DrawTextRight(count.ToString(), margin + contentWidth - 4, y);
+
+                    y -= 20;
+                }
+
+                y -= 16;
+
+                // AI Analysis text
+                page.SetFont("Helvetica-Bold", 11);
+                page.SetColor(0.15f, 0.15f, 0.2f);
+                page.DrawText("AI Analysis", margin, y);
+                y -= 6;
+
+                // Thin accent line
+                page.SetColor(0.65f, 0.55f, 0.98f);
+                page.DrawLine(margin, y, margin + 60, y, 2);
+                y -= 16;
+
+                // Render the assessment text with word wrapping
+                page.SetFont("Helvetica", 9);
+                float lineHeight = 13;
+                float maxLineWidth = contentWidth;
+
+                foreach (var rawLine in criticalityAssessment.Split('\n'))
+                {
+                    var line = rawLine.TrimEnd('\r');
+
+                    // Detect markdown headings
+                    if (line.StartsWith("## "))
+                    {
+                        y -= 6;
+                        if (y < 60) { page = pdf.AddPage(); y = 760; }
+                        page.SetFont("Helvetica-Bold", 11);
+                        page.SetColor(0.15f, 0.15f, 0.2f);
+                        page.DrawText(line[3..], margin, y);
+                        y -= 18;
+                        page.SetFont("Helvetica", 9);
+                        page.SetColor(0.2f, 0.2f, 0.25f);
+                        continue;
+                    }
+
+                    if (line.StartsWith("# "))
+                    {
+                        y -= 8;
+                        if (y < 60) { page = pdf.AddPage(); y = 760; }
+                        page.SetFont("Helvetica-Bold", 13);
+                        page.SetColor(0.1f, 0.1f, 0.15f);
+                        page.DrawText(line[2..], margin, y);
+                        y -= 20;
+                        page.SetFont("Helvetica", 9);
+                        page.SetColor(0.2f, 0.2f, 0.25f);
+                        continue;
+                    }
+
+                    // Bold lines (e.g. **text**)
+                    bool isBold = line.StartsWith("**") && line.EndsWith("**") && line.Length > 4;
+                    if (isBold)
+                    {
+                        page.SetFont("Helvetica-Bold", 9);
+                        line = line[2..^2];
+                    }
+                    else
+                    {
+                        // Bullet points
+                        bool isBullet = line.StartsWith("- ") || line.StartsWith("* ");
+                        if (isBullet)
+                            line = "\u2022 " + line[2..];
+
+                        page.SetFont("Helvetica", 9);
+                    }
+
+                    page.SetColor(0.2f, 0.2f, 0.25f);
+
+                    // Empty line → small vertical gap
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        y -= 8;
+                        continue;
+                    }
+
+                    // Word-wrap
+                    var words = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    var currentLine = new StringBuilder();
+                    float charWidth = page.EstimateCharWidth();
+
+                    foreach (var word in words)
+                    {
+                        float projectedWidth = (currentLine.Length + word.Length + 1) * charWidth;
+                        if (currentLine.Length > 0 && projectedWidth > maxLineWidth)
+                        {
+                            if (y < 60) { page = pdf.AddPage(); y = 760; }
+                            page.DrawText(currentLine.ToString(), margin, y);
+                            y -= lineHeight;
+                            currentLine.Clear();
+                        }
+
+                        if (currentLine.Length > 0) currentLine.Append(' ');
+                        currentLine.Append(word);
+                    }
+
+                    if (currentLine.Length > 0)
+                    {
+                        if (y < 60) { page = pdf.AddPage(); y = 760; }
+                        page.DrawText(currentLine.ToString(), margin, y);
+                        y -= lineHeight;
+                    }
+
+                    if (isBold)
+                        page.SetFont("Helvetica", 9);
                 }
             }
 
@@ -671,6 +852,16 @@ namespace QAssistant.Services
                     _ => 0.48f      // Helvetica
                 };
                 return glyphCount * _currentSize * avgWidth;
+            }
+
+            internal float EstimateCharWidth()
+            {
+                return _currentFont switch
+                {
+                    "/F3" => 0.60f * _currentSize,
+                    "/F2" => 0.52f * _currentSize,
+                    _ => 0.48f * _currentSize
+                };
             }
         }
     }

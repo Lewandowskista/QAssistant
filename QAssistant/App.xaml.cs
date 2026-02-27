@@ -113,8 +113,9 @@ namespace QAssistant
             var apiEnabled = CredentialService.LoadCredential("AutomationApiEnabled");
             if (apiEnabled == "true")
             {
+                AutomationApiService.GetOrCreateApiKey();
                 var portStr = CredentialService.LoadCredential("AutomationApiPort");
-                int port = int.TryParse(portStr, out var p) && p is > 0 and < 65536 ? p : 5248;
+                int port = int.TryParse(portStr, out var p) && p is >= 1024 and <= 65535 ? p : 5248;
                 AutomationApi.Start(port);
             }
         }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -8,6 +9,9 @@ namespace QAssistant.Services
     {
         public static void SaveCredential(string key, string value)
         {
+            ArgumentException.ThrowIfNullOrEmpty(key);
+            ArgumentNullException.ThrowIfNull(value);
+
             var byteArray = Encoding.UTF8.GetBytes(value);
             IntPtr targetName = IntPtr.Zero;
             IntPtr credentialBlob = IntPtr.Zero;
@@ -34,10 +38,13 @@ namespace QAssistant.Services
 
                 credPtr = Marshal.AllocCoTaskMem(Marshal.SizeOf(cred));
                 Marshal.StructureToPtr(cred, credPtr, false);
-                CredWrite(credPtr, 0);
+
+                if (!CredWrite(credPtr, 0))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
             }
             finally
             {
+                Array.Clear(byteArray);
                 if (credPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(credPtr);
                 if (credentialBlob != IntPtr.Zero) Marshal.FreeCoTaskMem(credentialBlob);
                 if (targetName != IntPtr.Zero) Marshal.FreeCoTaskMem(targetName);
@@ -47,6 +54,8 @@ namespace QAssistant.Services
 
         public static string? LoadCredential(string key)
         {
+            ArgumentException.ThrowIfNullOrEmpty(key);
+
             if (!CredRead("QAssistant_" + key, 1, 0, out IntPtr credPtr))
                 return null;
 
@@ -58,7 +67,14 @@ namespace QAssistant.Services
 
                 var bytes = new byte[cred.CredentialBlobSize];
                 Marshal.Copy(cred.CredentialBlob, bytes, 0, bytes.Length);
-                return Encoding.UTF8.GetString(bytes);
+                try
+                {
+                    return Encoding.UTF8.GetString(bytes);
+                }
+                finally
+                {
+                    Array.Clear(bytes);
+                }
             }
             finally
             {
@@ -68,7 +84,14 @@ namespace QAssistant.Services
 
         public static void DeleteCredential(string key)
         {
-            CredDelete("QAssistant_" + key, 1, 0);
+            ArgumentException.ThrowIfNullOrEmpty(key);
+
+            if (!CredDelete("QAssistant_" + key, 1, 0))
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (error != 1168) // ERROR_NOT_FOUND — credential doesn't exist
+                    throw new Win32Exception(error);
+            }
         }
 
         /// <summary>

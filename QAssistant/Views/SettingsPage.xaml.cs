@@ -68,6 +68,10 @@ namespace QAssistant.Views
             var apiPort = CredentialService.LoadCredential("AutomationApiPort");
             AutomationApiPortBox.Text = string.IsNullOrEmpty(apiPort) ? "5248" : apiPort;
 
+            var apiKey = CredentialService.LoadCredential("AutomationApiKey");
+            if (!string.IsNullOrEmpty(apiKey))
+                AutomationApiKeyBox.Password = apiKey;
+
             var linearKey = LoadProjectCred("LinearApiKey");
             if (!string.IsNullOrEmpty(linearKey))
                 LinearApiKeyBox.Password = linearKey;
@@ -200,8 +204,11 @@ namespace QAssistant.Views
 
             if (enabled)
             {
+                var apiKey = AutomationApiService.GetOrCreateApiKey();
+                AutomationApiKeyBox.Password = apiKey;
+
                 var portStr = CredentialService.LoadCredential("AutomationApiPort");
-                int port = int.TryParse(portStr, out var p) && p is > 0 and < 65536 ? p : 5248;
+                int port = int.TryParse(portStr, out var p) && p is >= 1024 and <= 65535 ? p : 5248;
                 App.AutomationApi.Start(port);
                 ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
                     $"Automation API started on http://localhost:{port}/", true);
@@ -217,16 +224,24 @@ namespace QAssistant.Views
         private void SaveAutomationPort_Click(object sender, RoutedEventArgs e)
         {
             var portText = AutomationApiPortBox.Text.Trim();
-            if (!int.TryParse(portText, out var port) || port is <= 0 or >= 65536)
+            if (!int.TryParse(portText, out var port) || port is < 1024 or > 65535)
             {
                 ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
-                    "Invalid port number. Use a value between 1 and 65535.", false);
+                    "Invalid port number. Use a value between 1024 and 65535.", false);
                 return;
             }
 
             CredentialService.SaveCredential("AutomationApiPort", port.ToString());
             ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
                 $"Port saved ({port}). Toggle the API off and on to apply.", true);
+        }
+
+        private void RegenerateApiKey_Click(object sender, RoutedEventArgs e)
+        {
+            var newKey = AutomationApiService.RegenerateApiKey();
+            AutomationApiKeyBox.Password = newKey;
+            ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
+                "API key regenerated. Update your test runner configuration.", true);
         }
 
         // ── Linear ───────────────────────────────────────────────────

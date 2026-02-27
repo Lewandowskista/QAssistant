@@ -28,6 +28,34 @@ namespace QAssistant.Services
         }
 
         /// <summary>
+        /// Sanitizes a free-text value before embedding it in a TOON prompt.
+        /// Neutralises characters that could break TOON structural boundaries
+        /// or inject directives, while preserving human-readable content.
+        /// </summary>
+        private static string SanitizeToonValue(string? value, int maxLength = 500)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            var s = value.Length > maxLength ? value[..maxLength] + "..." : value;
+
+            // Collapse newlines to spaces – prevents line-based directive injection
+            s = s.Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
+
+            // Replace TOON structural delimiters with safe visual equivalents
+            s = s.Replace('{', '(').Replace('}', ')');
+            s = s.Replace('[', '(').Replace(']', ')');
+
+            // Neutralise directive prefix at the start and after spaces
+            s = s.Replace("@", "(at)");
+
+            // Break TOON section separators
+            s = s.Replace("---", "- - -");
+
+            return s;
+        }
+
+        /// <summary>
         /// Builds a Token-Oriented Object Notation (TOON) prompt for issue analysis.
 
         /// TOON uses compact key-value pairs and directive-style instructions to
@@ -152,7 +180,7 @@ namespace QAssistant.Services
             sb.AppendLine("@role:sr_qa_engineer");
             sb.AppendLine("@task:generate_test_cases");
             sb.AppendLine("@source:" + sourceName);
-            sb.AppendLine("@out_fmt:json_array[{testCaseId,title,preConditions,testSteps,testData,expectedResult}]");
+            sb.AppendLine("@out_fmt:json_array[{testCaseId,title,preConditions,testSteps,testData,expectedResult,priority}]");
             sb.AppendLine("@out_rules:raw_json_only|no_markdown_wrap|no_code_block");
             sb.AppendLine("@rules:comprehensive|all_fields_required|specific_actionable|realistic_test_data|cover_positive_negative_edge|no_generic");
             sb.AppendLine("---");
@@ -163,30 +191,28 @@ namespace QAssistant.Services
             sb.AppendLine(" testSteps:numbered_step_by_step");
             sb.AppendLine(" testData:specific_values");
             sb.AppendLine(" expectedResult:pass_criteria");
+            sb.AppendLine(" priority:one_of(Blocker,Major,Medium,Low)_based_on_issue_severity_and_impact");
             sb.AppendLine("}");
             sb.AppendLine("---");
 
             sb.AppendLine("project_issues[");
             foreach (var task in tasks)
             {
-                sb.Append($" {{id:{task.IssueIdentifier}");
-                sb.Append($",title:{task.Title}");
+                sb.Append($" {{id:{SanitizeToonValue(task.IssueIdentifier, 100)}");
+                sb.Append($",title:{SanitizeToonValue(task.Title, 300)}");
                 sb.Append($",status:{task.Status}");
                 sb.Append($",priority:{task.Priority}");
 
                 if (!string.IsNullOrWhiteSpace(task.Description))
                 {
-                    var desc = task.Description.Length > 500
-                        ? task.Description[..500] + "..."
-                        : task.Description;
-                    sb.Append($",desc:{desc}");
+                    sb.Append($",desc:{SanitizeToonValue(task.Description, 500)}");
                 }
 
                 if (!string.IsNullOrEmpty(task.IssueType))
-                    sb.Append($",type:{task.IssueType}");
+                    sb.Append($",type:{SanitizeToonValue(task.IssueType, 100)}");
 
                 if (!string.IsNullOrEmpty(task.Labels))
-                    sb.Append($",labels:{task.Labels}");
+                    sb.Append($",labels:{SanitizeToonValue(task.Labels, 200)}");
 
                 sb.AppendLine("}");
             }
@@ -231,14 +257,17 @@ namespace QAssistant.Services
                 if (testCases.Count >= maxTestCases)
                     break;
 
+                const int MaxFieldLength = 10_000;
+
                 var tc = new TestCase
                 {
-                    TestCaseId = GetJsonString(element, "testCaseId") ?? $"TC-{counter:D3}",
-                    Title = GetJsonString(element, "title") ?? $"Test Case {counter}",
-                    PreConditions = GetJsonString(element, "preConditions") ?? "",
-                    TestSteps = GetJsonString(element, "testSteps") ?? "",
-                    TestData = GetJsonString(element, "testData") ?? "",
-                    ExpectedResult = GetJsonString(element, "expectedResult") ?? "",
+                    TestCaseId = Truncate(GetJsonString(element, "testCaseId") ?? $"TC-{counter:D3}", 50),
+                    Title = Truncate(GetJsonString(element, "title") ?? $"Test Case {counter}", MaxFieldLength),
+                    PreConditions = Truncate(GetJsonString(element, "preConditions") ?? "", MaxFieldLength),
+                    TestSteps = Truncate(GetJsonString(element, "testSteps") ?? "", MaxFieldLength),
+                    TestData = Truncate(GetJsonString(element, "testData") ?? "", MaxFieldLength),
+                    ExpectedResult = Truncate(GetJsonString(element, "expectedResult") ?? "", MaxFieldLength),
+                    Priority = ParsePriority(GetJsonString(element, "priority")),
                     Source = source,
                     GeneratedAt = DateTime.Now
                 };
@@ -249,12 +278,121 @@ namespace QAssistant.Services
             return testCases;
         }
 
+        private static string Truncate(string value, int maxLength) =>
+            value.Length > maxLength ? value[..maxLength] : value;
+
         private static string? GetJsonString(JsonElement element, string propertyName)
         {
             if (element.TryGetProperty(propertyName, out var value) &&
                 value.ValueKind == JsonValueKind.String)
                 return value.GetString();
             return null;
+        }
+
+        private static TestCasePriority ParsePriority(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return TestCasePriority.Medium;
+
+            return value.Trim().ToLowerInvariant() switch
+            {
+                "blocker" => TestCasePriority.Blocker,
+                "major" => TestCasePriority.Major,
+                "medium" => TestCasePriority.Medium,
+                "low" => TestCasePriority.Low,
+                _ => TestCasePriority.Medium
+            };
+        }
+
+        /// <summary>
+        /// Builds a prompt for generating a Criticality Assessment based on the entire project overview.
+        /// </summary>
+        public static string BuildCriticalityAssessmentPrompt(
+            IReadOnlyList<ProjectTask> tasks,
+            IReadOnlyList<TestCase> testCases,
+            IReadOnlyList<TestExecution> executions,
+            IReadOnlyList<TestPlan> testPlans)
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine("@role:sr_qa_engineer");
+            sb.AppendLine("@task:criticality_assessment");
+            sb.AppendLine("@out_fmt:md_sections[## Failure Summary by Priority,## Overall Risk Level,## Key Areas of Concern,## Recommended Actions,## Release Readiness]");
+            sb.AppendLine("@rules:concise|actionable|data_driven|risk_focused|all_sections_required|include_counts_per_priority(Blocker,Major,Medium,Low)|risk_level_one_of(Critical,High,Moderate,Low)|actions_ordered_by_severity|no_skip|no_merge");
+            sb.AppendLine("---");
+
+            // Failed test cases grouped by priority
+            var failedCases = testCases.Where(tc => tc.Status == TestCaseStatus.Failed).ToList();
+            var blockerFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Blocker);
+            var majorFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Major);
+            var mediumFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Medium);
+            var lowFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Low);
+
+            sb.AppendLine("failure_summary{");
+            sb.AppendLine($" total_test_cases:{testCases.Count}");
+            sb.AppendLine($" total_failed:{failedCases.Count}");
+            sb.AppendLine($" blocker_failed:{blockerFailed}");
+            sb.AppendLine($" major_failed:{majorFailed}");
+            sb.AppendLine($" medium_failed:{mediumFailed}");
+            sb.AppendLine($" low_failed:{lowFailed}");
+            sb.AppendLine($" total_executions:{executions.Count}");
+            sb.AppendLine($" total_test_plans:{testPlans.Count}");
+            sb.AppendLine("}");
+
+            // Project tasks overview
+            if (tasks.Count > 0)
+            {
+                sb.AppendLine("project_tasks[");
+                foreach (var task in tasks.Take(50))
+                {
+                    sb.Append($" {{id:{SanitizeToonValue(task.IssueIdentifier, 100)},title:{SanitizeToonValue(task.Title, 300)}");
+                    sb.Append($",status:{task.Status},priority:{task.Priority}");
+                    if (!string.IsNullOrEmpty(task.IssueType))
+                        sb.Append($",type:{SanitizeToonValue(task.IssueType, 100)}");
+                    sb.AppendLine("}");
+                }
+                sb.AppendLine("]");
+            }
+
+            // Failed test case details
+            if (failedCases.Count > 0)
+            {
+                sb.AppendLine("failed_test_cases[");
+                foreach (var tc in failedCases.Take(50))
+                {
+                    sb.Append($" {{id:{SanitizeToonValue(tc.TestCaseId, 100)},title:{SanitizeToonValue(tc.Title, 300)}");
+                    sb.Append($",priority:{tc.Priority},source:{tc.Source}");
+                    if (!string.IsNullOrWhiteSpace(tc.ActualResult))
+                    {
+                        sb.Append($",actual_result:{SanitizeToonValue(tc.ActualResult, 200)}");
+                    }
+                    sb.AppendLine("}");
+                }
+                sb.AppendLine("]");
+            }
+
+            // Execution results in TOON inline-object notation
+            if (executions.Count > 0)
+            {
+                var resultGroups = executions.GroupBy(e => e.Result)
+                    .Select(g => $"{g.Key}:{g.Count()}");
+                sb.AppendLine($"exec_results{{{string.Join(",", resultGroups)}}}");
+            }
+
+            // Test plan details in TOON array notation
+            if (testPlans.Count > 0)
+            {
+                sb.AppendLine("test_plans[");
+                foreach (var plan in testPlans.Take(50))
+                {
+                    var planCaseCount = testCases.Count(tc => tc.TestPlanId == plan.Id);
+                    var planFailedCount = testCases.Count(tc => tc.TestPlanId == plan.Id && tc.Status == TestCaseStatus.Failed);
+                    sb.AppendLine($" {{id:{SanitizeToonValue(plan.TestPlanId, 100)},name:{SanitizeToonValue(plan.Name, 200)},cases:{planCaseCount},failed:{planFailedCount},source:{plan.Source}}}");
+                }
+                sb.AppendLine("]");
+            }
+
+            return sb.ToString();
         }
 
         public async Task<string> AnalyzeIssueAsync(string prompt, IReadOnlyList<(string MimeType, string Base64Data)>? images = null, string? modelName = null)

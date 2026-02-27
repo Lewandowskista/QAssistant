@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -22,6 +23,10 @@ namespace QAssistant.Services
         private Task? _listenTask;
         private int _port;
 
+        private const int MaxRequestBodyBytes = 1_048_576; // 1 MB
+        private const int MaxBatchSize = 100;
+        private const string ApiKeyCredentialKey = "AutomationApiKey";
+
         private static readonly JsonSerializerOptions s_jsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -32,6 +37,28 @@ namespace QAssistant.Services
 
         public bool IsRunning => _listener?.IsListening == true;
         public int Port => _port;
+
+        /// <summary>
+        /// Generate a new cryptographically random API key, persist it via
+        /// <see cref="CredentialService"/>, and return the value.
+        /// </summary>
+        public static string RegenerateApiKey()
+        {
+            var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            CredentialService.SaveCredential(ApiKeyCredentialKey, key);
+            return key;
+        }
+
+        /// <summary>
+        /// Ensure an API key exists; create one on first use.
+        /// </summary>
+        public static string GetOrCreateApiKey()
+        {
+            var existing = CredentialService.LoadCredential(ApiKeyCredentialKey);
+            if (!string.IsNullOrEmpty(existing))
+                return existing;
+            return RegenerateApiKey();
+        }
 
         public void Start(int port = 5248)
         {
@@ -90,14 +117,36 @@ namespace QAssistant.Services
             var req = ctx.Request;
             var res = ctx.Response;
 
-            res.AddHeader("Access-Control-Allow-Origin", "*");
-            res.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            res.AddHeader("Access-Control-Allow-Headers", "Content-Type");
+            // Only allow requests originating from the local machine.
+            if (!req.IsLocal)
+            {
+                res.StatusCode = 403;
+                res.Close();
+                return;
+            }
+
+            // Restrict CORS to localhost origins only.
+            var origin = req.Headers["Origin"];
+            if (!string.IsNullOrEmpty(origin)
+                && Uri.TryCreate(origin, UriKind.Absolute, out var originUri)
+                && (originUri.Host == "localhost" || originUri.Host == "127.0.0.1" || originUri.Host == "[::1]"))
+            {
+                res.AddHeader("Access-Control-Allow-Origin", origin);
+                res.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                res.AddHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            }
 
             if (req.HttpMethod == "OPTIONS")
             {
                 res.StatusCode = 204;
                 res.Close();
+                return;
+            }
+
+            // Authenticate via Bearer token.
+            if (!AuthenticateRequest(req))
+            {
+                await WriteJson(res, 401, new { error = "Unauthorized. Provide header: Authorization: Bearer <api-key>" });
                 return;
             }
 
@@ -148,11 +197,7 @@ namespace QAssistant.Services
                         return;
                     }
 
-                    // GET /api/projects/{id}/testcases/{tcId}
-                    if (req.HttpMethod == "GET" && segments.Length == 4 && segments[3].StartsWith("testcases:"))
-                    {
-                        // alternate: /api/projects/{id}/testcases/{tcGuid}
-                    }
+                    // GET /api/projects/{id}/testcases/{tcGuid}
                     if (req.HttpMethod == "GET" && segments is ["api", "projects", _, "testcases", _]
                         && Guid.TryParse(segments[4], out var tcGuid))
                     {
@@ -186,8 +231,25 @@ namespace QAssistant.Services
             }
             catch (Exception ex)
             {
-                await WriteJson(res, 500, new { error = ex.Message });
+                System.Diagnostics.Debug.WriteLine($"AutomationApiService error: {ex}");
+                await WriteJson(res, 500, new { error = "An internal error occurred." });
             }
+        }
+
+        private static bool AuthenticateRequest(HttpListenerRequest req)
+        {
+            var expectedKey = CredentialService.LoadCredential(ApiKeyCredentialKey);
+            if (string.IsNullOrEmpty(expectedKey))
+                return false;
+
+            var authHeader = req.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var providedKey = authHeader["Bearer ".Length..].Trim();
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(expectedKey),
+                Encoding.UTF8.GetBytes(providedKey));
         }
 
         // ── Handlers ─────────────────────────────────────────────
@@ -340,6 +402,12 @@ namespace QAssistant.Services
                 return;
             }
 
+            if (dtos.Count > MaxBatchSize)
+            {
+                await WriteJson(res, 400, new { error = $"Batch size exceeds maximum of {MaxBatchSize}." });
+                return;
+            }
+
             var results = new List<object>();
 
             foreach (var dto in dtos)
@@ -442,8 +510,22 @@ namespace QAssistant.Services
 
         private static async Task<string> ReadBody(HttpListenerRequest req)
         {
-            using var reader = new System.IO.StreamReader(req.InputStream, Encoding.UTF8);
-            return await reader.ReadToEndAsync();
+            // Reject content-length above the cap immediately.
+            if (req.ContentLength64 > MaxRequestBodyBytes)
+                throw new InvalidOperationException("Request body too large.");
+
+            using var ms = new System.IO.MemoryStream();
+            var buffer = new byte[8192];
+            int totalRead = 0;
+            int bytesRead;
+            while ((bytesRead = await req.InputStream.ReadAsync(buffer)) > 0)
+            {
+                totalRead += bytesRead;
+                if (totalRead > MaxRequestBodyBytes)
+                    throw new InvalidOperationException("Request body too large.");
+                ms.Write(buffer, 0, bytesRead);
+            }
+            return Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
         }
 
         private static async Task WriteJson(HttpListenerResponse res, int statusCode, object data)

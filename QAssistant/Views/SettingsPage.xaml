@@ -109,6 +109,22 @@
                             CornerRadius="8"
                             Padding="16,8"/>
 
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="API Key" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                        <PasswordBox x:Name="AutomationApiKeyBox"
+                                     IsEnabled="False"
+                                     Background="{ThemeResource ApplicationBackgroundBrush}"
+                                     Foreground="{ThemeResource TextPrimaryBrush}"
+                                     BorderBrush="{ThemeResource BorderBrush}"
+                                     CornerRadius="8"
+                                     Padding="12,10"/>
+                        <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                   Text="All requests must include: Authorization: Bearer &lt;key&gt;"/>
+                        <Button Content="Regenerate Key" Click="RegenerateApiKey_Click"
+                                Background="#3F1A1A" Foreground="#F87171"
+                                CornerRadius="8" Padding="12,8"/>
+                    </StackPanel>
+
                     <Border x:Name="AutomationApiStatusBorder" Visibility="Collapsed"
                             CornerRadius="8" Padding="12,8">
                         <TextBlock x:Name="AutomationApiStatusText" FontSize="12"/>
@@ -125,7 +141,7 @@
                                        Text="GET  /api/projects&#x0a;GET  /api/projects/{id}/testplans&#x0a;GET  /api/projects/{id}/testcases&#x0a;GET  /api/projects/{id}/testcases?planId={guid}&#x0a;GET  /api/projects/{id}/testcases/{tcId}&#x0a;GET  /api/projects/{id}/executions&#x0a;POST /api/projects/{id}/executions&#x0a;POST /api/projects/{id}/executions/batch"/>
                             <TextBlock FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"
                                        TextWrapping="Wrap" Margin="0,4,0,0"
-                                       Text="POST body: { &quot;testCaseDisplayId&quot;: &quot;TC-001&quot;, &quot;result&quot;: &quot;passed&quot;, &quot;actualResult&quot;: &quot;...&quot;, &quot;notes&quot;: &quot;...&quot; }"/>
+                                       Text="Header: Authorization: Bearer &lt;api-key&gt;&#x0a;POST body: { &quot;testCaseDisplayId&quot;: &quot;TC-001&quot;, &quot;result&quot;: &quot;passed&quot;, &quot;actualResult&quot;: &quot;...&quot;, &quot;notes&quot;: &quot;...&quot; }"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
