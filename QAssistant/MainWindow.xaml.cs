@@ -752,15 +752,18 @@ namespace QAssistant
                 case "Files":
                     ContentFrame.Navigate(typeof(FilesPage), ViewModel);
                     break;
+                case "Tests":
+                    ContentFrame.Navigate(typeof(TestsPage), ViewModel);
+                    break;
                 case "Settings":
-                    ContentFrame.Navigate(typeof(SettingsPage));
+                    ContentFrame.Navigate(typeof(SettingsPage), ViewModel);
                     break;
             }
         }
 
         private void UpdateTabStyles()
         {
-            var tabs = new[] { TabLinks, TabNotes, TabTasks, TabFiles, TabSettings };
+            var tabs = new[] { TabLinks, TabNotes, TabTasks, TabFiles, TabTests, TabSettings };
             foreach (var tab in tabs)
             {
                 bool active = tab.Tag.ToString() == ViewModel.ActiveTab;

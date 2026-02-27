@@ -27,6 +27,9 @@ namespace QAssistant.Models
         public List<ProjectTask> Tasks { get; set; } = new();
         public List<EmbedLink> Links { get; set; } = new();
         public List<FileAttachment> Attachments { get; set; } = new();
+        public List<TestCase> TestCases { get; set; } = new();
+        public List<TestPlan> TestPlans { get; set; } = new();
+        public List<TestExecution> TestExecutions { get; set; } = new();
 
         /// <summary>
         /// Persisted analysis history for Linear tasks, keyed by ExternalId.

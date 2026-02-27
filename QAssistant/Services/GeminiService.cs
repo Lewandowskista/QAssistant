@@ -142,6 +142,121 @@ namespace QAssistant.Services
             return fallback.Item1;
         }
 
+        /// <summary>
+        /// Builds a TOON prompt for generating test cases from project documentation.
+        /// </summary>
+        public static string BuildTestCaseGenerationPrompt(IReadOnlyList<ProjectTask> tasks, string sourceName)
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine("@role:sr_qa_engineer");
+            sb.AppendLine("@task:generate_test_cases");
+            sb.AppendLine("@source:" + sourceName);
+            sb.AppendLine("@out_fmt:json_array[{testCaseId,title,preConditions,testSteps,testData,expectedResult}]");
+            sb.AppendLine("@out_rules:raw_json_only|no_markdown_wrap|no_code_block");
+            sb.AppendLine("@rules:comprehensive|all_fields_required|specific_actionable|realistic_test_data|cover_positive_negative_edge|no_generic");
+            sb.AppendLine("---");
+            sb.AppendLine("field_spec{");
+            sb.AppendLine(" testCaseId:sequential(TC-001,TC-002,...)");
+            sb.AppendLine(" title:clear_descriptive");
+            sb.AppendLine(" preConditions:state_before_execution");
+            sb.AppendLine(" testSteps:numbered_step_by_step");
+            sb.AppendLine(" testData:specific_values");
+            sb.AppendLine(" expectedResult:pass_criteria");
+            sb.AppendLine("}");
+            sb.AppendLine("---");
+
+            sb.AppendLine("project_issues[");
+            foreach (var task in tasks)
+            {
+                sb.Append($" {{id:{task.IssueIdentifier}");
+                sb.Append($",title:{task.Title}");
+                sb.Append($",status:{task.Status}");
+                sb.Append($",priority:{task.Priority}");
+
+                if (!string.IsNullOrWhiteSpace(task.Description))
+                {
+                    var desc = task.Description.Length > 500
+                        ? task.Description[..500] + "..."
+                        : task.Description;
+                    sb.Append($",desc:{desc}");
+                }
+
+                if (!string.IsNullOrEmpty(task.IssueType))
+                    sb.Append($",type:{task.IssueType}");
+
+                if (!string.IsNullOrEmpty(task.Labels))
+                    sb.Append($",labels:{task.Labels}");
+
+                sb.AppendLine("}");
+            }
+            sb.AppendLine("]");
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Parses Gemini's response into a list of <see cref="TestCase"/> objects.
+        /// Handles JSON arrays that may be wrapped in markdown code blocks.
+        /// </summary>
+        public static List<TestCase> ParseTestCasesFromResponse(string response, TaskSource source, int maxTestCases = 200)
+        {
+            var json = response.Trim();
+
+            // Strip markdown code block wrappers (```json ... ``` or ``` ... ```)
+            if (json.StartsWith("```"))
+            {
+                var startIdx = json.IndexOf('\n');
+                if (startIdx >= 0)
+                {
+                    startIdx++;
+                    var endIdx = json.LastIndexOf("```");
+                    if (endIdx > startIdx)
+                        json = json[startIdx..endIdx].Trim();
+                }
+            }
+
+            // Find the JSON array boundaries
+            var arrayStart = json.IndexOf('[');
+            var arrayEnd = json.LastIndexOf(']');
+            if (arrayStart >= 0 && arrayEnd > arrayStart)
+                json = json[arrayStart..(arrayEnd + 1)];
+
+            using var doc = JsonDocument.Parse(json);
+            var testCases = new List<TestCase>();
+            int counter = 1;
+
+            foreach (var element in doc.RootElement.EnumerateArray())
+            {
+                if (testCases.Count >= maxTestCases)
+                    break;
+
+                var tc = new TestCase
+                {
+                    TestCaseId = GetJsonString(element, "testCaseId") ?? $"TC-{counter:D3}",
+                    Title = GetJsonString(element, "title") ?? $"Test Case {counter}",
+                    PreConditions = GetJsonString(element, "preConditions") ?? "",
+                    TestSteps = GetJsonString(element, "testSteps") ?? "",
+                    TestData = GetJsonString(element, "testData") ?? "",
+                    ExpectedResult = GetJsonString(element, "expectedResult") ?? "",
+                    Source = source,
+                    GeneratedAt = DateTime.Now
+                };
+                testCases.Add(tc);
+                counter++;
+            }
+
+            return testCases;
+        }
+
+        private static string? GetJsonString(JsonElement element, string propertyName)
+        {
+            if (element.TryGetProperty(propertyName, out var value) &&
+                value.ValueKind == JsonValueKind.String)
+                return value.GetString();
+            return null;
+        }
+
         public async Task<string> AnalyzeIssueAsync(string prompt, IReadOnlyList<(string MimeType, string Base64Data)>? images = null, string? modelName = null)
         {
             var primaryModel = NormalizeModelPath(modelName ?? PrimaryModel);

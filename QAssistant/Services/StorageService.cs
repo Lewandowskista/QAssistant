@@ -25,6 +25,13 @@ namespace QAssistant.Services
     [JsonSerializable(typeof(Models.TaskStatus))]
     [JsonSerializable(typeof(TaskPriority))]
     [JsonSerializable(typeof(AttachmentScope))]
+    [JsonSerializable(typeof(TestCase))]
+    [JsonSerializable(typeof(TestCaseStatus))]
+    [JsonSerializable(typeof(List<TestCase>))]
+    [JsonSerializable(typeof(TestPlan))]
+    [JsonSerializable(typeof(List<TestPlan>))]
+    [JsonSerializable(typeof(TestExecution))]
+    [JsonSerializable(typeof(List<TestExecution>))]
     [JsonSourceGenerationOptions(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNameCaseInsensitive = true,

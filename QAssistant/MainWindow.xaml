@@ -239,6 +239,10 @@
                      Click="Tab_Click" Tag="Files"
                      Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                      CornerRadius="8" Padding="14,8" Margin="0,6"/>
+                        <Button x:Name="TabTests" Content="Tests"
+                     Click="Tab_Click" Tag="Tests"
+                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
                         <Button x:Name="TabSettings" Content="Settings"
                     Click="Tab_Click" Tag="Settings"
                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"

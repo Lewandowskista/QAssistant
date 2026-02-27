@@ -2,21 +2,36 @@
 using System.IO;
 using System.Linq;
 using QAssistant.Helpers;
+using QAssistant.Models;
 using QAssistant.Services;
+using QAssistant.ViewModels;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Navigation;
 
 namespace QAssistant.Views
 {
     public sealed partial class SettingsPage : Page
     {
         private bool _isLoading = true;
+        private MainViewModel? _vm;
+        private Guid _projectId;
 
         public SettingsPage()
         {
             this.InitializeComponent();
+        }
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            if (e.Parameter is MainViewModel vm)
+            {
+                _vm = vm;
+                _projectId = vm.SelectedProject?.Id ?? Guid.Empty;
+            }
             LoadSavedKeys();
             LoadStorageDiagnostics();
         }
@@ -40,35 +55,41 @@ namespace QAssistant.Views
 
         private void LoadSavedKeys()
         {
-            var linearKey = CredentialService.LoadCredential("LinearApiKey");
+            // Show which project these keys apply to
+            if (_vm?.SelectedProject != null)
+                ProjectContextText.Text = $"Configuring keys for: {_vm.SelectedProject.Name}";
+            else
+                ProjectContextText.Text = "No project selected — keys will be saved globally.";
+
+            var linearKey = LoadProjectCred("LinearApiKey");
             if (!string.IsNullOrEmpty(linearKey))
                 LinearApiKeyBox.Password = linearKey;
 
-            var linearTeam = CredentialService.LoadCredential("LinearTeamId");
+            var linearTeam = LoadProjectCred("LinearTeamId");
             if (!string.IsNullOrEmpty(linearTeam))
                 LinearTeamIdBox.Text = linearTeam;
 
-            var jiraDomain = CredentialService.LoadCredential("JiraDomain");
+            var jiraDomain = LoadProjectCred("JiraDomain");
             if (!string.IsNullOrEmpty(jiraDomain))
                 JiraDomainBox.Text = jiraDomain;
 
-            var jiraEmail = CredentialService.LoadCredential("JiraEmail");
+            var jiraEmail = LoadProjectCred("JiraEmail");
             if (!string.IsNullOrEmpty(jiraEmail))
                 JiraEmailBox.Text = jiraEmail;
 
-            var jiraToken = CredentialService.LoadCredential("JiraApiToken");
+            var jiraToken = LoadProjectCred("JiraApiToken");
             if (!string.IsNullOrEmpty(jiraToken))
                 JiraApiTokenBox.Password = jiraToken;
 
-            var jiraProject = CredentialService.LoadCredential("JiraProjectKey");
+            var jiraProject = LoadProjectCred("JiraProjectKey");
             if (!string.IsNullOrEmpty(jiraProject))
                 JiraProjectKeyBox.Text = jiraProject;
 
-            var geminiKey = CredentialService.LoadCredential("GeminiApiKey");
+            var geminiKey = LoadProjectCred("GeminiApiKey");
             if (!string.IsNullOrEmpty(geminiKey))
                 GeminiApiKeyBox.Password = geminiKey;
 
-            // Load tray setting — default to true on first run
+            // Load tray setting — default to true on first run (global, not per-project)
             var trayEnabled = CredentialService.LoadCredential("MinimizeToTray");
             if (string.IsNullOrEmpty(trayEnabled))
             {
@@ -81,6 +102,30 @@ namespace QAssistant.Views
             }
 
             _isLoading = false;
+        }
+
+        // ── Project-scoped credential helpers ────────────────────
+        private string? LoadProjectCred(string key)
+        {
+            if (_projectId != Guid.Empty)
+                return CredentialService.LoadProjectCredential(_projectId, key);
+            return CredentialService.LoadCredential(key);
+        }
+
+        private void SaveProjectCred(string key, string value)
+        {
+            if (_projectId != Guid.Empty)
+                CredentialService.SaveProjectCredential(_projectId, key, value);
+            else
+                CredentialService.SaveCredential(key, value);
+        }
+
+        private void DeleteProjectCred(string key)
+        {
+            if (_projectId != Guid.Empty)
+                CredentialService.DeleteProjectCredential(_projectId, key);
+            else
+                CredentialService.DeleteCredential(key);
         }
 
         // ── General Settings ─────────────────────────────────────────
@@ -155,15 +200,15 @@ namespace QAssistant.Views
                 return;
             }
 
-            CredentialService.SaveCredential("LinearApiKey", LinearApiKeyBox.Password.Trim());
-            CredentialService.SaveCredential("LinearTeamId", LinearTeamIdBox.Text.Trim());
-            ShowStatus(LinearStatusBorder, LinearStatusText, "Linear keys saved successfully.", true);
+            SaveProjectCred("LinearApiKey", LinearApiKeyBox.Password.Trim());
+            SaveProjectCred("LinearTeamId", LinearTeamIdBox.Text.Trim());
+            ShowStatus(LinearStatusBorder, LinearStatusText, "Linear keys saved for this project.", true);
         }
 
         private async void TestLinear_Click(object sender, RoutedEventArgs e)
         {
-            var key = CredentialService.LoadCredential("LinearApiKey");
-            var teamId = CredentialService.LoadCredential("LinearTeamId");
+            var key = LoadProjectCred("LinearApiKey");
+            var teamId = LoadProjectCred("LinearTeamId");
 
             if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(teamId))
             {
@@ -190,11 +235,11 @@ namespace QAssistant.Views
 
         private void DisconnectLinear_Click(object sender, RoutedEventArgs e)
         {
-            CredentialService.DeleteCredential("LinearApiKey");
-            CredentialService.DeleteCredential("LinearTeamId");
+            DeleteProjectCred("LinearApiKey");
+            DeleteProjectCred("LinearTeamId");
             LinearApiKeyBox.Password = string.Empty;
             LinearTeamIdBox.Text = string.Empty;
-            ShowStatus(LinearStatusBorder, LinearStatusText, "Linear disconnected.", true);
+            ShowStatus(LinearStatusBorder, LinearStatusText, "Linear disconnected for this project.", true);
         }
 
         // ── Jira ─────────────────────────────────────────────────────
@@ -215,19 +260,19 @@ namespace QAssistant.Views
                 return;
             }
 
-            CredentialService.SaveCredential("JiraDomain", JiraDomainBox.Text.Trim());
-            CredentialService.SaveCredential("JiraEmail", JiraEmailBox.Text.Trim());
-            CredentialService.SaveCredential("JiraApiToken", JiraApiTokenBox.Password.Trim());
-            CredentialService.SaveCredential("JiraProjectKey", JiraProjectKeyBox.Text.Trim());
-            ShowStatus(JiraStatusBorder, JiraStatusText, "Jira keys saved successfully.", true);
+            SaveProjectCred("JiraDomain", JiraDomainBox.Text.Trim());
+            SaveProjectCred("JiraEmail", JiraEmailBox.Text.Trim());
+            SaveProjectCred("JiraApiToken", JiraApiTokenBox.Password.Trim());
+            SaveProjectCred("JiraProjectKey", JiraProjectKeyBox.Text.Trim());
+            ShowStatus(JiraStatusBorder, JiraStatusText, "Jira keys saved for this project.", true);
         }
 
         private async void TestJira_Click(object sender, RoutedEventArgs e)
         {
-            var domain = CredentialService.LoadCredential("JiraDomain");
-            var email = CredentialService.LoadCredential("JiraEmail");
-            var token = CredentialService.LoadCredential("JiraApiToken");
-            var projectKey = CredentialService.LoadCredential("JiraProjectKey");
+            var domain = LoadProjectCred("JiraDomain");
+            var email = LoadProjectCred("JiraEmail");
+            var token = LoadProjectCred("JiraApiToken");
+            var projectKey = LoadProjectCred("JiraProjectKey");
 
             if (string.IsNullOrEmpty(domain) || string.IsNullOrEmpty(email) ||
                 string.IsNullOrEmpty(token) || string.IsNullOrEmpty(projectKey))
@@ -255,15 +300,15 @@ namespace QAssistant.Views
 
         private void DisconnectJira_Click(object sender, RoutedEventArgs e)
         {
-            CredentialService.DeleteCredential("JiraDomain");
-            CredentialService.DeleteCredential("JiraEmail");
-            CredentialService.DeleteCredential("JiraApiToken");
-            CredentialService.DeleteCredential("JiraProjectKey");
+            DeleteProjectCred("JiraDomain");
+            DeleteProjectCred("JiraEmail");
+            DeleteProjectCred("JiraApiToken");
+            DeleteProjectCred("JiraProjectKey");
             JiraDomainBox.Text = string.Empty;
             JiraEmailBox.Text = string.Empty;
             JiraApiTokenBox.Password = string.Empty;
             JiraProjectKeyBox.Text = string.Empty;
-            ShowStatus(JiraStatusBorder, JiraStatusText, "Jira disconnected.", true);
+            ShowStatus(JiraStatusBorder, JiraStatusText, "Jira disconnected for this project.", true);
         }
 
         private async void OpenGeminiKeys_Click(object sender, RoutedEventArgs e)
@@ -280,8 +325,8 @@ namespace QAssistant.Views
                 return;
             }
 
-            CredentialService.SaveCredential("GeminiApiKey", GeminiApiKeyBox.Password.Trim());
-            ShowStatus(GeminiStatusBorder, GeminiStatusText, "Google AI Studio API key saved successfully.", true);
+            SaveProjectCred("GeminiApiKey", GeminiApiKeyBox.Password.Trim());
+            ShowStatus(GeminiStatusBorder, GeminiStatusText, "Google AI Studio API key saved for this project.", true);
         }
 
         // ── Helpers ──────────────────────────────────────────────────

@@ -38,6 +38,9 @@
 		<None Remove="Views\SettingsPage.xaml" />
 		<None Remove="Views\TasksPage.xaml" />
 	</ItemGroup>
+	<ItemGroup>
+	  <None Remove="Views\TestsPage.xaml" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<Content Include="Assets\SplashScreen.scale-200.png" />
@@ -71,6 +74,11 @@
 		<Content Update="Assets\tray.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+	</ItemGroup>
+	<ItemGroup>
+	  <Page Update="Views\TestsPage.xaml">
+		<Generator>MSBuild:Compile</Generator>
+	  </Page>
 	</ItemGroup>
 	<ItemGroup>
 		<Page Update="Views\FilesPage.xaml">

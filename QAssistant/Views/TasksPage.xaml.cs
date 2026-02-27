@@ -31,6 +31,13 @@ namespace QAssistant.Views
         private ProjectTask? _draggedTask;
         private List<LinearWorkflowState> _linearStates = new();
 
+        private Guid ProjectId => _vm?.SelectedProject?.Id ?? Guid.Empty;
+
+        private string? LoadProjectCred(string key) =>
+            ProjectId != Guid.Empty
+                ? CredentialService.LoadProjectCredential(ProjectId, key)
+                : CredentialService.LoadCredential(key);
+
         public TasksPage()
         {
             this.InitializeComponent();
@@ -103,8 +110,8 @@ namespace QAssistant.Views
             StatusText.Visibility = Visibility.Visible;
             StatusText.Text = "Fetching Linear issues...";
 
-            var key = CredentialService.LoadCredential("LinearApiKey");
-            var teamId = CredentialService.LoadCredential("LinearTeamId");
+            var key = LoadProjectCred("LinearApiKey");
+            var teamId = LoadProjectCred("LinearTeamId");
 
             if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(teamId))
             {
@@ -177,7 +184,7 @@ namespace QAssistant.Views
             StatusText.Visibility = Visibility.Visible;
             CloseDetailPanel();
 
-            var key = CredentialService.LoadCredential("LinearApiKey");
+            var key = LoadProjectCred("LinearApiKey");
             if (string.IsNullOrEmpty(key))
             {
                 StatusText.Text = "No Linear API key found. Go to Settings to connect.";
@@ -459,7 +466,7 @@ namespace QAssistant.Views
                 // Linear-hosted upload URLs require the API key to download
                 if (url.Contains("linear.app", StringComparison.OrdinalIgnoreCase))
                 {
-                    var key = CredentialService.LoadCredential("LinearApiKey");
+                    var key = LoadProjectCred("LinearApiKey");
                     if (!string.IsNullOrEmpty(key))
                         httpClient.DefaultRequestHeaders.Add("Authorization", key);
                 }
@@ -508,7 +515,7 @@ namespace QAssistant.Views
                     using var httpClient = new HttpClient();
                     if (url.Contains("linear.app", StringComparison.OrdinalIgnoreCase))
                     {
-                        var key = CredentialService.LoadCredential("LinearApiKey");
+                        var key = LoadProjectCred("LinearApiKey");
                         if (!string.IsNullOrEmpty(key))
                             httpClient.DefaultRequestHeaders.Add("Authorization", key);
                     }
@@ -1017,7 +1024,7 @@ namespace QAssistant.Views
 
             try
             {
-                var key = CredentialService.LoadCredential("LinearApiKey");
+                var key = LoadProjectCred("LinearApiKey");
                 if (string.IsNullOrEmpty(key)) return;
 
                 var service = new LinearService(key);
@@ -1189,7 +1196,7 @@ namespace QAssistant.Views
                 return;
             }
 
-            var key = CredentialService.LoadCredential("LinearApiKey");
+            var key = LoadProjectCred("LinearApiKey");
             if (string.IsNullOrEmpty(key)) return;
 
             try
@@ -1319,7 +1326,7 @@ namespace QAssistant.Views
         {
             if (_selectedTask == null) return;
 
-            var geminiKey = CredentialService.LoadCredential("GeminiApiKey");
+            var geminiKey = LoadProjectCred("GeminiApiKey");
             if (string.IsNullOrEmpty(geminiKey))
             {
                 var noKeyDialog = new ContentDialog
@@ -1340,7 +1347,7 @@ namespace QAssistant.Views
             {
                 try
                 {
-                    var linearKey = CredentialService.LoadCredential("LinearApiKey");
+                    var linearKey = LoadProjectCred("LinearApiKey");
                     if (!string.IsNullOrEmpty(linearKey))
                     {
                         var linearService = new LinearService(linearKey);
@@ -1509,7 +1516,7 @@ namespace QAssistant.Views
 
             if (_isLinearMode && task.Source == TaskSource.Linear && !string.IsNullOrEmpty(task.ExternalId))
             {
-                var key = CredentialService.LoadCredential("LinearApiKey");
+                var key = LoadProjectCred("LinearApiKey");
 
                 // Lazily fetch workflow states if they weren't loaded yet
                 if (_linearStates.Count == 0 && !string.IsNullOrEmpty(key))

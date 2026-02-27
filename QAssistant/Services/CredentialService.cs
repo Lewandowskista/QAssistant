@@ -71,6 +71,31 @@ namespace QAssistant.Services
             CredDelete("QAssistant_" + key, 1, 0);
         }
 
+        /// <summary>
+        /// Save a credential scoped to a specific project.
+        /// </summary>
+        public static void SaveProjectCredential(Guid projectId, string key, string value)
+        {
+            SaveCredential($"{projectId}_{key}", value);
+        }
+
+        /// <summary>
+        /// Load a credential scoped to a specific project.
+        /// Returns null when the project has no value saved for this key.
+        /// </summary>
+        public static string? LoadProjectCredential(Guid projectId, string key)
+        {
+            return LoadCredential($"{projectId}_{key}");
+        }
+
+        /// <summary>
+        /// Delete a project-scoped credential.
+        /// </summary>
+        public static void DeleteProjectCredential(Guid projectId, string key)
+        {
+            DeleteCredential($"{projectId}_{key}");
+        }
+
         [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool CredWrite(IntPtr Credential, uint Flags);
 

@@ -13,6 +13,9 @@
                            FontSize="24" FontWeight="SemiBold"/>
                 <TextBlock Text="Connect your tools and manage API keys."
                            Foreground="{ThemeResource TextSecondaryBrush}" FontSize="13"/>
+                <TextBlock x:Name="ProjectContextText"
+                           Foreground="{ThemeResource AccentBrush}" FontSize="12"
+                           FontWeight="SemiBold" Margin="0,4,0,0"/>
             </StackPanel>
 
             <!-- General Settings -->
