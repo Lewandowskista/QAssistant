@@ -19,6 +19,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -42,8 +44,105 @@ namespace QAssistant.Services
                 throw new ArgumentException("Invalid Jira domain. Use only your Atlassian subdomain (e.g. 'mycompany').", nameof(domain));
 
             _client = CreateClient(email, apiToken);
-            _baseUrl = $"https://{domain}.atlassian.net/rest/api/3";
+            // Ensure base URL targets the v3 Cloud REST API and includes trailing slash for concatenation
+            _baseUrl = $"https://{domain}.atlassian.net/rest/api/3/";
             _browseUrl = $"https://{domain}.atlassian.net/browse";
+        }
+
+        // Helper to GET JSON with special handling for 410 Gone and other HTTP errors
+        private async Task<JsonElement> GetJsonAsync(string url)
+        {
+            using var resp = await _client.GetAsync(url);
+            if (resp.StatusCode == HttpStatusCode.Gone)
+            {
+                var body = await resp.Content.ReadAsStringAsync();
+                Debug.WriteLine($"Jira API returned 410 Gone for '{url}'. Response body: {body}");
+
+                // Attempt fallback to REST API v2
+                var altUrl = url.Replace("/rest/api/3/", "/rest/api/2/");
+                if (altUrl != url)
+                {
+                    Debug.WriteLine($"Attempting fallback to '{altUrl}'");
+                    using var resp2 = await _client.GetAsync(altUrl);
+                    if (resp2.StatusCode == HttpStatusCode.Gone)
+                    {
+                        var body2 = await resp2.Content.ReadAsStringAsync();
+                        var msg = $"Jira API returned 410 Gone for '{url}' and fallback '{altUrl}'. Bodies: {body} | {body2}";
+                        Debug.WriteLine(msg);
+                        throw new HttpRequestException(msg, null, resp2.StatusCode);
+                    }
+
+                    resp2.EnsureSuccessStatusCode();
+                    var stream2 = await resp2.Content.ReadAsStreamAsync();
+                    using var doc2 = await JsonDocument.ParseAsync(stream2);
+                    return doc2.RootElement.Clone();
+                }
+
+                var msgNoFallback = $"Jira API returned 410 Gone for '{url}'. The endpoint may be deprecated or the resource removed.";
+                Debug.WriteLine(msgNoFallback);
+                throw new HttpRequestException(msgNoFallback, null, resp.StatusCode);
+            }
+
+            resp.EnsureSuccessStatusCode();
+            var stream = await resp.Content.ReadAsStreamAsync();
+            using var doc = await JsonDocument.ParseAsync(stream);
+            return doc.RootElement.Clone();
+        }
+
+        // Helper to POST JSON and return response JSON with 410/400 handling
+        private async Task<JsonElement> PostJsonAsync(string url, object payload)
+        {
+            using var resp = await _client.PostAsJsonAsync(url, payload);
+            if (resp.StatusCode == HttpStatusCode.Gone)
+            {
+                var body = await resp.Content.ReadAsStringAsync();
+                Debug.WriteLine($"Jira API returned 410 Gone for '{url}'. Response body: {body}");
+
+                // Attempt fallback to REST API v2
+                var altUrl = url.Replace("/rest/api/3/", "/rest/api/2/");
+                if (altUrl != url)
+                {
+                    Debug.WriteLine($"Attempting POST fallback to '{altUrl}'");
+                    using var resp2 = await _client.PostAsJsonAsync(altUrl, payload);
+                    if (resp2.StatusCode == HttpStatusCode.Gone)
+                    {
+                        var body2 = await resp2.Content.ReadAsStringAsync();
+                        var msg = $"Jira API returned 410 Gone for '{url}' and fallback '{altUrl}'. Bodies: {body} | {body2}";
+                        Debug.WriteLine(msg);
+                        throw new HttpRequestException(msg, null, resp2.StatusCode);
+                    }
+
+                    if (resp2.StatusCode == HttpStatusCode.BadRequest)
+                    {
+                        var body2 = await resp2.Content.ReadAsStringAsync();
+                        var msg = $"Jira API returned 400 Bad Request for fallback '{altUrl}': {body2}";
+                        Debug.WriteLine(msg);
+                        throw new HttpRequestException(msg, null, resp2.StatusCode);
+                    }
+
+                    resp2.EnsureSuccessStatusCode();
+                    var stream2 = await resp2.Content.ReadAsStreamAsync();
+                    using var doc2 = await JsonDocument.ParseAsync(stream2);
+                    return doc2.RootElement.Clone();
+                }
+
+                var msgNoFallback = $"Jira API returned 410 Gone for '{url}'. The endpoint may be deprecated or the resource removed.";
+                Debug.WriteLine(msgNoFallback);
+                throw new HttpRequestException(msgNoFallback, null, resp.StatusCode);
+            }
+
+            if (resp.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var body = await resp.Content.ReadAsStringAsync();
+                var msg = $"Jira API returned 400 Bad Request for '{url}': {body}";
+                Debug.WriteLine(msg);
+                throw new HttpRequestException(msg, null, resp.StatusCode);
+            }
+
+            resp.EnsureSuccessStatusCode();
+            var stream = await resp.Content.ReadAsStreamAsync();
+            using var doc = await JsonDocument.ParseAsync(stream);
+            return doc.RootElement.Clone();
         }
 
         public void Dispose() => _client.Dispose();
@@ -59,21 +158,51 @@ namespace QAssistant.Services
 
         public async Task<List<JiraProject>> GetProjectsAsync()
         {
-            var projects = await _client.GetFromJsonAsync<List<JsonElement>>($"{_baseUrl}/project");
+            var root = await GetJsonAsync($"{_baseUrl}project");
+            List<JsonElement>? projects = null;
+            try
+            {
+                projects = root.Deserialize<List<JsonElement>>();
+            }
+            catch { projects = null; }
+
             return projects?.Select(node => new JiraProject
             {
                 Id = node.GetProperty("id").GetString() ?? "",
                 Key = node.GetProperty("key").GetString() ?? "",
                 Name = node.GetProperty("name").GetString() ?? ""
-            }).ToList() ?? [];
+            }).ToList() ?? new List<JiraProject>();
         }
 
         public async Task<List<ProjectTask>> GetIssuesAsync(string projectKey)
         {
             var jql = $"project={projectKey} ORDER BY updated DESC";
-            var url = $"{_baseUrl}/search?jql={Uri.EscapeDataString(jql)}&maxResults=100&fields=summary,description,status,priority,assignee,reporter,issuetype,duedate,story_points,labels,components,comment";
+            // Use the updated JQL search endpoint: '/rest/api/3/search/jql'
+            var url = $"{_baseUrl}search/jql";
 
-            var response = await _client.GetFromJsonAsync<JsonElement>(url);
+            // Use an explicit string array for fields to avoid serialization ambiguity
+            var fieldsArray = new[] { "summary", "description", "status", "priority", "assignee", "reporter", "issuetype", "duedate", "labels", "components" };
+
+            var payload = new
+            {
+                jql = jql,
+                startAt = 0,
+                maxResults = 100,
+                fields = fieldsArray
+            };
+
+            JsonElement response;
+            try
+            {
+                response = await PostJsonAsync(url, payload);
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+            {
+                Debug.WriteLine($"POST to '{url}' returned 400, attempting GET fallback with querystring");
+                // Fallback to GET with query string (some instances reject POST payloads)
+                var qs = $"{url}?jql={Uri.EscapeDataString(jql)}&startAt=0&maxResults=100&fields={Uri.EscapeDataString(string.Join(",", fieldsArray))}";
+                response = await GetJsonAsync(qs);
+            }
             var tasks = new List<ProjectTask>();
 
             if (response.TryGetProperty("issues", out var issues))
@@ -108,14 +237,22 @@ namespace QAssistant.Services
 
         public async Task UpdateIssueStatusAsync(string issueIdOrKey, string transitionId)
         {
-            var url = $"{_baseUrl}/issue/{issueIdOrKey}/transitions";
+            var url = $"{_baseUrl}issue/{issueIdOrKey}/transitions";
             var payload = new { transition = new { id = transitionId } };
-            await _client.PostAsJsonAsync(url, payload);
+            try
+            {
+                await PostJsonAsync(url, payload);
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Gone)
+            {
+                Debug.WriteLine($"Cannot transition issue {issueIdOrKey}: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task AddCommentAsync(string issueIdOrKey, string body)
         {
-            var url = $"{_baseUrl}/issue/{issueIdOrKey}/comment";
+            var url = $"{_baseUrl}issue/{issueIdOrKey}/comment";
             var payload = new
             {
                 body = new
@@ -132,14 +269,21 @@ namespace QAssistant.Services
                     }
                 }
             };
-
-            await _client.PostAsJsonAsync(url, payload);
+            try
+            {
+                await PostJsonAsync(url, payload);
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Gone)
+            {
+                Debug.WriteLine($"Cannot add comment to {issueIdOrKey}: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task<List<LinearComment>> GetCommentsAsync(string issueIdOrKey)
         {
-            var url = $"{_baseUrl}/issue/{issueIdOrKey}/comment?orderBy=-created";
-            var response = await _client.GetFromJsonAsync<JsonElement>(url);
+            var url = $"{_baseUrl}issue/{issueIdOrKey}/comment?orderBy=-created";
+            var response = await GetJsonAsync(url);
             var comments = new List<LinearComment>();
 
             if (response.TryGetProperty("comments", out var commentsArray))
@@ -174,8 +318,8 @@ namespace QAssistant.Services
 
         public async Task<List<JiraTransition>> GetTransitionsAsync(string issueIdOrKey)
         {
-            var url = $"{_baseUrl}/issue/{issueIdOrKey}/transitions";
-            var response = await _client.GetFromJsonAsync<JsonElement>(url);
+            var url = $"{_baseUrl}issue/{issueIdOrKey}/transitions";
+            var response = await GetJsonAsync(url);
             var transitions = new List<JiraTransition>();
 
             if (response.TryGetProperty("transitions", out var transitionsArray))
@@ -197,8 +341,8 @@ namespace QAssistant.Services
 
         public async Task<List<WorklogEntry>> GetChangelogAsync(string issueIdOrKey)
         {
-            var url = $"{_baseUrl}/issue/{issueIdOrKey}?expand=changelog&fields=summary";
-            var response = await _client.GetFromJsonAsync<JsonElement>(url);
+            var url = $"{_baseUrl}issue/{issueIdOrKey}?expand=changelog&fields=summary";
+            var response = await GetJsonAsync(url);
             var entries = new List<WorklogEntry>();
 
             if (response.TryGetProperty("changelog", out var changelog) &&
@@ -261,24 +405,46 @@ namespace QAssistant.Services
             return null;
         }
 
+        // Recursive extractor for Atlassian Document Format (ADF) that preserves block boundaries
         private static string ExtractAdfText(JsonElement adfNode)
         {
             var sb = new StringBuilder();
-            if (adfNode.TryGetProperty("content", out var content))
+
+            bool IsBlockType(JsonElement node)
             {
-                foreach (var block in content.EnumerateArray())
+                if (node.ValueKind != JsonValueKind.Object) return false;
+                if (!node.TryGetProperty("type", out var t)) return false;
+                var s = t.GetString() ?? string.Empty;
+                return s is "paragraph" or "heading" or "bulletList" or "orderedList" or "listItem" or "blockquote" or "table" or "codeBlock" or "panel";
+            }
+
+            void Recurse(JsonElement node)
+            {
+                if (node.ValueKind == JsonValueKind.Object)
                 {
-                    if (block.TryGetProperty("content", out var inline))
+                    // If this node contains a direct text property, append it
+                    if (node.TryGetProperty("text", out var textEl) && textEl.ValueKind == JsonValueKind.String)
+                        sb.Append(textEl.GetString());
+
+                    // Recurse into content array if present
+                    if (node.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
                     {
-                        foreach (var item in inline.EnumerateArray())
+                        foreach (var child in content.EnumerateArray())
                         {
-                            if (item.TryGetProperty("text", out var text))
-                                sb.Append(text.GetString());
+                            Recurse(child);
                         }
                     }
-                    sb.AppendLine();
+
+                    // Preserve block separation
+                    if (IsBlockType(node)) sb.AppendLine();
+                }
+                else if (node.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var child in node.EnumerateArray()) Recurse(child);
                 }
             }
+
+            Recurse(adfNode);
             return sb.ToString().Trim();
         }
 
@@ -288,17 +454,7 @@ namespace QAssistant.Services
             {
                 var desc = fields.GetProperty("description");
                 if (desc.ValueKind == JsonValueKind.Null) return string.Empty;
-                var content = desc.GetProperty("content");
-                var sb = new StringBuilder();
-                foreach (var block in content.EnumerateArray())
-                {
-                    if (block.TryGetProperty("content", out var inline))
-                        foreach (var item in inline.EnumerateArray())
-                            if (item.TryGetProperty("text", out var text))
-                                sb.Append(text.GetString());
-                    sb.AppendLine();
-                }
-                return sb.ToString().Trim();
+                return ExtractAdfText(desc);
             }
             catch { return string.Empty; }
         }

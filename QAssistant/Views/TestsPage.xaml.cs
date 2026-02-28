@@ -259,7 +259,7 @@ namespace QAssistant.Views
                 var plan = new TestPlan
                 {
                     TestPlanId = NextTestPlanId(),
-                    Name = $"{selectedSource} Â· {DateTime.Now:MMM d, yyyy h:mm tt}",
+                    Name = NormalizeForDisplay($"{selectedSource} \u00B7 {DateTime.Now:MMM d, yyyy h:mm tt}"),
                     Description = $"Auto-generated from {tasks.Count} {selectedSource} issue(s).",
                     Source = source
                 };
@@ -275,13 +275,29 @@ namespace QAssistant.Views
 
                 await _vm.SaveAsync();
 
-                GenerationStatusText.Text = $"Generated {generatedCases.Count} test cases in {plan.TestPlanId} Â· {DateTime.Now:h:mm tt}";
+                GenerationStatusText.Text = NormalizeForDisplay($"Generated {generatedCases.Count} test cases in {plan.TestPlanId} \u00B7 {DateTime.Now:h:mm tt}");
                 RenderTestPlans();
             }
             catch (Exception ex)
             {
                 GenerationStatusText.Text = $"Parse error: {ex.Message}";
             }
+
+        }
+
+        // Normalize any mojibake or non-breaking spaces that may appear due to
+        // encoding mismatches (e.g. 'Â' or NBSP). Keep visible punctuation like
+        // middle dot as a proper Unicode character.
+        private static string NormalizeForDisplay(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+            // Replace non-breaking space with regular space
+            var s = input.Replace('\u00A0', ' ');
+            // Remove stray 'Â' characters that appear from mojibake (0xC2)
+            s = s.Replace("Â", string.Empty);
+            // Collapse multiple spaces
+            while (s.Contains("  ")) s = s.Replace("  ", " ");
+            return s.Trim();
         }
 
         private async System.Threading.Tasks.Task<List<ProjectTask>> FetchIssuesFromSourceAsync(string source)
@@ -343,8 +359,8 @@ namespace QAssistant.Views
                 ? plans.OrderByDescending(p => p.CreatedAt).ToList()
                 : plans.Where(p => !p.IsArchived).OrderByDescending(p => p.CreatedAt).ToList();
 
-            var archiveInfo = archivedCount > 0 ? $" Â· {archivedCount} archived" : "";
-            TestCaseCountText.Text = $"{activeCount} plan(s) Â· {allCases.Count} case(s){archiveInfo}";
+            var archiveInfo = archivedCount > 0 ? $" \u00B7 {archivedCount} archived" : "";
+            TestCaseCountText.Text = NormalizeForDisplay($"{activeCount} plan(s) \u00B7 {allCases.Count} case(s){archiveInfo}");
 
             foreach (var plan in visiblePlans)
             {
@@ -1167,7 +1183,7 @@ namespace QAssistant.Views
             traceRow.Children.Add(MakeTraceBadge(exec.ExecutionId, GetStatusBrush(exec.Result)));
             traceRow.Children.Add(new TextBlock
             {
-                Text = "â†’",
+                Text = "\u2192",
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center
@@ -1177,7 +1193,7 @@ namespace QAssistant.Views
                 new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))));
             traceRow.Children.Add(new TextBlock
             {
-                Text = "â†’",
+                Text = "\u2192",
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center
@@ -1233,7 +1249,7 @@ namespace QAssistant.Views
             }
             resultRow.Children.Add(new TextBlock
             {
-                Text = exec.ExecutedAt.ToString("MMM d, yyyy Â· h:mm:ss tt"),
+                Text = exec.ExecutedAt.ToString("MMM d, yyyy \u00B7 h:mm:ss tt"),
                 FontSize = 11,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
                 VerticalAlignment = VerticalAlignment.Center

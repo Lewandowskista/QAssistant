@@ -45,6 +45,34 @@ namespace QAssistant.Services
         }
 
         /// <summary>
+        /// Sanitizer variant for test-case generation prompts.
+        /// Preserves newlines and allows a larger max length so detailed
+        /// Jira descriptions (lists, steps) are retained for the model.
+        /// </summary>
+        private static string SanitizeToonValueForTestGen(string? value, int maxLength = 2000)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            var s = value.Length > maxLength ? value[..maxLength] + "..." : value;
+
+            // Preserve newlines for test-step structure but normalize CRLF
+            s = s.Replace("\r\n", "\n").Replace('\r', '\n');
+
+            // Replace TOON structural delimiters with safe visual equivalents
+            s = s.Replace('{', '(').Replace('}', ')');
+            s = s.Replace('[', '(').Replace(']', ')');
+
+            // Neutralise directive prefix
+            s = s.Replace("@", "(at)");
+
+            // Break TOON section separators
+            s = s.Replace("---", "- - -");
+
+            return s;
+        }
+
+        /// <summary>
         /// Sanitizes a free-text value before embedding it in a TOON prompt.
         /// Neutralises characters that could break TOON structural boundaries
         /// or inject directives, while preserving human-readable content.
@@ -222,7 +250,9 @@ namespace QAssistant.Services
 
                 if (!string.IsNullOrWhiteSpace(task.Description))
                 {
-                    sb.Append($",desc:{SanitizeToonValue(task.Description, 500)}");
+                    // Use a specialized sanitizer for test-case generation to keep
+                    // multiline steps and longer descriptions intact.
+                    sb.Append($",desc:{SanitizeToonValueForTestGen(task.Description, 2000)}");
                 }
 
                 if (!string.IsNullOrEmpty(task.IssueType))
@@ -259,13 +289,14 @@ namespace QAssistant.Services
                 }
             }
 
-            // Find the JSON array boundaries
-            var arrayStart = json.IndexOf('[');
-            var arrayEnd = json.LastIndexOf(']');
-            if (arrayStart >= 0 && arrayEnd > arrayStart)
-                json = json[arrayStart..(arrayEnd + 1)];
+            // Extract the first balanced JSON array from the response text. This
+            // is more robust than IndexOf/LastIndexOf when the model returns
+            // surrounding text or multiple arrays.
+            var extracted = ExtractFirstJsonArray(json);
+            if (string.IsNullOrEmpty(extracted))
+                throw new JsonException("Could not locate a JSON array in the model response.");
 
-            using var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(extracted);
             var testCases = new List<TestCase>();
             int counter = 1;
 
@@ -293,6 +324,57 @@ namespace QAssistant.Services
             }
 
             return testCases;
+        }
+
+        // Finds and returns the first balanced JSON array (including brackets)
+        // from the input text, or null if none found. Handles quoted strings
+        // and escaped characters so brackets inside strings are ignored.
+        private static string? ExtractFirstJsonArray(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return null;
+            int start = input.IndexOf('[');
+            if (start < 0) return null;
+
+            int depth = 0;
+            bool inString = false;
+            bool escape = false;
+
+            for (int i = start; i < input.Length; i++)
+            {
+                char c = input[i];
+
+                if (escape)
+                {
+                    escape = false;
+                    continue;
+                }
+
+                if (c == '\\')
+                {
+                    escape = true;
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    inString = !inString;
+                    continue;
+                }
+
+                if (inString) continue;
+
+                if (c == '[') depth++;
+                else if (c == ']')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        return input[start..(i + 1)];
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static string Truncate(string value, int maxLength) =>
