@@ -120,16 +120,17 @@ namespace QAssistant
         public App()
         {
             this.InitializeComponent();
-            // Load tray setting immediately so it's ready before window activates
-            var trayEnabled = CredentialService.LoadCredential("MinimizeToTray");
+            // Load tray setting immediately so it's ready before window activates.
+            // Uses StorageService (settings.json) — SettingsPage writes here via SaveSetting().
+            var trayEnabled = StorageService.Instance.GetSetting("MinimizeToTray");
             MinimizeToTray = trayEnabled == "true";
 
             // Start automation API if enabled
-            var apiEnabled = CredentialService.LoadCredential("AutomationApiEnabled");
+            var apiEnabled = StorageService.Instance.GetSetting("AutomationApiEnabled");
             if (apiEnabled == "true")
             {
                 AutomationApiService.GetOrCreateApiKey();
-                var portStr = CredentialService.LoadCredential("AutomationApiPort");
+                var portStr = StorageService.Instance.GetSetting("AutomationApiPort");
                 int port = int.TryParse(portStr, out var p) && p is >= 1024 and <= 65535 ? p : 5248;
                 AutomationApi.Start(port);
             }

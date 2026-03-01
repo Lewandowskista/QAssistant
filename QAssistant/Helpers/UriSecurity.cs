@@ -54,12 +54,28 @@ namespace QAssistant.Helpers
                 {
                     // 10.x.x.x
                     if (bytes[0] == 10) return false;
-                    // 172.16â€“31.x.x
+                    // 172.16-31.x.x
                     if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return false;
                     // 192.168.x.x
                     if (bytes[0] == 192 && bytes[1] == 168) return false;
                     // 169.254.x.x (link-local)
                     if (bytes[0] == 169 && bytes[1] == 254) return false;
+                }
+                else if (bytes.Length == 16)
+                {
+                    // fc00::/7 — unique local (covers fc00:: through fdff::)
+                    if (bytes[0] == 0xFC || bytes[0] == 0xFD) return false;
+                    // fe80::/10 — link-local (covers fe80:: through febf::)
+                    if (bytes[0] == 0xFE && (bytes[1] & 0xC0) == 0x80) return false;
+                    // ::ffff:0:0/96 — IPv4-mapped: apply the same IPv4 private-range rules
+                    if (ip.IsIPv4MappedToIPv6)
+                    {
+                        var v4 = ip.MapToIPv4().GetAddressBytes();
+                        if (v4[0] == 10) return false;
+                        if (v4[0] == 172 && v4[1] >= 16 && v4[1] <= 31) return false;
+                        if (v4[0] == 192 && v4[1] == 168) return false;
+                        if (v4[0] == 169 && v4[1] == 254) return false;
+                    }
                 }
             }
 

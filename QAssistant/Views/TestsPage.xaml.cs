@@ -17,6 +17,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using QAssistant.Helpers;
 using QAssistant.Models;
 using QAssistant.Services;
@@ -25,6 +26,7 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Windows.ApplicationModel.DataTransfer;
@@ -43,6 +45,8 @@ namespace QAssistant.Views
         private readonly HashSet<Guid> _selectedPlanIds = [];
         private bool _criticalityExpanded;
         private string? _criticalityAssessmentText;
+        private int _suggestionsSnapshotExecutionCount = -1;
+        private int _suggestionsSnapshotFailedCount = -1;
         private bool _showArchived;
         private bool _showArchivedRuns;
         private string? _designDocumentContent;
@@ -63,13 +67,13 @@ namespace QAssistant.Views
             this.InitializeComponent();
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
             if (e.Parameter is MainViewModel vm)
             {
                 _vm = vm;
-                MigrateOrphanedTestCases();
+                await MigrateOrphanedTestCasesAsync();
                 RenderTestPlans();
             }
         }
@@ -192,7 +196,7 @@ namespace QAssistant.Views
 
         // â”€â”€ Backward compatibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-        private void MigrateOrphanedTestCases()
+        private async System.Threading.Tasks.Task MigrateOrphanedTestCasesAsync()
         {
             if (_vm?.SelectedProject == null) return;
 
@@ -202,19 +206,20 @@ namespace QAssistant.Views
 
             if (orphans.Count == 0) return;
 
+            var distinctSources = orphans.Select(tc => tc.Source).Distinct().ToList();
             var plan = new TestPlan
             {
                 TestPlanId = NextTestPlanId(),
                 Name = "Imported Test Cases",
                 Description = "Test cases imported from a previous session.",
-                Source = orphans[0].Source
+                Source = distinctSources.Count == 1 ? distinctSources[0] : TaskSource.Manual
             };
             _vm.SelectedProject.TestPlans.Add(plan);
 
             foreach (var tc in orphans)
                 tc.TestPlanId = plan.Id;
 
-            _ = _vm.SaveAsync();
+            await _vm.SaveAsync();
         }
 
         // â”€â”€ ID helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -292,7 +297,7 @@ namespace QAssistant.Views
             string response = string.Empty;
             var generateTask = System.Threading.Tasks.Task.Run(async () =>
             {
-                var service = new GeminiService(geminiKey);
+                using var service = new GeminiService(geminiKey);
                 response = await service.AnalyzeIssueAsync(prompt);
             });
 
@@ -369,6 +374,8 @@ namespace QAssistant.Views
         // Normalize any mojibake or non-breaking spaces that may appear due to
         // encoding mismatches (e.g. 'Â' or NBSP). Keep visible punctuation like
         // middle dot as a proper Unicode character.
+        private static readonly Regex MultiSpaceRegex = new(" {2,}", RegexOptions.Compiled);
+
         private static string NormalizeForDisplay(string input)
         {
             if (string.IsNullOrEmpty(input)) return string.Empty;
@@ -377,36 +384,58 @@ namespace QAssistant.Views
             // Remove stray 'Â' characters that appear from mojibake (0xC2)
             s = s.Replace("Â", string.Empty);
             // Collapse multiple spaces
-            while (s.Contains("  ")) s = s.Replace("  ", " ");
+            s = MultiSpaceRegex.Replace(s, " ");
             return s.Trim();
         }
 
         private async System.Threading.Tasks.Task<List<ProjectTask>> FetchIssuesFromSourceAsync(string source)
         {
+            var project = _vm?.SelectedProject;
+            if (project == null) throw new Exception("No project selected.");
+
             if (source == "Jira")
             {
-                var domain = LoadProjectCred("JiraDomain");
-                var email = LoadProjectCred("JiraEmail");
-                var token = LoadProjectCred("JiraApiToken");
-                var projectKey = LoadProjectCred("JiraProjectKey");
+                if (project.JiraConnections.Count == 0)
+                    throw new Exception("No Jira connections configured. Go to Settings.");
 
-                if (string.IsNullOrEmpty(domain) || string.IsNullOrEmpty(email) ||
-                    string.IsNullOrEmpty(token) || string.IsNullOrEmpty(projectKey))
-                    throw new Exception("Jira credentials not configured. Go to Settings.");
+                bool anyToken = false;
+                var allTasks = new List<ProjectTask>();
+                foreach (var conn in project.JiraConnections)
+                {
+                    var token = CredentialService.LoadProjectCredential(project.Id, $"JiraApiToken_{conn.Id}");
+                    if (string.IsNullOrEmpty(token)) continue;
+                    anyToken = true;
+                    var service = new JiraService(conn.Domain, conn.Email, token);
+                    var tasks = await service.GetIssuesAsync(conn.ProjectKey);
+                    allTasks.AddRange(tasks);
+                }
 
-                var service = new JiraService(domain, email, token);
-                return await service.GetIssuesAsync(projectKey);
+                if (!anyToken)
+                    throw new Exception("Jira API token not configured. Go to Settings.");
+
+                return allTasks;
             }
             else
             {
-                var key = LoadProjectCred("LinearApiKey");
-                var teamId = LoadProjectCred("LinearTeamId");
+                if (project.LinearConnections.Count == 0)
+                    throw new Exception("No Linear connections configured. Go to Settings.");
 
-                if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(teamId))
-                    throw new Exception("Linear credentials not configured. Go to Settings.");
+                bool anyKey = false;
+                var allTasks = new List<ProjectTask>();
+                foreach (var conn in project.LinearConnections)
+                {
+                    var key = CredentialService.LoadProjectCredential(project.Id, $"LinearApiKey_{conn.Id}");
+                    if (string.IsNullOrEmpty(key)) continue;
+                    anyKey = true;
+                    var service = new LinearService(key);
+                    var tasks = await service.GetIssuesAsync(conn.TeamId);
+                    allTasks.AddRange(tasks);
+                }
 
-                var service = new LinearService(key);
-                return await service.GetIssuesAsync(teamId);
+                if (!anyKey)
+                    throw new Exception("Linear API key not configured. Go to Settings.");
+
+                return allTasks;
             }
         }
 
@@ -1151,10 +1180,12 @@ namespace QAssistant.Views
         }
 
         private Border BuildExecutionPlanGroup(TestPlan? plan, List<TestExecution> planExecs)
-        {
-            var planId = plan?.Id ?? Guid.Empty;
-            bool collapsed = _collapsedExecutionPlans.Contains(planId);
-            bool isAllArchived = planExecs.All(e => e.IsArchived);
+            {
+                var planId = plan?.Id ?? planExecs.FirstOrDefault()?.TestPlanId ?? Guid.Empty;
+                bool collapsed = _collapsedExecutionPlans.Contains(planId);
+                bool isAllArchived = planExecs.All(e => e.IsArchived);
+                var snapshotPlanDisplayId = planExecs.FirstOrDefault()?.SnapshotPlanDisplayId;
+                var snapshotPlanName = planExecs.FirstOrDefault()?.SnapshotPlanName;
 
             var outerStack = new StackPanel { Spacing = 0 };
 
@@ -1180,7 +1211,7 @@ namespace QAssistant.Views
             var titleRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             titleRow.Children.Add(new TextBlock
             {
-                Text = plan?.TestPlanId ?? "Unknown Plan",
+                Text = plan?.TestPlanId ?? snapshotPlanDisplayId ?? "Unknown Plan",
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 14,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 56, 189, 248)),
@@ -1189,7 +1220,7 @@ namespace QAssistant.Views
             });
             titleRow.Children.Add(new TextBlock
             {
-                Text = plan?.Name ?? "Orphaned Executions",
+                Text = plan?.Name ?? snapshotPlanName ?? "Orphaned Executions",
                 FontSize = 14,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
@@ -1289,7 +1320,7 @@ namespace QAssistant.Views
                 if (deleteRunBtn.Content is FontIcon icon)
                     icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
             };
-            deleteRunBtn.Click += async (s, _) => await DeleteExecutionGroupAsync(planId, plan?.TestPlanId);
+            deleteRunBtn.Click += async (s, _) => await DeleteExecutionGroupAsync(planId, plan?.TestPlanId ?? snapshotPlanDisplayId);
             runActionPanel.Children.Add(deleteRunBtn);
 
             Grid.SetColumn(runActionPanel, 2);
@@ -1360,6 +1391,8 @@ namespace QAssistant.Views
         {
             var project = _vm!.SelectedProject!;
             var tc = project.TestCases.FirstOrDefault(c => c.Id == testCaseId);
+            var snapshotTcDisplayId = executions.FirstOrDefault()?.SnapshotTestCaseDisplayId;
+            var snapshotTcTitle = executions.FirstOrDefault()?.SnapshotTestCaseTitle;
             bool collapsed = _collapsedExecutionTestCases.Contains(testCaseId);
 
             var outerStack = new StackPanel { Spacing = 0 };
@@ -1386,7 +1419,7 @@ namespace QAssistant.Views
             var titleRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             titleRow.Children.Add(new TextBlock
             {
-                Text = tc?.TestCaseId ?? "?",
+                Text = tc?.TestCaseId ?? snapshotTcDisplayId ?? "?",
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 12,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
@@ -1395,7 +1428,7 @@ namespace QAssistant.Views
             });
             titleRow.Children.Add(new TextBlock
             {
-                Text = tc?.Title ?? "Unknown Test Case",
+                Text = tc?.Title ?? snapshotTcTitle ?? "Unknown Test Case",
                 FontSize = 12,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
                 TextWrapping = TextWrapping.Wrap,
@@ -1516,7 +1549,7 @@ namespace QAssistant.Views
             });
             expandBtnContent.Children.Add(new TextBlock
             {
-                Text = "Expand for detailed view",
+                Text = "AI Suggestions",
                 FontSize = 13,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
@@ -1549,7 +1582,7 @@ namespace QAssistant.Views
 
             var summaryTitle = new TextBlock
             {
-                Text = "CRITICALITY ASSESSMENT",
+                Text = "AI SUGGESTIONS",
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
                 FontSize = 10,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
@@ -1582,13 +1615,71 @@ namespace QAssistant.Views
             // AI-generated assessment area
             if (!string.IsNullOrWhiteSpace(_criticalityAssessmentText))
             {
-                AddFieldSection(bodyStack, "AI ANALYSIS", _criticalityAssessmentText);
+                bool isGenerating = _criticalityAssessmentText == "Generating suggestions...";
+                bool hasNewData = !isGenerating
+                    && _suggestionsSnapshotExecutionCount >= 0
+                    && (project.TestExecutions.Count != _suggestionsSnapshotExecutionCount
+                        || project.TestCases.Count(tc => tc.Status == TestCaseStatus.Failed) != _suggestionsSnapshotFailedCount);
+
+                if (hasNewData)
+                {
+                    var banner = new Border
+                    {
+                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(20, 251, 191, 36)),
+                        BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(180, 251, 191, 36)),
+                        BorderThickness = new Thickness(1),
+                        CornerRadius = new CornerRadius(6),
+                        Padding = new Thickness(10, 8, 10, 8)
+                    };
+                    var bannerInner = new Grid();
+                    bannerInner.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    bannerInner.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                    var bannerLeft = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+                    bannerLeft.Children.Add(new FontIcon
+                    {
+                        Glyph = "\uE7BA",
+                        FontSize = 12,
+                        FontFamily = new FontFamily("Segoe Fluent Icons"),
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    bannerLeft.Children.Add(new TextBlock
+                    {
+                        Text = "New executions added — suggestions may be outdated",
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+                        FontSize = 11,
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    Grid.SetColumn(bannerLeft, 0);
+                    bannerInner.Children.Add(bannerLeft);
+
+                    var regenBtn = new Button
+                    {
+                        Content = "Regenerate",
+                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53)),
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+                        BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                        CornerRadius = new CornerRadius(6),
+                        Padding = new Thickness(12, 5, 12, 5),
+                        FontSize = 11,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    regenBtn.Click += async (s, _) => await GenerateCriticalityAssessmentAsync();
+                    Grid.SetColumn(regenBtn, 1);
+                    bannerInner.Children.Add(regenBtn);
+
+                    banner.Child = bannerInner;
+                    bodyStack.Children.Add(banner);
+                }
+
+                bodyStack.Children.Add(BuildFormattedSuggestionsPanel(_criticalityAssessmentText));
             }
             else
             {
                 var generateBtn = new Button
                 {
-                    Content = "Generate AI Criticality Assessment",
+                    Content = "Get AI Suggestions",
                     Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53)),
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
                     BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
@@ -1643,8 +1734,7 @@ namespace QAssistant.Views
                 return;
             }
 
-            var prompt = GeminiService.BuildCriticalityAssessmentPrompt(
-                project.Tasks,
+            var prompt = GeminiService.BuildTestRunSuggestionsPrompt(
                 project.TestCases,
                 project.TestExecutions,
                 project.TestPlans,
@@ -1652,10 +1742,10 @@ namespace QAssistant.Views
 
             try
             {
-                _criticalityAssessmentText = "Generating assessment...";
+                _criticalityAssessmentText = "Generating suggestions...";
                 RenderExecutionHistory();
 
-                var service = new GeminiService(geminiKey);
+                using var service = new GeminiService(geminiKey);
                 var response = await service.AnalyzeIssueAsync(prompt);
 
                 // Cap stored response length to prevent unbounded memory use
@@ -1663,6 +1753,8 @@ namespace QAssistant.Views
                 _criticalityAssessmentText = response.Length > MaxAssessmentLength
                     ? response[..MaxAssessmentLength] + "\n\n(truncated)"
                     : response;
+                _suggestionsSnapshotExecutionCount = project.TestExecutions.Count;
+                _suggestionsSnapshotFailedCount = project.TestCases.Count(tc => tc.Status == TestCaseStatus.Failed);
                 RenderExecutionHistory();
             }
             catch (GeminiAllModelsRateLimitedException)
@@ -1761,7 +1853,7 @@ namespace QAssistant.Views
                 VerticalAlignment = VerticalAlignment.Center
             });
             traceRow.Children.Add(MakeTraceBadge(
-                tc?.TestCaseId ?? "?",
+                tc?.TestCaseId ?? exec.SnapshotTestCaseDisplayId ?? "?",
                 new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))));
             traceRow.Children.Add(new TextBlock
             {
@@ -1771,7 +1863,7 @@ namespace QAssistant.Views
                 VerticalAlignment = VerticalAlignment.Center
             });
             traceRow.Children.Add(MakeTraceBadge(
-                plan?.TestPlanId ?? "?",
+                plan?.TestPlanId ?? exec.SnapshotPlanDisplayId ?? "?",
                 new SolidColorBrush(Windows.UI.Color.FromArgb(255, 56, 189, 248))));
 
             var capturedExec = exec;
@@ -1814,11 +1906,12 @@ namespace QAssistant.Views
             cardStack.Children.Add(traceHeaderGrid);
 
             // Test case title
-            if (tc != null)
+            var tcDisplayTitle = tc?.Title ?? exec.SnapshotTestCaseTitle;
+            if (!string.IsNullOrEmpty(tcDisplayTitle))
             {
                 cardStack.Children.Add(new TextBlock
                 {
-                    Text = tc.Title,
+                    Text = tcDisplayTitle,
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
                     FontSize = 13,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
@@ -2121,6 +2214,20 @@ namespace QAssistant.Views
             var result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary) return;
 
+            foreach (var exec in _vm.SelectedProject.TestExecutions.Where(e => e.TestPlanId == plan.Id))
+            {
+                exec.SnapshotPlanDisplayId ??= plan.TestPlanId;
+                exec.SnapshotPlanName ??= plan.Name;
+            }
+            foreach (var deletedCase in _vm.SelectedProject.TestCases.Where(c => c.TestPlanId == plan.Id))
+            {
+                foreach (var exec in _vm.SelectedProject.TestExecutions.Where(e => e.TestCaseId == deletedCase.Id))
+                {
+                    exec.SnapshotTestCaseDisplayId ??= deletedCase.TestCaseId;
+                    exec.SnapshotTestCaseTitle ??= deletedCase.Title;
+                }
+            }
+
             _vm.SelectedProject.TestCases.RemoveAll(tc => tc.TestPlanId == plan.Id);
             _vm.SelectedProject.TestPlans.Remove(plan);
             await _vm.SaveAsync();
@@ -2142,6 +2249,15 @@ namespace QAssistant.Views
 
             var result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary) return;
+
+            if (_vm?.SelectedProject != null)
+            {
+                foreach (var exec in _vm.SelectedProject.TestExecutions.Where(e => e.TestCaseId == tc.Id))
+                {
+                    exec.SnapshotTestCaseDisplayId ??= tc.TestCaseId;
+                    exec.SnapshotTestCaseTitle ??= tc.Title;
+                }
+            }
 
             _vm?.SelectedProject?.TestCases.Remove(tc);
             if (_vm != null) await _vm.SaveAsync();
@@ -2231,6 +2347,23 @@ namespace QAssistant.Views
             var result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary) return;
 
+            foreach (var plan in _vm.SelectedProject.TestPlans)
+            {
+                foreach (var exec in _vm.SelectedProject.TestExecutions.Where(e => e.TestPlanId == plan.Id))
+                {
+                    exec.SnapshotPlanDisplayId ??= plan.TestPlanId;
+                    exec.SnapshotPlanName ??= plan.Name;
+                }
+            }
+            foreach (var deletedCase in _vm.SelectedProject.TestCases)
+            {
+                foreach (var exec in _vm.SelectedProject.TestExecutions.Where(e => e.TestCaseId == deletedCase.Id))
+                {
+                    exec.SnapshotTestCaseDisplayId ??= deletedCase.TestCaseId;
+                    exec.SnapshotTestCaseTitle ??= deletedCase.Title;
+                }
+            }
+
             _vm.SelectedProject.TestCases.Clear();
             _vm.SelectedProject.TestPlans.Clear();
             await _vm.SaveAsync();
@@ -2305,7 +2438,7 @@ namespace QAssistant.Views
             var caseIds = new HashSet<Guid>(cases.Select(c => c.Id));
 
             var execs = project.TestExecutions
-                .Where(te => planIds.Contains(te.TestPlanId) || caseIds.Contains(te.TestCaseId))
+                .Where(te => (te.TestPlanId.HasValue && planIds.Contains(te.TestPlanId.Value)) || caseIds.Contains(te.TestCaseId))
                 .ToList();
 
             return (plans, cases, execs);
@@ -2955,6 +3088,150 @@ namespace QAssistant.Views
                 IsTextSelectionEnabled = true,
                 Margin = new Thickness(0, 0, 0, 4)
             });
+        }
+
+        private static StackPanel BuildFormattedSuggestionsPanel(string text)
+        {
+            var contentStack = new StackPanel { Spacing = 6 };
+            var defaultFg = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240));
+            var headerFg = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36));
+            var knownSections = new[] { "Overall Status", "Deployment Readiness", "Key Risks", "Suggestions" };
+            var lines = text.Split('\n');
+            int sectionIndex = 0;
+
+            foreach (var section in knownSections)
+            {
+                var startIdx = Array.FindIndex(lines, l => l.Contains(section, StringComparison.OrdinalIgnoreCase));
+                if (startIdx < 0) continue;
+
+                int endIdx = lines.Length;
+                for (int i = startIdx + 1; i < lines.Length; i++)
+                {
+                    if (knownSections.Any(s => lines[i].Contains(s, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        endIdx = i;
+                        break;
+                    }
+                }
+
+                var headerLine = lines[startIdx];
+                var namePos = headerLine.IndexOf(section, StringComparison.OrdinalIgnoreCase);
+                var inlineAfterHeader = headerLine[(namePos + section.Length)..].TrimStart(':', ' ', '*', '#').Trim();
+
+                var bodyLines = lines.Skip(startIdx + 1).Take(endIdx - startIdx - 1);
+                var parts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(inlineAfterHeader))
+                    parts.Add(inlineAfterHeader);
+                parts.AddRange(bodyLines);
+
+                var cleanedLines = parts.Select(line =>
+                {
+                    var t = line.TrimStart();
+                    if (t.StartsWith("### ")) return t[4..];
+                    if (t.StartsWith("## ")) return t[3..];
+                    if (t.StartsWith("# ")) return t[2..];
+                    if (t.StartsWith("- ")) return "\u2022 " + t[2..];
+                    if (t.StartsWith("* ") && !t.StartsWith("**")) return "\u2022 " + t[2..];
+                    return line;
+                });
+
+                var sectionContent = string.Join("\n", cleanedLines).Trim();
+                if (string.IsNullOrWhiteSpace(sectionContent)) continue;
+
+                if (sectionIndex > 0)
+                {
+                    contentStack.Children.Add(new Border
+                    {
+                        Height = 1,
+                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                        Margin = new Thickness(0, 4, 0, 4)
+                    });
+                }
+
+                contentStack.Children.Add(new TextBlock
+                {
+                    Text = section.ToUpperInvariant(),
+                    Foreground = headerFg,
+                    FontSize = 10,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    CharacterSpacing = 100,
+                    Margin = new Thickness(0, 0, 0, 2),
+                    IsTextSelectionEnabled = true
+                });
+
+                foreach (var bodyLine in sectionContent.Split('\n'))
+                {
+                    if (string.IsNullOrWhiteSpace(bodyLine)) continue;
+                    bool isBullet = bodyLine.TrimStart().StartsWith("\u2022 ");
+                    var lineBlock = new TextBlock
+                    {
+                        Foreground = defaultFg,
+                        FontFamily = new FontFamily("Segoe UI, Segoe UI Symbol, Segoe UI Emoji"),
+                        FontSize = 12,
+                        TextWrapping = TextWrapping.Wrap,
+                        LineHeight = 20,
+                        IsTextSelectionEnabled = true,
+                        Margin = isBullet ? new Thickness(8, 0, 0, 0) : new Thickness(0)
+                    };
+                    AppendInlineMarkdown(lineBlock, bodyLine.TrimStart());
+                    contentStack.Children.Add(lineBlock);
+                }
+
+                sectionIndex++;
+            }
+
+            // Fallback: no known sections found – render raw with inline formatting
+            if (contentStack.Children.Count == 0)
+            {
+                foreach (var rawLine in text.Split('\n'))
+                {
+                    if (string.IsNullOrWhiteSpace(rawLine)) continue;
+                    var lineBlock = new TextBlock
+                    {
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                        FontFamily = new FontFamily("Segoe UI, Segoe UI Symbol, Segoe UI Emoji"),
+                        FontSize = 12,
+                        TextWrapping = TextWrapping.Wrap,
+                        LineHeight = 20,
+                        IsTextSelectionEnabled = true
+                    };
+                    AppendInlineMarkdown(lineBlock, rawLine.TrimStart());
+                    contentStack.Children.Add(lineBlock);
+                }
+            }
+
+            return contentStack;
+        }
+
+        private static void AppendInlineMarkdown(TextBlock block, string text)
+        {
+            var pattern = new Regex(@"(\*\*.*?\*\*|`[^`]+`)");
+            foreach (var segment in pattern.Split(text))
+            {
+                if (string.IsNullOrEmpty(segment)) continue;
+
+                if (segment.StartsWith("**") && segment.EndsWith("**") && segment.Length > 4)
+                {
+                    block.Inlines.Add(new Run
+                    {
+                        Text = segment[2..^2],
+                        FontWeight = Microsoft.UI.Text.FontWeights.Bold
+                    });
+                }
+                else if (segment.StartsWith('`') && segment.EndsWith('`') && segment.Length > 2)
+                {
+                    block.Inlines.Add(new Run
+                    {
+                        Text = segment[1..^1],
+                        FontFamily = new FontFamily("Consolas"),
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
+                    });
+                }
+                else
+                {
+                    block.Inlines.Add(new Run { Text = segment });
+                }
+            }
         }
 
         private static SolidColorBrush GetStatusForeground(TestCaseStatus status) => status switch
@@ -4548,7 +4825,7 @@ namespace QAssistant.Views
             {
                 var doneTasks = project.Tasks.Where(t => t.Status == TaskStatus.Done).ToList();
                 var prompt = GeminiService.BuildSmokeSubsetPrompt(project.TestCases, doneTasks, project);
-                var service = new GeminiService(geminiKey);
+                using var service = new GeminiService(geminiKey);
                 var response = await service.AnalyzeIssueAsync(prompt);
                 _smokeSubsetCaseIds = GeminiService.ParseSmokeSubsetIds(response);
             }

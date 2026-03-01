@@ -381,7 +381,7 @@ namespace QAssistant.Services
             {
                 ExecutionId = NextExecutionId(project),
                 TestCaseId = tc.Id,
-                TestPlanId = tc.TestPlanId ?? Guid.Empty,
+                TestPlanId = tc.TestPlanId,
                 Result = status,
                 ActualResult = Truncate(dto.ActualResult ?? string.Empty, 10_000),
                 Notes = Truncate(dto.Notes ?? string.Empty, 10_000),
@@ -446,7 +446,7 @@ namespace QAssistant.Services
                 {
                     ExecutionId = NextExecutionId(project),
                     TestCaseId = tc.Id,
-                    TestPlanId = tc.TestPlanId ?? Guid.Empty,
+                    TestPlanId = tc.TestPlanId,
                     Result = status,
                     ActualResult = Truncate(dto.ActualResult ?? string.Empty, 10_000),
                     Notes = Truncate(dto.Notes ?? string.Empty, 10_000),

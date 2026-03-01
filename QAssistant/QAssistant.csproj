@@ -45,6 +45,8 @@
 	  <None Remove="Views\CsvImportDialog.xaml" />
 	</ItemGroup>
 	<ItemGroup>
+	  <Page Remove="Views\Controls\ExecutionCardControl.xaml" />
+	  <Page Remove="Views\Controls\TestCaseCardControl.xaml" />
 	  <Page Remove="Views\CsvImportDialog.xaml" />
 	</ItemGroup>
 
@@ -90,6 +92,14 @@
 	  <Page Include="Views\CsvImportDialog.xaml">
 		<Generator>MSBuild:Compile</Generator>
 	  </Page>
+	</ItemGroup>
+	<ItemGroup>
+	  <None Update="Views\Controls\ExecutionCardControl.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </None>
+	  <None Update="Views\Controls\TestCaseCardControl.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </None>
 	</ItemGroup>
 	<ItemGroup>
 		<Page Update="Views\FilesPage.xaml">

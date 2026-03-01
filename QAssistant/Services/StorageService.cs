@@ -15,8 +15,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -67,6 +69,11 @@ namespace QAssistant.Services
     [JsonSerializable(typeof(List<LinearConnection>))]
     [JsonSerializable(typeof(SapCommerceModule))]
     [JsonSerializable(typeof(SapCommerceModule?))]
+    [JsonSerializable(typeof(Runbook))]
+    [JsonSerializable(typeof(List<Runbook>))]
+    [JsonSerializable(typeof(RunbookStep))]
+    [JsonSerializable(typeof(RunbookCategory))]
+    [JsonSerializable(typeof(RunbookStepStatus))]
     [JsonSourceGenerationOptions(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNameCaseInsensitive = true,
@@ -414,33 +421,104 @@ namespace QAssistant.Services
             catch (Exception ex)
             {
                 LogMessage($"SaveSecrets error: {ex.Message}");
+                throw;
             }
         }
 
+        // ── Win32 DPAPI (user-scoped, synchronous) ───────────────────────
+        // Uses CryptProtectData/CryptUnprotectData directly instead of the WinRT
+        // DataProtectionProvider async API to avoid Task.Run().GetAwaiter().GetResult()
+        // blocking the calling thread and the associated deadlock risk under STA contexts.
+        // Projects.json still uses the WinRT async API correctly (awaited in async methods).
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct DATA_BLOB
+        {
+            public int cbData;
+            public IntPtr pbData;
+        }
+
+        [DllImport("crypt32.dll", SetLastError = true)]
+        private static extern bool CryptProtectData(
+            ref DATA_BLOB pDataIn,
+            [MarshalAs(UnmanagedType.LPWStr)] string? szDataDescr,
+            IntPtr pOptionalEntropy,
+            IntPtr pvReserved,
+            IntPtr pPromptStruct,
+            uint dwFlags,
+            out DATA_BLOB pDataOut);
+
+        [DllImport("crypt32.dll", SetLastError = true)]
+        private static extern bool CryptUnprotectData(
+            ref DATA_BLOB pDataIn,
+            [MarshalAs(UnmanagedType.LPWStr)] out string? pszDataDescr,
+            IntPtr pOptionalEntropy,
+            IntPtr pvReserved,
+            IntPtr pPromptStruct,
+            uint dwFlags,
+            out DATA_BLOB pDataOut);
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr LocalFree(IntPtr hMem);
+
         private static string DpapiEncrypt(string plainText)
         {
-            return Task.Run(async () =>
+            var plainBytes = Encoding.UTF8.GetBytes(plainText);
+            var handle = GCHandle.Alloc(plainBytes, GCHandleType.Pinned);
+            try
             {
-                var plainBytes = Encoding.UTF8.GetBytes(plainText);
-                var plainBuffer = CryptographicBuffer.CreateFromByteArray(plainBytes);
-                var provider = new DataProtectionProvider("LOCAL=user");
-                var encryptedBuffer = await provider.ProtectAsync(plainBuffer);
-                CryptographicBuffer.CopyToByteArray(encryptedBuffer, out var encryptedBytes);
-                return Convert.ToBase64String(encryptedBytes);
-            }).GetAwaiter().GetResult();
+                var inBlob = new DATA_BLOB { cbData = plainBytes.Length, pbData = handle.AddrOfPinnedObject() };
+                if (!CryptProtectData(ref inBlob, null, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, out var outBlob))
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "DPAPI encryption failed");
+                try
+                {
+                    var result = new byte[outBlob.cbData];
+                    Marshal.Copy(outBlob.pbData, result, 0, outBlob.cbData);
+                    return Convert.ToBase64String(result);
+                }
+                finally
+                {
+                    LocalFree(outBlob.pbData);
+                }
+            }
+            finally
+            {
+                handle.Free();
+                Array.Clear(plainBytes);
+            }
         }
 
         private static string DpapiDecrypt(string encryptedBase64)
         {
-            return Task.Run(async () =>
+            var encryptedBytes = Convert.FromBase64String(encryptedBase64);
+            var handle = GCHandle.Alloc(encryptedBytes, GCHandleType.Pinned);
+            try
             {
-                var encryptedBytes = Convert.FromBase64String(encryptedBase64);
-                var protectedBuffer = CryptographicBuffer.CreateFromByteArray(encryptedBytes);
-                var provider = new DataProtectionProvider();
-                var decryptedBuffer = await provider.UnprotectAsync(protectedBuffer);
-                CryptographicBuffer.CopyToByteArray(decryptedBuffer, out var decryptedBytes);
-                return Encoding.UTF8.GetString(decryptedBytes);
-            }).GetAwaiter().GetResult();
+                var inBlob = new DATA_BLOB { cbData = encryptedBytes.Length, pbData = handle.AddrOfPinnedObject() };
+                if (!CryptUnprotectData(ref inBlob, out _, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, out var outBlob))
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "DPAPI decryption failed");
+                try
+                {
+                    var decryptedBytes = new byte[outBlob.cbData];
+                    Marshal.Copy(outBlob.pbData, decryptedBytes, 0, outBlob.cbData);
+                    try
+                    {
+                        return Encoding.UTF8.GetString(decryptedBytes);
+                    }
+                    finally
+                    {
+                        Array.Clear(decryptedBytes);
+                    }
+                }
+                finally
+                {
+                    LocalFree(outBlob.pbData);
+                }
+            }
+            finally
+            {
+                handle.Free();
+            }
         }
 
         /// <summary>

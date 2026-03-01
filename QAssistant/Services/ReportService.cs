@@ -76,7 +76,7 @@ namespace QAssistant.Services
             foreach (var exec in executions.OrderByDescending(e => e.ExecutedAt))
             {
                 testCaseLookup.TryGetValue(exec.TestCaseId, out var tc);
-                testPlanLookup.TryGetValue(exec.TestPlanId, out var plan);
+                testPlanLookup.TryGetValue(exec.TestPlanId.GetValueOrDefault(), out var plan);
 
                 sb.Append(CsvEscape(exec.ExecutionId)).Append(',');
                 sb.Append(CsvEscape(tc?.TestCaseId ?? "N/A")).Append(',');
@@ -134,7 +134,7 @@ namespace QAssistant.Services
             page.SetColor(0.4f, 0.4f, 0.45f);
             page.DrawText($"Project: {project.Name}", margin, y);
             y -= 16;
-            page.DrawText($"Generated: {DateTime.Now:MMMM d, yyyy Â· h:mm tt}", margin, y);
+            page.DrawText($"Generated: {DateTime.Now:MMMM d, yyyy \u00B7 h:mm tt}", margin, y);
             y -= 8;
 
             // Separator

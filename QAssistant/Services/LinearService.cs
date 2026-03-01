@@ -64,15 +64,23 @@ namespace QAssistant.Services
             if (!string.IsNullOrEmpty(teamId))
                 resolvedTeamId = await ResolveTeamUuidAsync(teamId);
 
-            string response;
             bool useTeamQuery = !string.IsNullOrEmpty(resolvedTeamId);
+            const int MaxPages = 10; // hard cap: 10 × 250 = 2,500 issues
 
-            if (useTeamQuery)
+            var tasks = new List<ProjectTask>();
+            string? cursor = null;
+            int pagesFetched = 0;
+
+            do
             {
-                var query = @"
-    query($teamId: String!) {
+                string response;
+                if (useTeamQuery)
+                {
+                    var query = @"
+    query($teamId: String!, $after: String) {
         team(id: $teamId) {
-            issues(first: 50) {
+            issues(first: 250, after: $after) {
+                pageInfo { hasNextPage endCursor }
                 nodes {
                     id
                     identifier
@@ -89,16 +97,16 @@ namespace QAssistant.Services
             }
         }
     }";
-                response = await PostQueryAsync(query, new System.Text.Json.Nodes.JsonObject
+                    var vars = new JsonObject { ["teamId"] = resolvedTeamId };
+                    if (cursor != null) vars["after"] = cursor;
+                    response = await PostQueryAsync(query, vars);
+                }
+                else
                 {
-                    ["teamId"] = resolvedTeamId
-                });
-            }
-            else
-            {
-                var query = @"
-    {
-        issues(first: 50) {
+                    var query = @"
+    query($after: String) {
+        issues(first: 250, after: $after) {
+            pageInfo { hasNextPage endCursor }
             nodes {
                 id
                 identifier
@@ -114,99 +122,120 @@ namespace QAssistant.Services
             }
         }
     }";
-                response = await PostQueryAsync(query);
-            }
+                    var vars = new JsonObject();
+                    if (cursor != null) vars["after"] = cursor;
+                    response = await PostQueryAsync(query, vars);
+                }
 
-            var tasks = new List<ProjectTask>();
+                pagesFetched++;
 
-            try
-            {
-                using var doc = JsonDocument.Parse(response);
-                var root = doc.RootElement;
-
-                if (root.TryGetProperty("errors", out var errors))
-                    throw new Exception(errors[0].GetProperty("message").GetString());
-
-                if (!root.TryGetProperty("data", out var data))
-                    throw new Exception("Unexpected response from Linear API.");
-
-                var issuesEl = useTeamQuery
-                    ? data.GetProperty("team").GetProperty("issues")
-                    : data.GetProperty("issues");
-
-                var nodes = issuesEl.GetProperty("nodes");
-
-                foreach (var node in nodes.EnumerateArray())
+                try
                 {
-                    var stateName = node.GetProperty("state").GetProperty("name").GetString() ?? "";
+                    using var doc = JsonDocument.Parse(response);
+                    var root = doc.RootElement;
 
-                    // Parse assignee
-                    string assignee = "";
-                    if (node.TryGetProperty("assignee", out var assigneeEl) &&
-                        assigneeEl.ValueKind != JsonValueKind.Null)
-                        assignee = assigneeEl.GetProperty("name").GetString() ?? "";
+                    if (root.TryGetProperty("errors", out var errors))
+                        throw new Exception(errors[0].GetProperty("message").GetString());
 
-                    // Parse due date
-                    DateTime? dueDate = null;
-                    if (node.TryGetProperty("dueDate", out var dueDateEl) &&
-                        dueDateEl.ValueKind != JsonValueKind.Null &&
-                        DateTime.TryParse(dueDateEl.GetString(), out var parsedDate))
-                        dueDate = parsedDate;
+                    if (!root.TryGetProperty("data", out var data))
+                        throw new Exception("Unexpected response from Linear API.");
 
-                    // Parse labels
-                    string labels = "";
-                    if (node.TryGetProperty("labels", out var labelsEl) &&
-                        labelsEl.ValueKind != JsonValueKind.Null &&
-                        labelsEl.TryGetProperty("nodes", out var labelNodes))
+                    var issuesEl = useTeamQuery
+                        ? data.GetProperty("team").GetProperty("issues")
+                        : data.GetProperty("issues");
+
+                    tasks.AddRange(ParseIssueNodes(issuesEl.GetProperty("nodes")));
+
+                    // Advance cursor; break when there are no further pages
+                    cursor = null;
+                    if (issuesEl.TryGetProperty("pageInfo", out var pageInfo) &&
+                        pageInfo.TryGetProperty("hasNextPage", out var hasNextEl) &&
+                        hasNextEl.GetBoolean() &&
+                        pageInfo.TryGetProperty("endCursor", out var endCursorEl))
                     {
-                        var labelList = new List<string>();
-                        foreach (var label in labelNodes.EnumerateArray())
-                            labelList.Add(label.GetProperty("name").GetString() ?? "");
-                        labels = string.Join(", ", labelList);
+                        cursor = endCursorEl.GetString();
                     }
-
-                    // Parse attachment URLs
-                    var attachmentUrls = new List<string>();
-                    if (node.TryGetProperty("attachments", out var attachmentsEl) &&
-                        attachmentsEl.ValueKind != JsonValueKind.Null &&
-                        attachmentsEl.TryGetProperty("nodes", out var attachmentNodes))
-                    {
-                        foreach (var att in attachmentNodes.EnumerateArray())
-                        {
-                            if (att.TryGetProperty("url", out var attUrlEl) &&
-                                attUrlEl.ValueKind != JsonValueKind.Null)
-                            {
-                                var attUrl = attUrlEl.GetString();
-                                if (!string.IsNullOrEmpty(attUrl))
-                                    attachmentUrls.Add(attUrl);
-                            }
-                        }
-                    }
-
-                    var task = new ProjectTask
-                    {
-                        Id = Guid.NewGuid(),
-                        ExternalId = node.GetProperty("id").GetString() ?? "",
-                        IssueIdentifier = node.TryGetProperty("identifier", out var identifier)
-                            ? identifier.GetString() ?? "" : "",
-                        Title = node.GetProperty("title").GetString() ?? "",
-                        Description = CleanDescription(node.GetProperty("description").GetString()),
-                        Status = MapLinearStatus(stateName),
-                        Priority = MapLinearPriority(node.GetProperty("priority").GetInt32()),
-                        TicketUrl = node.GetProperty("url").GetString() ?? "",
-                        RawDescription = node.GetProperty("description").GetString() ?? "",
-                        Assignee = assignee,
-                        Labels = labels,
-                        DueDate = dueDate,
-                        Source = TaskSource.Linear,
-                        AttachmentUrls = attachmentUrls
-                    };
-                    tasks.Add(task);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Parse error while reading Linear issues response: {ex.Message}");
                 }
             }
-            catch (Exception ex)
+            while (cursor != null && pagesFetched < MaxPages);
+
+            return tasks;
+        }
+
+        private static List<ProjectTask> ParseIssueNodes(JsonElement nodes)
+        {
+            var tasks = new List<ProjectTask>();
+
+            foreach (var node in nodes.EnumerateArray())
             {
-                throw new Exception($"Parse error while reading Linear issues response: {ex.Message}");
+                var stateName = node.GetProperty("state").GetProperty("name").GetString() ?? "";
+
+                // Parse assignee
+                string assignee = "";
+                if (node.TryGetProperty("assignee", out var assigneeEl) &&
+                    assigneeEl.ValueKind != JsonValueKind.Null)
+                    assignee = assigneeEl.GetProperty("name").GetString() ?? "";
+
+                // Parse due date
+                DateTime? dueDate = null;
+                if (node.TryGetProperty("dueDate", out var dueDateEl) &&
+                    dueDateEl.ValueKind != JsonValueKind.Null &&
+                    DateTime.TryParse(dueDateEl.GetString(), out var parsedDate))
+                    dueDate = parsedDate;
+
+                // Parse labels
+                string labels = "";
+                if (node.TryGetProperty("labels", out var labelsEl) &&
+                    labelsEl.ValueKind != JsonValueKind.Null &&
+                    labelsEl.TryGetProperty("nodes", out var labelNodes))
+                {
+                    var labelList = new List<string>();
+                    foreach (var label in labelNodes.EnumerateArray())
+                        labelList.Add(label.GetProperty("name").GetString() ?? "");
+                    labels = string.Join(", ", labelList);
+                }
+
+                // Parse attachment URLs
+                var attachmentUrls = new List<string>();
+                if (node.TryGetProperty("attachments", out var attachmentsEl) &&
+                    attachmentsEl.ValueKind != JsonValueKind.Null &&
+                    attachmentsEl.TryGetProperty("nodes", out var attachmentNodes))
+                {
+                    foreach (var att in attachmentNodes.EnumerateArray())
+                    {
+                        if (att.TryGetProperty("url", out var attUrlEl) &&
+                            attUrlEl.ValueKind != JsonValueKind.Null)
+                        {
+                            var attUrl = attUrlEl.GetString();
+                            if (!string.IsNullOrEmpty(attUrl))
+                                attachmentUrls.Add(attUrl);
+                        }
+                    }
+                }
+
+                var task = new ProjectTask
+                {
+                    Id = Guid.NewGuid(),
+                    ExternalId = node.GetProperty("id").GetString() ?? "",
+                    IssueIdentifier = node.TryGetProperty("identifier", out var identifier)
+                        ? identifier.GetString() ?? "" : "",
+                    Title = node.GetProperty("title").GetString() ?? "",
+                    Description = CleanDescription(node.GetProperty("description").GetString()),
+                    Status = MapLinearStatus(stateName),
+                    Priority = MapLinearPriority(node.GetProperty("priority").GetInt32()),
+                    TicketUrl = node.GetProperty("url").GetString() ?? "",
+                    RawDescription = node.GetProperty("description").GetString() ?? "",
+                    Assignee = assignee,
+                    Labels = labels,
+                    DueDate = dueDate,
+                    Source = TaskSource.Linear,
+                    AttachmentUrls = attachmentUrls
+                };
+                tasks.Add(task);
             }
 
             return tasks;

@@ -32,7 +32,7 @@ namespace QAssistant.Services
         private readonly HttpClient _client = CreateClient(apiKey);
         private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta";
         private const string PrimaryModel = "models/gemini-2.5-flash";
-        private const string FallbackModel = "models/gemini-3-flash";
+        private const string FallbackModel = "models/gemini-2.0-flash";
 
         public void Dispose() => _client.Dispose();
 
@@ -616,6 +616,111 @@ namespace QAssistant.Services
                     sb.AppendLine($" {{id:{SanitizeToonValue(plan.TestPlanId, 100)},name:{SanitizeToonValue(plan.Name, 200)},cases:{planCaseCount},failed:{planFailedCount},source:{plan.Source}}}");
                 }
                 sb.AppendLine("]");
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Builds a TOON prompt that asks Gemini for actionable QA suggestions based on
+        /// current test run status, pass rate per test plan, and failed test case impact.
+        /// </summary>
+        public static string BuildTestRunSuggestionsPrompt(
+            IReadOnlyList<TestCase> testCases,
+            IReadOnlyList<TestExecution> executions,
+            IReadOnlyList<TestPlan> testPlans,
+            Project? project = null)
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine("@role:sr_qa_engineer");
+            sb.AppendLine("@task:test_run_suggestions");
+            sb.AppendLine("@perspective:qa_engineer—give specific,actionable QA gate and deployment suggestions based on test run results,pass rates per plan,and failed test case impact");
+            sb.AppendLine("@out_fmt:md_sections[## Overall Status,## Deployment Readiness,## Key Risks,## Suggestions]");
+            sb.AppendLine("@rules:concise|specific|data_driven|bold_decisions|deployment_verdict_prominent|reference_failing_areas|no_generic_advice|all_sections_required|suggestions_imperative_sentences_referencing_actual_data");
+            sb.AppendLine("@example_output:Do not deploy to UAT — 3 blocker failures in the Checkout UI module|Retest Payment flow before promoting to staging — 2 major failures detected|UI regression suite is at 45% pass rate — address before UAT");
+            sb.AppendLine("---");
+
+            AppendQaContext(sb, project);
+
+            // Overall pass rate
+            int total = testCases.Count;
+            int passed = testCases.Count(tc => tc.Status == TestCaseStatus.Passed);
+            int failed = testCases.Count(tc => tc.Status == TestCaseStatus.Failed);
+            int blocked = testCases.Count(tc => tc.Status == TestCaseStatus.Blocked);
+            int skipped = testCases.Count(tc => tc.Status == TestCaseStatus.Skipped);
+            int notRun = testCases.Count(tc => tc.Status == TestCaseStatus.NotRun);
+            double passRate = total > 0 ? (double)passed / total * 100 : 0;
+
+            sb.AppendLine("overall_stats{");
+            sb.AppendLine($" total_cases:{total}");
+            sb.AppendLine($" passed:{passed}");
+            sb.AppendLine($" failed:{failed}");
+            sb.AppendLine($" blocked:{blocked}");
+            sb.AppendLine($" skipped:{skipped}");
+            sb.AppendLine($" not_run:{notRun}");
+            sb.AppendLine($" pass_rate:{passRate:F1}%");
+            sb.AppendLine($" total_executions:{executions.Count}");
+            sb.AppendLine("}");
+
+            // Per-plan pass rate
+            if (testPlans.Count > 0)
+            {
+                var casesByPlan = testCases.ToLookup(tc => tc.TestPlanId);
+                sb.AppendLine("plan_results[");
+                foreach (var plan in testPlans.Take(20))
+                {
+                    var planCases = casesByPlan[plan.Id].ToList();
+                    int planTotal = planCases.Count;
+                    int planPassed = planCases.Count(c => c.Status == TestCaseStatus.Passed);
+                    int planFailed = planCases.Count(c => c.Status == TestCaseStatus.Failed);
+                    int planBlocked = planCases.Count(c => c.Status == TestCaseStatus.Blocked);
+                    double planRate = planTotal > 0 ? (double)planPassed / planTotal * 100 : 0;
+                    sb.AppendLine($" {{name:{SanitizeToonValue(plan.Name, 200)},total:{planTotal},passed:{planPassed},failed:{planFailed},blocked:{planBlocked},pass_rate:{planRate:F1}%,source:{plan.Source}}}");
+                }
+                sb.AppendLine("]");
+            }
+
+            // Failed test case details with priority and impact area
+            var failedCases = testCases.Where(tc => tc.Status == TestCaseStatus.Failed).ToList();
+            if (failedCases.Count > 0)
+            {
+                sb.AppendLine("failed_cases[");
+                foreach (var tc in failedCases.Take(50))
+                {
+                    sb.Append($" {{id:{SanitizeToonValue(tc.TestCaseId, 100)},title:{SanitizeToonValue(tc.Title, 300)},priority:{tc.Priority}");
+                    if (tc.SapModule.HasValue)
+                        sb.Append($",module:{tc.SapModule.Value}");
+                    if (!string.IsNullOrWhiteSpace(tc.ActualResult))
+                        sb.Append($",actual:{SanitizeToonValue(tc.ActualResult, 200)}");
+                    if (!string.IsNullOrWhiteSpace(tc.SourceIssueId))
+                        sb.Append($",issue:{SanitizeToonValue(tc.SourceIssueId, 60)}");
+                    sb.AppendLine("}");
+                }
+                sb.AppendLine("]");
+            }
+
+            // Blocked test cases
+            var blockedCases = testCases.Where(tc => tc.Status == TestCaseStatus.Blocked).ToList();
+            if (blockedCases.Count > 0)
+            {
+                sb.AppendLine("blocked_cases[");
+                foreach (var tc in blockedCases.Take(20))
+                {
+                    sb.Append($" {{title:{SanitizeToonValue(tc.Title, 200)},priority:{tc.Priority}");
+                    if (tc.SapModule.HasValue)
+                        sb.Append($",module:{tc.SapModule.Value}");
+                    sb.AppendLine("}");
+                }
+                sb.AppendLine("]");
+            }
+
+            // Execution result breakdown
+            if (executions.Count > 0)
+            {
+                var resultGroups = executions.GroupBy(e => e.Result)
+                    .Select(g => $"{g.Key}:{g.Count()}");
+                sb.AppendLine($"exec_results{{{string.Join(",", resultGroups)}}}");
             }
 
             return sb.ToString();
