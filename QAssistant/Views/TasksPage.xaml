@@ -624,6 +624,17 @@
                                     HorizontalAlignment="Stretch"
                                     Background="{ThemeResource AccentBrush}" Foreground="White"
                                     CornerRadius="8" Padding="14,8"/>
+                            <!-- Bug Report button -->
+                            <Button x:Name="BugReportBtn" Click="BugReport_Click"
+                                    HorizontalAlignment="Stretch"
+                                    Background="#1E2A1E" Foreground="#34D399"
+                                    BorderBrush="#2A4A2A" BorderThickness="1"
+                                    CornerRadius="8" Padding="14,8">
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xE768;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                    <TextBlock Text="Generate Bug Report" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
                             <!-- Manual actions -->
                             <StackPanel x:Name="ManualActions" Orientation="Horizontal"
                                         Spacing="8" Visibility="Collapsed">

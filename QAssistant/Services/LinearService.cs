@@ -370,6 +370,50 @@ namespace QAssistant.Services
             });
         }
 
+        /// <summary>
+        /// Creates a new Linear issue and returns its URL, or null on failure.
+        /// </summary>
+        public async Task<string?> CreateIssueAsync(string teamId, string title, string description, int priority = 3)
+        {
+            string? resolvedTeamId = await ResolveTeamUuidAsync(teamId);
+            if (string.IsNullOrEmpty(resolvedTeamId))
+                throw new Exception($"Could not resolve Linear team '{teamId}'.");
+
+            var mutation = @"
+            mutation($teamId: String!, $title: String!, $description: String!, $priority: Int!) {
+                issueCreate(input: { teamId: $teamId, title: $title, description: $description, priority: $priority }) {
+                    success
+                    issue { url identifier }
+                }
+            }";
+
+            var response = await PostQueryAsync(mutation, new JsonObject
+            {
+                ["teamId"] = resolvedTeamId,
+                ["title"] = title,
+                ["description"] = description,
+                ["priority"] = priority
+            });
+
+            using var doc = JsonDocument.Parse(response);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0)
+            {
+                var msg = errors[0].TryGetProperty("message", out var msgEl) ? msgEl.GetString() : "Unknown error";
+                throw new Exception($"Linear API error: {msg}");
+            }
+
+            if (root.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("issueCreate", out var issueCreate) &&
+                issueCreate.TryGetProperty("issue", out var issue))
+            {
+                return issue.TryGetProperty("url", out var urlEl) ? urlEl.GetString() : null;
+            }
+
+            return null;
+        }
+
         private async Task<string> PostQueryAsync(string query, JsonObject? variables = null)
         {
             var payload = new JsonObject { ["query"] = query };

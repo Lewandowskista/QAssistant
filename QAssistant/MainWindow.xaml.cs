@@ -770,6 +770,9 @@ namespace QAssistant
                 case "Tests":
                     ContentFrame.Navigate(typeof(TestsPage), ViewModel);
                     break;
+                case "TestData":
+                    ContentFrame.Navigate(typeof(TestDataPage), ViewModel);
+                    break;
                 case "Environments":
                     ContentFrame.Navigate(typeof(EnvironmentsPage), ViewModel);
                     break;
@@ -784,7 +787,7 @@ namespace QAssistant
 
         private void UpdateTabStyles()
         {
-            var tabs = new[] { TabLinks, TabNotes, TabTasks, TabFiles, TabTests, TabEnvironments, TabApi, TabSettings };
+            var tabs = new[] { TabLinks, TabNotes, TabTasks, TabFiles, TabTests, TabTestData, TabEnvironments, TabApi, TabSettings };
             foreach (var tab in tabs)
             {
                 bool active = tab.Tag.ToString() == ViewModel.ActiveTab;

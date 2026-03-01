@@ -280,6 +280,50 @@ namespace QAssistant.Services
             }
         }
 
+        /// <summary>
+        /// Creates a new Jira bug issue and returns its browse URL, or null on failure.
+        /// </summary>
+        public async Task<string?> CreateIssueAsync(string projectKey, string summary, string description, string priority = "Medium")
+        {
+            var url = $"{_baseUrl}issue";
+            var descriptionAdf = new
+            {
+                type = "doc",
+                version = 1,
+                content = description.Split('\n')
+                    .Select(line => (object)new
+                    {
+                        type = "paragraph",
+                        content = new[] { new { type = "text", text = line } }
+                    }).ToArray()
+            };
+
+            var payload = new
+            {
+                fields = new
+                {
+                    project = new { key = projectKey },
+                    summary,
+                    description = descriptionAdf,
+                    issuetype = new { name = "Bug" },
+                    priority = new { name = priority }
+                }
+            };
+
+            try
+            {
+                var response = await PostJsonAsync(url, payload);
+                if (response.TryGetProperty("key", out var keyEl))
+                    return $"{_browseUrl}/{keyEl.GetString()}";
+                return null;
+            }
+            catch (HttpRequestException ex)
+            {
+                Debug.WriteLine($"Cannot create Jira issue: {ex.Message}");
+                throw;
+            }
+        }
+
         public async Task<List<LinearComment>> GetCommentsAsync(string issueIdOrKey)
         {
             var url = $"{_baseUrl}issue/{issueIdOrKey}/comment?orderBy=-created";

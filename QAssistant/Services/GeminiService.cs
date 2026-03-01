@@ -302,7 +302,7 @@ namespace QAssistant.Services
         /// <summary>
         /// Builds a TOON prompt for generating test cases from project documentation.
         /// </summary>
-        public static string BuildTestCaseGenerationPrompt(IReadOnlyList<ProjectTask> tasks, string sourceName, Project? project = null)
+        public static string BuildTestCaseGenerationPrompt(IReadOnlyList<ProjectTask> tasks, string sourceName, Project? project = null, string? designDocContent = null)
         {
             var sb = new StringBuilder();
 
@@ -313,10 +313,21 @@ namespace QAssistant.Services
             sb.AppendLine("@out_fmt:json_array[{testCaseId,title,preConditions,testSteps,testData,expectedResult,priority}]");
             sb.AppendLine("@out_rules:raw_json_only|no_markdown_wrap|no_code_block");
             sb.AppendLine("@rules:comprehensive|all_fields_required|specific_actionable|realistic_test_data|cover_positive_negative_edge|no_generic|env_aware|use_known_test_data_when_applicable");
+            if (!string.IsNullOrWhiteSpace(designDocContent))
+                sb.AppendLine("@extra_context:design_document_provided—use it to improve accuracy,coverage,and specificity of generated test cases");
             sb.AppendLine("---");
 
             // QA project context
             AppendQaContext(sb, project);
+
+            // Design document context (optional, improves accuracy)
+            if (!string.IsNullOrWhiteSpace(designDocContent))
+            {
+                sb.AppendLine("design_document{");
+                sb.AppendLine(SanitizeToonValueForTestGen(designDocContent, 20000));
+                sb.AppendLine("}");
+                sb.AppendLine("---");
+            }
 
             sb.AppendLine("field_spec{");
             sb.AppendLine(" testCaseId:sequential(TC-001,TC-002,...)");

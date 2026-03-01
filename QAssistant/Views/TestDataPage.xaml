@@ -57,10 +57,16 @@
                     </ListView.ItemTemplate>
                 </ListView>
 
-                <Button Grid.Row="2" Content="+ New Group" Click="AddGroup_Click"
-                        HorizontalAlignment="Stretch" Margin="12,8,12,16"
-                        Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                        CornerRadius="8" Padding="12,8"/>
+                <StackPanel Grid.Row="2" Spacing="4" Padding="12,8,12,16">
+                    <Button Content="+ New Group" Click="AddGroup_Click"
+                            HorizontalAlignment="Stretch"
+                            Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                            CornerRadius="8" Padding="12,8"/>
+                    <Button Content="SAP ImpEx Templates →" Click="ShowImpEx_Click"
+                            HorizontalAlignment="Stretch"
+                            Background="#1A1A2E" Foreground="#A78BFA"
+                            CornerRadius="8" Padding="12,8"/>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -110,16 +116,20 @@
                                 <ComboBoxItem Content="Other"/>
                             </ComboBox>
                             <Button Content="Save Group" Click="SaveGroup_Click"
-                                    Background="#A78BFA" Foreground="White"
-                                    CornerRadius="8" Padding="14,6"/>
-                            <Button Content="Delete Group" Click="DeleteGroup_Click"
-                                    Background="#3F1A1A" Foreground="#F87171"
-                                    CornerRadius="8" Padding="14,6"/>
-                        </StackPanel>
-                        <Button Content="+ Add Entry" Click="AddEntry_Click"
-                                HorizontalAlignment="Right"
-                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                                CornerRadius="8" Padding="14,6"/>
+                                        Background="#A78BFA" Foreground="White"
+                                        CornerRadius="8" Padding="14,6"/>
+                                <Button Content="Delete Group" Click="DeleteGroup_Click"
+                                        Background="#3F1A1A" Foreground="#F87171"
+                                        CornerRadius="8" Padding="14,6"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button Content="Copy All" Click="CopyAll_Click"
+                                        Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
+                                        CornerRadius="8" Padding="14,6"/>
+                                <Button Content="+ Add Entry" Click="AddEntry_Click"
+                                        Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                        CornerRadius="8" Padding="14,6"/>
+                            </StackPanel>
                     </Grid>
                 </Border>
 
@@ -139,6 +149,66 @@
                         Background="{ThemeResource SurfaceBrush}">
                     <TextBlock x:Name="DataStatusText" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
                 </Border>
+            </Grid>
+
+            <!-- ImpEx Templates panel -->
+            <Grid x:Name="ImpExPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- ImpEx header -->
+                <Border Grid.Row="0" Background="{ThemeResource SurfaceBrush}"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
+                        Padding="16,12">
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="SAP Commerce ImpEx Templates" FontSize="15" FontWeight="SemiBold"
+                                       Foreground="#A78BFA"/>
+                            <TextBlock Text="Ready-made ImpEx snippets — replace {{placeholders}} with your values"
+                                       FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Button Content="← Back to Data Vault" Click="HideImpEx_Click"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="8" Padding="14,6"/>
+                    </Grid>
+                </Border>
+
+                <!-- Category filter -->
+                <Border Grid.Row="1" Padding="16,8"
+                        Background="{ThemeResource SurfaceBrush}"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Filter:" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="12" VerticalAlignment="Center"/>
+                        <Button x:Name="ImpExFilterAll" Content="All" Tag="All" Click="ImpExFilter_Click"
+                                Background="#A78BFA" Foreground="White"
+                                CornerRadius="6" Padding="12,4" FontSize="12"/>
+                        <Button x:Name="ImpExFilterProducts" Content="Products" Tag="Products" Click="ImpExFilter_Click"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="12,4" FontSize="12"/>
+                        <Button x:Name="ImpExFilterCustomers" Content="Customers" Tag="Customers" Click="ImpExFilter_Click"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="12,4" FontSize="12"/>
+                        <Button x:Name="ImpExFilterPromotions" Content="Promotions" Tag="Promotions" Click="ImpExFilter_Click"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="12,4" FontSize="12"/>
+                        <Button x:Name="ImpExFilterStock" Content="Stock" Tag="Stock" Click="ImpExFilter_Click"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="12,4" FontSize="12"/>
+                        <Button x:Name="ImpExFilterCatalog" Content="Catalog" Tag="Catalog" Click="ImpExFilter_Click"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="12,4" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Templates list -->
+                <ScrollViewer Grid.Row="2" Padding="16">
+                    <StackPanel x:Name="ImpExContainer" Spacing="10"/>
+                </ScrollViewer>
             </Grid>
         </Grid>
     </Grid>

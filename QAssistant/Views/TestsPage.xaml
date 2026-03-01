@@ -63,6 +63,26 @@
                                     Click="GenerateTestCases_Click"
                                     Background="#A78BFA" Foreground="White"
                                     CornerRadius="8" Padding="16,8"/>
+                            <Button Click="UploadDesignDoc_Click"
+                                    Background="#252535" Foreground="#6B7280"
+                                    BorderBrush="#2A2A3A" BorderThickness="1"
+                                    CornerRadius="8" Padding="10,8"
+                                    ToolTipService.ToolTip="Upload a design document for extra context (optional)">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE8E5;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                    <TextBlock Text="Design Doc" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock x:Name="DesignDocStatus"
+                                       Foreground="#34D399" FontSize="11"
+                                       VerticalAlignment="Center" Visibility="Collapsed"/>
+                            <Button x:Name="ClearDesignDocBtn" Click="ClearDesignDoc_Click"
+                                    Background="Transparent" BorderThickness="0"
+                                    Foreground="#F87171" Padding="4,4"
+                                    CornerRadius="4" Visibility="Collapsed"
+                                    ToolTipService.ToolTip="Remove design document">
+                                <FontIcon Glyph="&#xE711;" FontSize="10" FontFamily="Segoe Fluent Icons"/>
+                            </Button>
                             <Button x:Name="ClearAllBtn" Content="Clear All"
                                     Click="ClearAllTestCases_Click"
                                     Background="#3F1A1A" Foreground="#F87171"

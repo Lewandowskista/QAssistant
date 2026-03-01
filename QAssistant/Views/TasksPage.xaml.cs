@@ -2148,5 +2148,186 @@ namespace QAssistant.Views
         {
             ShortcutOverlay.Visibility = Visibility.Collapsed;
         }
+
+        // ── Bug Report ──────────────────────────────────────────────
+
+        private async void BugReport_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedTask == null) return;
+            await ShowBugReportDialogAsync(_selectedTask);
+        }
+
+        private async System.Threading.Tasks.Task ShowBugReportDialogAsync(ProjectTask task)
+        {
+            var latestAnalysis = task.AnalysisHistory
+                .OrderByDescending(a => a.Version)
+                .FirstOrDefault()?.FullResult;
+
+            var envNames = _vm?.SelectedProject?.Environments
+                .Select(env => env.Name).ToList() ?? new List<string>();
+            if (envNames.Count == 0) envNames.Add("Not specified");
+
+            var envPicker = new ComboBox
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 15, 15, 19)),
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58))
+            };
+            foreach (var n in envNames) envPicker.Items.Add(new ComboBoxItem { Content = n });
+            envPicker.SelectedIndex = 0;
+
+            var reporterBox = new TextBox
+            {
+                PlaceholderText = "Your name (optional)",
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 15, 15, 19)),
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                CornerRadius = new CornerRadius(6)
+            };
+
+            var includeAnalysisCheck = new CheckBox
+            {
+                Content = "Include AI analysis",
+                IsChecked = latestAnalysis != null,
+                IsEnabled = latestAnalysis != null,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+            };
+
+            string GetReport() =>
+                BugReportService.GenerateFromTask(
+                    task,
+                    (envPicker.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "",
+                    reporterBox.Text.Trim(),
+                    includeAnalysisCheck.IsChecked == true ? latestAnalysis : null);
+
+            var reportBox = new TextBox
+            {
+                Text = GetReport(),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 320,
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 11,
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 10, 10, 16)),
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 134, 239, 172)),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(12)
+            };
+
+            void Regenerate()
+            {
+                reportBox.Text = GetReport();
+            }
+
+            envPicker.SelectionChanged += (s, _) => Regenerate();
+            reporterBox.TextChanged += (s, _) => Regenerate();
+            includeAnalysisCheck.Checked += (s, _) => Regenerate();
+            includeAnalysisCheck.Unchecked += (s, _) => Regenerate();
+
+            var panel = new StackPanel { Spacing = 10 };
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Environment",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 148, 163, 184)),
+                FontSize = 12
+            });
+            panel.Children.Add(envPicker);
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Reporter",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 148, 163, 184)),
+                FontSize = 12
+            });
+            panel.Children.Add(reporterBox);
+            panel.Children.Add(includeAnalysisCheck);
+            panel.Children.Add(new Border
+            {
+                Height = 1,
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58))
+            });
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Report Preview (editable)",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 148, 163, 184)),
+                FontSize = 12
+            });
+            panel.Children.Add(reportBox);
+
+            var dialog = new ContentDialog
+            {
+                Title = "Generate Bug Report",
+                Content = new ScrollViewer { Content = panel, MaxHeight = 560, VerticalScrollBarVisibility = ScrollBarVisibility.Auto },
+                PrimaryButtonText = "Copy Markdown",
+                SecondaryButtonText = _isLinearMode ? "Post to Linear" : (_isJiraMode ? "Post to Jira" : ""),
+                CloseButtonText = "Close",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.XamlRoot
+            };
+            dialog.Resources["ContentDialogMaxWidth"] = 680.0;
+            DialogHelper.ApplyDarkTheme(dialog);
+
+            var action = await dialog.ShowAsync();
+
+            if (action == ContentDialogResult.Primary)
+            {
+                var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                dp.SetText(reportBox.Text);
+                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+                StatusText.Visibility = Visibility.Visible;
+                StatusText.Text = "Bug report copied to clipboard.";
+            }
+            else if (action == ContentDialogResult.Secondary)
+            {
+                await PostBugReportToTrackerAsync(task, reportBox.Text);
+            }
+        }
+
+        private async System.Threading.Tasks.Task PostBugReportToTrackerAsync(ProjectTask task, string markdown)
+        {
+            var title = $"[Bug] {task.Title}";
+            try
+            {
+                if (_isLinearMode)
+                {
+                    var key = LoadProjectCred("LinearApiKey");
+                    var teamId = LoadProjectCred("LinearTeamId");
+                    if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(teamId))
+                    {
+                        StatusText.Visibility = Visibility.Visible;
+                        StatusText.Text = "No Linear credentials found. Go to Settings.";
+                        return;
+                    }
+                    var service = new LinearService(key);
+                    var url = await service.CreateIssueAsync(teamId, title, markdown, priority: 2);
+                    StatusText.Visibility = Visibility.Visible;
+                    StatusText.Text = url != null ? $"Bug created: {url}" : "Bug report posted to Linear.";
+                    if (url != null && Helpers.UriSecurity.IsSafeHttpUrl(url))
+                        await Windows.System.Launcher.LaunchUriAsync(new Uri(url));
+                }
+                else if (_isJiraMode)
+                {
+                    var service = CreateJiraService();
+                    var projectKey = LoadProjectCred("JiraProjectKey");
+                    if (service == null || string.IsNullOrEmpty(projectKey))
+                    {
+                        StatusText.Visibility = Visibility.Visible;
+                        StatusText.Text = "No Jira credentials found. Go to Settings.";
+                        return;
+                    }
+                    var url = await service.CreateIssueAsync(projectKey, title, markdown, "High");
+                    StatusText.Visibility = Visibility.Visible;
+                    StatusText.Text = url != null ? $"Bug created: {url}" : "Bug report posted to Jira.";
+                    if (url != null && Helpers.UriSecurity.IsSafeHttpUrl(url))
+                        await Windows.System.Launcher.LaunchUriAsync(new Uri(url));
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Visibility = Visibility.Visible;
+                StatusText.Text = $"Failed to post bug report: {ex.Message}";
+            }
+        }
     }
 }

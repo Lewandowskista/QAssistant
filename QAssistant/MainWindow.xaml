@@ -243,6 +243,10 @@
                      Click="Tab_Click" Tag="Tests"
                      Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                      CornerRadius="8" Padding="14,8" Margin="0,6"/>
+                        <Button x:Name="TabTestData" Content="Test Data"
+                     Click="Tab_Click" Tag="TestData"
+                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
                         <Button x:Name="TabEnvironments" Content="Environments"
                      Click="Tab_Click" Tag="Environments"
                      Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
