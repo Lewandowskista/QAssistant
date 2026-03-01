@@ -128,13 +128,49 @@
 
                     <StackPanel Spacing="8">
                         <TextBlock Text="API Key" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
-                        <PasswordBox x:Name="AutomationApiKeyBox"
+                        <Grid>
+                            <PasswordBox x:Name="AutomationApiKeyBox"
+                                         IsEnabled="False"
+                                         Background="{ThemeResource ApplicationBackgroundBrush}"
+                                         Foreground="{ThemeResource TextPrimaryBrush}"
+                                         BorderBrush="{ThemeResource BorderBrush}"
+                                         CornerRadius="8"
+                                         Padding="12,10"/>
+                            <TextBox x:Name="AutomationApiKeyRevealBox"
                                      IsEnabled="False"
+                                     IsReadOnly="True"
+                                     Visibility="Collapsed"
                                      Background="{ThemeResource ApplicationBackgroundBrush}"
                                      Foreground="{ThemeResource TextPrimaryBrush}"
                                      BorderBrush="{ThemeResource BorderBrush}"
                                      CornerRadius="8"
-                                     Padding="12,10"/>
+                                     Padding="12,10"
+                                     FontFamily="Consolas"
+                                     FontSize="12"/>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="ToggleApiKeyVisibilityBtn"
+                                    Click="ToggleApiKeyVisibility_Click"
+                                    Background="{ThemeResource HoverBrush}"
+                                    Foreground="{ThemeResource TextSecondaryBrush}"
+                                    CornerRadius="8" Padding="10,7">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon x:Name="ToggleApiKeyIcon" Glyph="&#xE7B3;" FontSize="12"
+                                              FontFamily="Segoe Fluent Icons"/>
+                                    <TextBlock x:Name="ToggleApiKeyText" Text="Show Key" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Click="CopyApiKey_Click"
+                                    Background="{ThemeResource HoverBrush}"
+                                    Foreground="{ThemeResource AccentBrush}"
+                                    CornerRadius="8" Padding="10,7">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE8C8;" FontSize="12"
+                                              FontFamily="Segoe Fluent Icons"/>
+                                    <TextBlock Text="Copy Key" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                         <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
                                    Text="All requests must include: Authorization: Bearer &lt;key&gt;"/>
                         <Button Content="Regenerate Key" Click="RegenerateApiKey_Click"

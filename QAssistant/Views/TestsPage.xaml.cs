@@ -54,7 +54,7 @@ namespace QAssistant.Views
         private string _coverageViewMode = "Issue";
         private string _testCaseViewMode = "AllPlans";
         private List<string>? _smokeSubsetCaseIds;
-
+Copy
         private Guid ProjectId => _vm?.SelectedProject?.Id ?? Guid.Empty;
 
         private string? LoadProjectCred(string key) =>

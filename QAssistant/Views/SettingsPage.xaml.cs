@@ -34,6 +34,7 @@ namespace QAssistant.Views
     public sealed partial class SettingsPage : Page
     {
         private bool _isLoading = true;
+        private bool _apiKeyVisible = false;
         private MainViewModel? _vm;
         private Guid _projectId;
         private Guid? _editingLinearConnectionId;
@@ -111,7 +112,10 @@ namespace QAssistant.Views
 
             var apiKey = CredentialService.LoadCredential("AutomationApiKey");
             if (!string.IsNullOrEmpty(apiKey))
+            {
                 AutomationApiKeyBox.Password = apiKey;
+                AutomationApiKeyRevealBox.Text = apiKey;
+            }
 
             MigrateLegacyCredentials();
             RenderLinearConnectionsList();
@@ -280,8 +284,29 @@ namespace QAssistant.Views
         {
             var newKey = AutomationApiService.RegenerateApiKey();
             AutomationApiKeyBox.Password = newKey;
+            AutomationApiKeyRevealBox.Text = newKey;
             ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
                 "API key regenerated. Update your test runner configuration.", true);
+        }
+
+        private void ToggleApiKeyVisibility_Click(object sender, RoutedEventArgs e)
+        {
+            _apiKeyVisible = !_apiKeyVisible;
+            AutomationApiKeyBox.Visibility = _apiKeyVisible ? Visibility.Collapsed : Visibility.Visible;
+            AutomationApiKeyRevealBox.Visibility = _apiKeyVisible ? Visibility.Visible : Visibility.Collapsed;
+            ToggleApiKeyIcon.Glyph = _apiKeyVisible ? "\uED1A" : "\uE7B3";
+            ToggleApiKeyText.Text = _apiKeyVisible ? "Hide Key" : "Show Key";
+        }
+
+        private void CopyApiKey_Click(object sender, RoutedEventArgs e)
+        {
+            var key = AutomationApiKeyBox.Password;
+            if (string.IsNullOrEmpty(key)) return;
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(key);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+            ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
+                "API key copied to clipboard.", true);
         }
 
         // ── Linear ───────────────────────────────────────────────────
