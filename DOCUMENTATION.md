@@ -18,6 +18,12 @@
 9. [Files](#9-files)
 10. [Tasks](#10-tasks)
 11. [Tests](#11-tests)
+    - [11.1 Test Case Generation](#111-test-case-generation)
+    - [11.2 Test Runs](#112-test-runs)
+    - [11.3 Reports](#113-reports)
+    - [11.4 Coverage Matrix](#114-coverage-matrix)
+    - [11.5 Regression Builder](#115-regression-builder)
+    - [11.6 Test Case Bug Report](#116-test-case-bug-report)
 12. [Test Data](#12-test-data)
 13. [Checklists](#13-checklists)
 14. [Environments](#14-environments)
@@ -357,78 +363,254 @@ Delete an individual history entry using the trash icon on each entry card.
 **Navigation:** Tools sidebar → **Tests** (under **QA BASIC**)
 
 ### Purpose
-Manage test plans and test cases, run tests, track coverage, and generate reports — all integrated with Linear and Jira for issue-driven test generation.
+Manage test plans and test cases, record execution results, track issue coverage, and generate reports — all integrated with Linear and Jira for issue-driven test generation.
 
-The Tests page has five sub-tabs:
+The Tests page has five sub-tabs: **Test Case Generation**, **Test Runs**, **Reports**, **Coverage Matrix**, and **Regression Builder**.
 
 ---
 
 ### 11.1 Test Case Generation
 
+This sub-tab displays all test plans and their test cases, and provides tools to create new ones.
+
+#### View modes
+
+Use the **View** picker in the toolbar to switch between:
+
+| Mode | What is shown |
+|---|---|
+| **All Plans** | Every test plan in the project |
+| **Regression Suites Only** | Only plans flagged as regression suites (created via the Regression Builder) |
+
+Toggle **Show Archived** to include archived plans in the list.
+
+#### Generating from Linear / Jira issues
+
 **Requires** a Gemini API key in Settings.
 
-**From Linear / Jira issues:**
 1. Select the source (**Linear** or **Jira**) from the drop-down.
-2. Optionally upload a **design document** (`.txt`, `.md`, `.pdf`, `.docx`, `.csv`, `.json`, `.xml`, `.html`) as extra context — the first 30,000 characters are used.
+2. Optionally click **Upload Design Doc** to attach a `.txt`, `.md`, `.pdf`, `.docx`, `.rtf`, `.csv`, `.json`, `.xml`, or `.html` file as extra context (first 30,000 characters are used). Click **Clear** to remove it.
 3. Click **Generate Test Cases**.
-4. QAssistant fetches all issues from the configured integration, builds a structured prompt, and calls the Gemini API.
-5. Generated test cases are organised into a new **Test Plan** named after the source and timestamp.
+4. QAssistant fetches all issues from every configured connection of the selected type, builds a structured prompt, and calls the Gemini API.
+5. Generated test cases are organised into a new **Test Plan** named `<Source> · <date/time>`.
 
-**From CSV / Excel:**
+#### Importing from CSV / Excel
+
 1. Click **Import CSV / Excel** and select a `.csv` or `.xlsx` file.
-2. A column mapping dialog appears — map spreadsheet columns to test case fields (Title, Steps, Expected Result, etc.) and give the plan a name.
-3. Click **Import** — a new Test Plan is created with one test case per row.
+2. A column mapping dialog appears — map each spreadsheet column to a test case field (Title, Pre-Conditions, Test Steps, Test Data, Expected Result, Actual Result, Status, Priority, Source Issue ID, or `(Ignore)`) and optionally set a plan name.
+3. Click **Import** — a new Test Plan is created with one test case per non-empty row.
 
-**Test Plan display:** Plans are shown as collapsible groups. Each plan shows its ID (e.g. `TP-001`), name, source badge, case count, and pass/fail summary. Test cases inside show their ID, title, priority, and current status.
+#### Test Plan cards
 
-**Archiving a plan:** Use the archive button on the plan header to hide it from the default view. Toggle *Show Archived* to include archived plans.
+Plans are displayed as collapsible cards, most recently created first. Each card header shows:
+
+- **Chevron** — click anywhere on the header to expand / collapse the card.
+- **Plan ID** (e.g. `TP-001`), **Name**, **case count badge**, and an **ARCHIVED** badge when applicable.
+- **Status summary** — coloured dot-and-count row for the statuses of all cases in the plan.
+
+**Plan action buttons** (right side of header):
+
+| Icon | Action |
+|---|---|
+| ▶ (Run all) | Opens a batch execution dialog — set one result and optional notes for all cases in the plan simultaneously |
+| ↺ (Reset) | Resets every test case in the plan to *Not Run* and clears actual results (execution history is preserved) |
+| ⧉ (Duplicate) | Creates a copy of the plan and all its test cases (statuses reset to *Not Run*) for a fresh re-execution cycle |
+| 📦 (Archive/Unarchive) | Toggles the archived state of the plan |
+| 🗑 (Delete) | Permanently deletes the plan and all its test cases (execution history is preserved with snapshot data) |
+
+The **Clear All** button in the toolbar deletes all test plans and test cases in the project at once.
+
+#### Test case cards
+
+Each test case inside a plan shows:
+
+- **ID** (e.g. `TC-001`), **Title**, **Priority badge**, **Status badge**
+- **Traceability label** — `TC-xxx → TP-xxx` plus the number of execution records
+- Full field sections: **PRE-CONDITIONS**, **TEST STEPS**, **TEST DATA**, **EXPECTED RESULT**, and (when recorded) **ACTUAL RESULT**
+- **Source badge** and **Generated At** timestamp
+- **Execute** button — opens the execution dialog for this single test case
+- **Bug Report** button — generates a structured bug report from this test case (see §11.6)
+- **Delete** (trash icon) — removes the test case (execution history is preserved)
+
+#### Executing a single test case
+
+Click **Execute** on any test case card:
+
+1. A dialog shows the test case traceability and title.
+2. Set the **Result** (Passed / Failed / Blocked / Skipped / Not Run).
+3. Optionally enter **Actual Result** and **Notes** (each capped at 10,000 characters).
+4. Click **Record Execution** — the result is saved as a `TestExecution` record, and the test case status is updated to reflect the latest result.
 
 ---
 
-### 11.2 Test Runs (Execution)
+### 11.2 Test Runs
 
-The **Test Runs** sub-tab is where you record test execution results.
+The **Test Runs** sub-tab shows the complete execution history for the project, grouped hierarchically.
 
-1. Click **+ New Test Run** to start an execution session — select one or more Test Plans to include.
-2. For each test case:
-   - Set status: **Pass**, **Fail**, **Skip**, or **Blocked**.
-   - (Optional) Enter **Actual Result**, **Test Data**, and **Notes**.
-   - Optionally **Generate Bug Report** directly from a failed test case.
-3. Complete the run to save an execution snapshot.
+#### Structure
 
-Execution history is shown per run with pass/fail counts and a percentage. Toggle *Show Archived Runs* to include older runs.
+Executions are grouped **by Test Plan**, and within each plan they are grouped **by Test Case**. Both levels are individually collapsible.
+
+- **Plan group header** — shows Plan ID, name, execution count, status summary dots, latest date, and archive/delete actions.
+- **Test case group header** — shows Test Case ID, title, latest result badge, run count, and latest date.
+- **Individual execution card** — shows:
+  - Traceability chain: `TE-xxx → TC-xxx → TP-xxx` (with colour-coded badges)
+  - Test case title
+  - Result badge, Priority badge, and exact timestamp
+  - Actual Result and Notes (when present)
+  - Delete button to remove that single execution record
+
+Executions from plans or test cases that have since been deleted are still shown using **snapshot data** (the IDs and names captured at deletion time).
+
+Toggle **Show Archived Runs** to include run groups where every execution is archived.
+
+#### Plan group actions
+
+| Icon | Action |
+|---|---|
+| 📦 (Archive/Unarchive) | Toggles the archived state of every execution in the group |
+| 🗑 (Delete run) | Permanently deletes all executions in this plan group |
+
+#### AI Suggestions
+
+Below all execution groups, an expandable **AI Suggestions** card is available.
+
+- Click the header to expand it.
+- A priority breakdown bar chart shows how failed test cases are distributed across Blocker / Major / Medium / Low priorities.
+- Click **Get AI Suggestions** to send your full test execution data to the Gemini API. The response is parsed and rendered in four sections: **Overall Status**, **Deployment Readiness**, **Key Risks**, and **Suggestions**.
+- If new executions are recorded after suggestions were generated, a **staleness banner** appears with a **Regenerate** button.
 
 ---
 
 ### 11.3 Reports
 
-An aggregated dashboard showing:
+The **Reports** sub-tab provides exportable summaries of test results.
 
-- Overall pass rate across all test plans
-- Per-plan metrics (total, passed, failed, skipped)
-- Trend charts if multiple execution runs exist
-- Quick-access to generate bug reports for failing test cases
+#### Plan scope filter
+
+Use the **Scope** drop-down in the toolbar to select which test plans to include in the report. Options: **All Plans**, **No Plans Selected**, or individual plans with their case counts. **Select All** and **Clear** shortcuts are available inside the flyout.
+
+#### Report types
+
+Select the report type from the **Report Type** picker:
+
+| Type | Description |
+|---|---|
+| **Summary** | Metric cards (Test Plans, Test Cases, Executions, Pass Rate), a status breakdown bar chart (Passed / Failed / Blocked / Skipped / Not Run with percentages), and a per-plan overview table |
+| **Test Cases CSV** | Preview of the CSV export showing scope, row count, and column list |
+| **Executions CSV** | Preview of the execution history CSV export showing scope and column list |
+
+#### Exporting
+
+Click **Export** to save the report:
+
+- **Summary** → PDF file containing all metrics and the per-plan table; the AI Suggestions text (if generated) is appended.
+- **Test Cases CSV** → CSV with columns: `Test Plan ID`, `Test Plan Name`, `Test Case ID`, `Title`, `Status`, `Pre-Conditions`, `Test Steps`, `Test Data`, `Expected Result`, `Actual Result`, `Source`, `Generated At`
+- **Executions CSV** → CSV with columns: `Execution ID`, `Test Case ID`, `Test Case Title`, `Test Plan ID`, `Result`, `Actual Result`, `Notes`, `Executed At`
 
 ---
 
 ### 11.4 Coverage Matrix
 
-Displays a matrix of **issues (Linear/Jira) vs. test cases**, showing which issues have coverage and how many test cases are linked to each.
+The **Coverage Matrix** sub-tab visualises how well issues and functional areas are covered by test cases.
 
-Toggle the **view mode** between:
-- **Issue view** — rows are issues, columns are test case statuses
-- **Test Case view** — rows are test cases with their linked issue IDs
+Toggle the view mode with the **By Issue** / **By SAP Module** buttons:
+
+---
+
+#### Issue Coverage view
+
+Requires tasks to be loaded on the Tasks page (from Linear or Jira).
+
+- A **Coverage Overview** card shows Total Issues, Covered, Untested, and overall coverage percentage with a colour-coded progress bar (green ≥ 70 %, yellow ≥ 40 %, red < 40 %).
+- A **legend** defines the three coverage tiers:
+
+| Tier | Criteria | Colour |
+|---|---|---|
+| **Untested** | 0 test cases linked | Red |
+| **Under-tested** | 1 test case linked | Yellow |
+| **Well-tested** | 2+ test cases linked | Green |
+
+- Issues are grouped into three collapsible sections (Untested, Under-tested, Well-tested). Each row shows the issue identifier badge, title, TC count badge, and source badge.
+- Test cases are linked to issues via the `SourceIssueId` field. When `SourceIssueId` is empty, a keyword-overlap fallback is used (≥ 2 matching words of length > 3 between the test case title and the task title).
+
+---
+
+#### SAP Module Coverage view
+
+Automatically classifies test cases into nine SAP Commerce functional modules using keyword matching against the test case title, test steps, and expected result:
+
+| Module | Key keywords |
+|---|---|
+| **Cart** | cart, basket, minicart, add to cart, cart total |
+| **Checkout** | checkout, payment, order, shipping, delivery, billing, confirmation |
+| **Pricing** | price, tax, currency, net price, gross price, surcharge |
+| **Promotions** | promotion, coupon, voucher, campaign, rule engine, discount code |
+| **Catalog Sync** | catalog, product, category, sync, import, feed, variant, impex, solr |
+| **B2B Commerce** | b2b, company, organisation, budget, cost center, approval, quick order |
+| **Order Management** | order management, oms, fulfillment, consignment, return, refund, cancellation |
+| **Personalization** | personalization, targeting, segment, smartedit, cms, content slot, audience |
+| **CPQ** | cpq, configure, configurator, quote, guided selling, bundle, subscription |
+
+Each module card shows:
+- Module icon and name
+- Coverage tier badge (Untested / Minimal / Partial / Good)
+- Status pills (Passed / Failed / Blocked / Not Run counts)
+- Pass-rate progress bar
+- Total test case count
+
+> **Override:** Set the `SapModule` property directly on a `TestCase` object to pin it to a specific module regardless of keyword matching.
 
 ---
 
 ### 11.5 Regression Builder
 
-Build a smoke / regression subset from existing test cases:
+The **Regression Builder** sub-tab helps you compose a targeted regression suite from three complementary sources.
 
-1. Select test plans to include.
-2. Filter by priority, status, or tags.
-3. A prioritised list of recommended test cases for the regression run is generated.
-4. Save the subset as a new Test Plan to use in Test Runs.
+#### Date range filter
+
+Use the **From** and **To** date pickers to scope the *Done-Linked* source to tasks completed within a specific window. Click **Clear Dates** to remove the filter.
+
+#### Sources
+
+| Source | Description |
+|---|---|
+| **Done-Linked** | Test cases whose `SourceIssueId` matches any task currently in *Done* status. When a date range is set, tasks without a due date are included; tasks with a due date are filtered to that window. |
+| **Previously Failed** | Test cases that failed in the most recent execution run (identified by the highest `ExecutedAt` timestamp across all executions). |
+| **AI Smoke Subset** | A minimal critical set suggested by the Gemini AI, prioritising Blocker/Major cases and distinct functional areas. Requires a Gemini API key. Click **Generate AI Smoke Subset** to build it; click **Regenerate** to refresh. |
+
+The **Regression Suite Preview** summary card at the top shows the count from each source and the total unique test cases (deduplication applied across all three sources).
+
+#### Building the suite
+
+Click **Build Regression Suite**:
+
+1. All unique test cases from the three sources are combined (deduplication by ID).
+2. A new **Test Plan** is created with `IsRegressionSuite = true`, named `Regression Suite · <date range or today's date>`.
+3. Each selected test case is **copied** into the new plan with status reset to *Not Run*.
+4. The view switches to **Test Case Generation** sub-tab in **Regression Suites Only** mode, showing the newly created plan.
+
+> If no test cases are found for the current sources and date range, a warning dialog is shown.
+
+---
+
+### 11.6 Test Case Bug Report
+
+A structured bug report can be generated directly from any test case card (click the **Bug Report** button in the card footer).
+
+The dialog provides:
+
+| Field | Description |
+|---|---|
+| **Environment** | Picker populated from the project's Environments list |
+| **Reporter** | Optional free-text name |
+| **Include execution history** | When checked (and executions exist), appends a summary of all previous runs for this test case to the report |
+| **Report Preview** | Live-updating, editable Markdown preview |
+
+Actions:
+
+- **Copy Markdown** — copies the full report to the clipboard.
+- **Post to Linear** / **Post to Jira** — creates a new issue on the remote tracker with the report as the body and opens the new issue URL in the browser. The button is labelled for the tracker whose credentials are configured (Linear takes priority).
 
 ---
 

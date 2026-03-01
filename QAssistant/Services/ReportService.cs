@@ -19,6 +19,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using QAssistant.Models;
 
 namespace QAssistant.Services
@@ -221,7 +222,7 @@ namespace QAssistant.Services
 
                 page.SetFont("Helvetica", 10);
                 page.SetColor(0.4f, 0.4f, 0.45f);
-                page.DrawTextRight($"{casesInPlan.Count} cases Â· {planRate:F0}% pass", margin + contentWidth - 8, y);
+                page.DrawTextRight($"{casesInPlan.Count} cases \u00B7 {planRate:F0}% pass", margin + contentWidth - 8, y);
                 y -= 22;
 
                 // Test cases in this plan
@@ -298,7 +299,7 @@ namespace QAssistant.Services
                     page.SetFont("Helvetica", 8);
                     page.SetColor(0.2f, 0.2f, 0.25f);
                     string tcLabel = tc != null
-                        ? $"{tc.TestCaseId} Â· {(tc.Title.Length > 30 ? tc.Title[..27] + "..." : tc.Title)}"
+                        ? $"{tc.TestCaseId} \u00B7 {(tc.Title.Length > 30 ? tc.Title[..27] + "..." : tc.Title)}"
                         : "Deleted";
                     page.DrawText(tcLabel, margin + 80, y);
 
@@ -418,14 +419,43 @@ namespace QAssistant.Services
                 {
                     var line = rawLine.TrimEnd('\r');
 
-                    // Detect markdown headings
+                    // Horizontal rules (---, ***, ___)
+                    var ruleTrimmed = line.Trim();
+                    if (ruleTrimmed.Length >= 3 &&
+                        (ruleTrimmed.Replace("-", "").Length == 0 ||
+                         ruleTrimmed.Replace("*", "").Length == 0 ||
+                         ruleTrimmed.Replace("_", "").Length == 0))
+                    {
+                        y -= 6;
+                        if (y < 60) { page = pdf.AddPage(); y = 760; }
+                        page.SetColor(0.85f, 0.85f, 0.88f);
+                        page.DrawLine(margin, y, margin + contentWidth, y, 0.5f);
+                        y -= 10;
+                        page.SetColor(0.2f, 0.2f, 0.25f);
+                        continue;
+                    }
+
+                    // Detect markdown headings (### before ## before #)
+                    if (line.StartsWith("### "))
+                    {
+                        y -= 4;
+                        if (y < 60) { page = pdf.AddPage(); y = 760; }
+                        page.SetFont("Helvetica-Bold", 10);
+                        page.SetColor(0.2f, 0.2f, 0.25f);
+                        page.DrawText(StripInlineMarkdown(line[4..]), margin, y);
+                        y -= 16;
+                        page.SetFont("Helvetica", 9);
+                        page.SetColor(0.2f, 0.2f, 0.25f);
+                        continue;
+                    }
+
                     if (line.StartsWith("## "))
                     {
                         y -= 6;
                         if (y < 60) { page = pdf.AddPage(); y = 760; }
                         page.SetFont("Helvetica-Bold", 11);
                         page.SetColor(0.15f, 0.15f, 0.2f);
-                        page.DrawText(line[3..], margin, y);
+                        page.DrawText(StripInlineMarkdown(line[3..]), margin, y);
                         y -= 18;
                         page.SetFont("Helvetica", 9);
                         page.SetColor(0.2f, 0.2f, 0.25f);
@@ -438,7 +468,7 @@ namespace QAssistant.Services
                         if (y < 60) { page = pdf.AddPage(); y = 760; }
                         page.SetFont("Helvetica-Bold", 13);
                         page.SetColor(0.1f, 0.1f, 0.15f);
-                        page.DrawText(line[2..], margin, y);
+                        page.DrawText(StripInlineMarkdown(line[2..]), margin, y);
                         y -= 20;
                         page.SetFont("Helvetica", 9);
                         page.SetColor(0.2f, 0.2f, 0.25f);
@@ -457,10 +487,22 @@ namespace QAssistant.Services
                         // Bullet points
                         bool isBullet = line.StartsWith("- ") || line.StartsWith("* ");
                         if (isBullet)
+                        {
                             line = "\u2022 " + line[2..];
+                        }
+                        else if (line.Length > 2 && char.IsDigit(line[0]))
+                        {
+                            // Numbered lists (1. 2. etc.) - keep the number
+                            int dotIdx = line.IndexOf(". ", StringComparison.Ordinal);
+                            if (dotIdx > 0 && dotIdx <= 3 && line[..dotIdx].All(char.IsDigit))
+                                line = line[..dotIdx] + ". " + line[(dotIdx + 2)..];
+                        }
 
                         page.SetFont("Helvetica", 9);
                     }
+
+                    // Strip remaining inline markdown markers
+                    line = StripInlineMarkdown(line);
 
                     page.SetColor(0.2f, 0.2f, 0.25f);
 
@@ -506,7 +548,7 @@ namespace QAssistant.Services
             // Footer on last page
             page.SetFont("Helvetica", 8);
             page.SetColor(0.6f, 0.6f, 0.65f);
-            page.DrawText($"QAssistant Â· {project.Name} Â· {DateTime.Now:yyyy-MM-dd}", margin, 30);
+            page.DrawText($"QAssistant \u00B7 {project.Name} \u00B7 {DateTime.Now:yyyy-MM-dd}", margin, 30);
 
             return pdf.Build();
         }
@@ -575,6 +617,23 @@ namespace QAssistant.Services
             }
 
             return y;
+        }
+
+        private static string StripInlineMarkdown(string text)
+        {
+            // [text](url) -> text
+            text = Regex.Replace(text, @"\[([^\]]+)\]\([^)]+\)", "$1");
+            // **bold** -> bold
+            text = Regex.Replace(text, @"\*\*(.+?)\*\*", "$1");
+            // __bold__ -> bold
+            text = Regex.Replace(text, @"__(.+?)__", "$1");
+            // *italic* -> italic  (but not bullet lines starting with *)
+            text = Regex.Replace(text, @"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", "$1");
+            // _italic_ -> italic
+            text = Regex.Replace(text, @"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)", "$1");
+            // `code` -> code
+            text = Regex.Replace(text, @"`([^`]+)`", "$1");
+            return text;
         }
 
         private static (string label, float r, float g, float b) GetStatusDisplay(TestCaseStatus status) => status switch
