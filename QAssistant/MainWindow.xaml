@@ -153,7 +153,7 @@
                 BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,1,0">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="44"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
@@ -234,7 +234,7 @@
                 BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,1,0">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="44"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -248,7 +248,7 @@
                         <Button x:Name="CollapseToolsBtn" Click="CollapseTools_Click"
                                 HorizontalAlignment="Right" VerticalAlignment="Center"
                                 Background="Transparent" BorderThickness="0"
-                                Padding="6,4" CornerRadius="4"
+                                MinHeight="0" Padding="6,4" CornerRadius="4"
                                 ToolTipService.ToolTip="Collapse sidebar">
                             <FontIcon x:Name="CollapseToolsIcon" Glyph="&#xE76B;" FontSize="11"
                                       FontFamily="Segoe Fluent Icons"
