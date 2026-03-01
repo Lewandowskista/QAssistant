@@ -35,6 +35,7 @@ namespace QAssistant.Views
         private MainViewModel? _vm;
         private string _activeTab = "Cronjobs";
         private SapHacService? _hacService;
+        private Ccv2ManagementService? _ccv2Service;
         private QaEnvironment? _selectedEnv;
         private List<CronJobEntry> _allCronJobs = [];
         private string _currentCronFilter = "All";
@@ -88,8 +89,8 @@ namespace QAssistant.Views
         private void SetTab(string tab)
         {
             _activeTab = tab;
-            var tabBtns = new[] { SapTabCronjobs, SapTabCatalog, SapTabFlexSearch, SapTabImpex };
-            var tags = new[] { "Cronjobs", "Catalog", "FlexSearch", "Impex" };
+            var tabBtns = new[] { SapTabCronjobs, SapTabCatalog, SapTabFlexSearch, SapTabImpex, SapTabCcv2 };
+            var tags = new[] { "Cronjobs", "Catalog", "FlexSearch", "Impex", "Ccv2" };
             for (int i = 0; i < tabBtns.Length; i++)
             {
                 bool active = tags[i] == tab;
@@ -105,6 +106,7 @@ namespace QAssistant.Views
             CatalogPanel.Visibility = tab == "Catalog" ? Visibility.Visible : Visibility.Collapsed;
             FlexSearchPanel.Visibility = tab == "FlexSearch" ? Visibility.Visible : Visibility.Collapsed;
             ImpexPanel.Visibility = tab == "Impex" ? Visibility.Visible : Visibility.Collapsed;
+            Ccv2Panel.Visibility = tab == "Ccv2" ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private async void SapConnect_Click(object sender, RoutedEventArgs e)
@@ -805,6 +807,258 @@ namespace QAssistant.Views
                 ImpexLogText.Text = result.Log;
             }
             catch (Exception ex) { ImpexStatusText.Text = $"Error: {ex.Message}"; }
+        }
+
+        // ── CCv2 Deployments ──────────────────────────────────────────
+
+        private void InitCcv2Service()
+        {
+            var subCode = CredentialService.LoadCredential("Ccv2SubscriptionCode");
+            var token = CredentialService.LoadCredential("Ccv2ApiToken");
+            if (string.IsNullOrEmpty(subCode) || string.IsNullOrEmpty(token))
+            {
+                _ccv2Service?.Dispose();
+                _ccv2Service = null;
+                return;
+            }
+            _ccv2Service?.Dispose();
+            _ccv2Service = new Ccv2ManagementService(subCode, token);
+        }
+
+        private async void RefreshCcv2_Click(object sender, RoutedEventArgs e)
+        {
+            InitCcv2Service();
+            if (_ccv2Service == null)
+            {
+                Ccv2StatusText.Text = "Configure CCv2 credentials in Settings first";
+                Ccv2EmptyText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            Ccv2StatusText.Text = "Loading...";
+            Ccv2EmptyText.Visibility = Visibility.Collapsed;
+            Ccv2EnvContainer.Children.Clear();
+            Ccv2DeploymentsPanel.Visibility = Visibility.Collapsed;
+
+            try
+            {
+                var envs = await _ccv2Service.GetEnvironmentsAsync();
+                var deployments = await _ccv2Service.GetDeploymentsAsync(top: 30);
+
+                var latestByEnv = envs.ToDictionary(
+                    env => env.Code,
+                    env => (Ccv2Deployment?)deployments.FirstOrDefault(d =>
+                        string.Equals(d.EnvironmentCode, env.Code, StringComparison.OrdinalIgnoreCase)));
+
+                RenderCcv2Environments(envs, latestByEnv);
+                RenderCcv2Deployments(deployments.Take(20).ToList());
+                Ccv2StatusText.Text = $"{envs.Count} environment(s)  ·  {deployments.Count} deployment(s)";
+            }
+            catch (Exception ex)
+            {
+                Ccv2StatusText.Text = $"Error: {ex.Message}";
+                Ccv2EmptyText.Text = $"Could not load CCv2 data: {ex.Message}";
+                Ccv2EmptyText.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void RenderCcv2Environments(List<Ccv2Environment> envs, Dictionary<string, Ccv2Deployment?> latestByEnv)
+        {
+            Ccv2EnvContainer.Children.Clear();
+            Ccv2EmptyText.Visibility = envs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            foreach (var env in envs)
+            {
+                latestByEnv.TryGetValue(env.Code, out var latest);
+                Ccv2EnvContainer.Children.Add(BuildCcv2EnvCard(env, latest));
+            }
+        }
+
+        private static UIElement BuildCcv2EnvCard(Ccv2Environment env, Ccv2Deployment? latest)
+        {
+            Windows.UI.Color StatusColor(string s) => s switch
+            {
+                var v when v.Contains("AVAILABLE",    StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 16, 185, 129),
+                var v when v.Contains("PROVISIONING", StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 59, 130, 246),
+                var v when v.Contains("TERMINATING",  StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 239, 68, 68),
+                var v when v.Contains("FAIL",         StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 239, 68, 68),
+                var v when v.Contains("DEPLOY",       StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 59, 130, 246),
+                _ => Windows.UI.Color.FromArgb(255, 107, 114, 128)
+            };
+
+            Border Badge(string text, Windows.UI.Color color) => new()
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(30, color.R, color.G, color.B)),
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(8, 3, 8, 3),
+                Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock
+                {
+                    Text = string.IsNullOrEmpty(text) ? "UNKNOWN" : text,
+                    Foreground = new SolidColorBrush(color),
+                    FontSize = 10,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    CharacterSpacing = 80
+                }
+            };
+
+            var envStatusColor = StatusColor(env.Status);
+            var depStatusColor = StatusColor(env.DeploymentStatus);
+
+            var header = new Grid();
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var namePanel = new StackPanel { Spacing = 2 };
+            namePanel.Children.Add(new TextBlock
+            {
+                Text = env.Code,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                FontSize = 14,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            if (!string.IsNullOrEmpty(env.Name) && env.Name != env.Code)
+                namePanel.Children.Add(new TextBlock
+                {
+                    Text = env.Name,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 11
+                });
+
+            var deployBadge = Badge(string.IsNullOrEmpty(env.DeploymentStatus) ? "UNDEPLOYED" : env.DeploymentStatus, depStatusColor);
+            var envBadge = Badge(string.IsNullOrEmpty(env.Status) ? "UNKNOWN" : env.Status, envStatusColor);
+
+            Grid.SetColumn(namePanel, 0);
+            Grid.SetColumn(deployBadge, 1);
+            Grid.SetColumn(envBadge, 2);
+            header.Children.Add(namePanel);
+            header.Children.Add(deployBadge);
+            header.Children.Add(envBadge);
+
+            var cardPanel = new StackPanel { Spacing = 8 };
+            cardPanel.Children.Add(header);
+
+            if (latest != null)
+            {
+                cardPanel.Children.Add(new Border
+                {
+                    Height = 1,
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                    Margin = new Thickness(0, 4, 0, 4)
+                });
+
+                var metaRow = new StackPanel { Orientation = Microsoft.UI.Xaml.Controls.Orientation.Horizontal, Spacing = 24 };
+
+                void AddMeta(string label, string value)
+                {
+                    var col = new StackPanel { Spacing = 2 };
+                    col.Children.Add(new TextBlock
+                    {
+                        Text = label,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                        FontSize = 10,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        CharacterSpacing = 80
+                    });
+                    col.Children.Add(new TextBlock
+                    {
+                        Text = string.IsNullOrEmpty(value) ? "—" : value,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                        FontSize = 12
+                    });
+                    metaRow.Children.Add(col);
+                }
+
+                AddMeta("BUILD", latest.BuildCode);
+                AddMeta("STRATEGY", string.IsNullOrEmpty(latest.Strategy) ? "—" : latest.Strategy);
+                AddMeta("DEPLOYED AT", FormatCcv2Timestamp(latest.DeployedAt));
+                metaRow.Children.Add(Badge(latest.Status, StatusColor(latest.Status)));
+                cardPanel.Children.Add(metaRow);
+            }
+
+            return new Border
+            {
+                Child = cardPanel,
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 20, 20, 30)),
+                CornerRadius = new CornerRadius(10),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(16, 12, 16, 12)
+            };
+        }
+
+        private void RenderCcv2Deployments(List<Ccv2Deployment> deployments)
+        {
+            Ccv2DeploymentsContainer.Children.Clear();
+            if (deployments.Count == 0) return;
+
+            Ccv2DeploymentsPanel.Visibility = Visibility.Visible;
+            Ccv2DeploymentsContainer.Children.Add(
+                BuildCcv2DeploymentRow("Environment", "Build", "Status", "Strategy", "Deployed At", isHeader: true));
+            foreach (var dep in deployments)
+                Ccv2DeploymentsContainer.Children.Add(
+                    BuildCcv2DeploymentRow(dep.EnvironmentCode, dep.BuildCode, dep.Status,
+                        dep.Strategy, FormatCcv2Timestamp(dep.DeployedAt)));
+        }
+
+        private static UIElement BuildCcv2DeploymentRow(string env, string build, string status, string strategy, string deployedAt, bool isHeader = false)
+        {
+            var grid = new Grid
+            {
+                Padding = new Thickness(12, 8, 12, 8),
+                Background = isHeader
+                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36))
+                    : new SolidColorBrush(Colors.Transparent)
+            };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.0, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.0, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
+
+            Windows.UI.Color statusColor = status switch
+            {
+                var s when s.Contains("DEPLOYED", StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 16, 185, 129),
+                var s when s.Contains("DEPLOYING", StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 59, 130, 246),
+                var s when s.Contains("FAIL", StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 239, 68, 68),
+                _ => Windows.UI.Color.FromArgb(255, 107, 114, 128)
+            };
+
+            var values = new[] { env, build, status, strategy, deployedAt };
+            for (int i = 0; i < values.Length; i++)
+            {
+                var tb = new TextBlock
+                {
+                    Text = string.IsNullOrEmpty(values[i]) ? "—" : values[i],
+                    FontSize = isHeader ? 11 : 12,
+                    FontWeight = isHeader ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal,
+                    Foreground = new SolidColorBrush(i == 2 && !isHeader
+                        ? statusColor
+                        : isHeader
+                            ? Windows.UI.Color.FromArgb(255, 107, 114, 128)
+                            : Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(tb, i);
+                grid.Children.Add(tb);
+            }
+
+            return new Border
+            {
+                Child = grid,
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(0, 0, 0, 1)
+            };
+        }
+
+        private static string FormatCcv2Timestamp(string isoTimestamp)
+        {
+            if (string.IsNullOrEmpty(isoTimestamp)) return "—";
+            return DateTime.TryParse(isoTimestamp, out var dt)
+                ? dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                : isoTimestamp;
         }
     }
 }

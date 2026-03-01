@@ -34,10 +34,34 @@ using WinRT.Interop;
 
 namespace QAssistant.Views
 {
+    internal sealed class RunbookListItem
+    {
+        public Runbook Runbook { get; }
+        public string Title => Runbook.Title;
+        public string CategoryLabel => Runbook.Category switch
+        {
+            RunbookCategory.GoLive => "Go-Live",
+            _ => Runbook.Category.ToString()
+        };
+        public string StepsLabel
+        {
+            get
+            {
+                int total = Runbook.Steps.Count;
+                if (total == 0) return "No steps";
+                int done = Runbook.Steps.Count(s => s.Status is RunbookStepStatus.Done or RunbookStepStatus.Skipped);
+                return $"{done}/{total} done";
+            }
+        }
+        public string UpdatedAtLabel => Runbook.UpdatedAt.ToString("MMM d, yyyy");
+        public RunbookListItem(Runbook r) => Runbook = r;
+    }
+
     public sealed partial class NotesPage : Page
     {
         private MainViewModel? _vm;
         private Note? _activeNote;
+        private Runbook? _activeRunbook;
         private bool _isLoading = false;
         private CancellationTokenSource? _saveCts;
         private Note? _clipboardNote;
@@ -617,6 +641,504 @@ namespace QAssistant.Views
                 await dialog.ShowAsync();
             }
         }
+
+        #endregion
+
+        #region Tab switching
+
+        private void UpdateTabStyles(bool notesActive)
+        {
+            var accent = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AccentBrush"];
+            var hover = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["HoverBrush"];
+            var textPrimary = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextPrimaryBrush"];
+            var textSecondary = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextSecondaryBrush"];
+            NotesTabBtn.Background = notesActive ? accent : hover;
+            NotesTabBtn.Foreground = notesActive ? textPrimary : textSecondary;
+            RunbooksTabBtn.Background = notesActive ? hover : accent;
+            RunbooksTabBtn.Foreground = notesActive ? textSecondary : textPrimary;
+        }
+
+        private void NotesTab_Click(object sender, RoutedEventArgs e)
+        {
+            if (NotesPanel == null || RunbooksPanel == null) return;
+            UpdateTabStyles(notesActive: true);
+            NotesPanel.Visibility = Visibility.Visible;
+            RunbooksPanel.Visibility = Visibility.Collapsed;
+            NotesEditorArea.Visibility = Visibility.Visible;
+            RunbooksEditorArea.Visibility = Visibility.Collapsed;
+        }
+
+        private void RunbooksTab_Click(object sender, RoutedEventArgs e)
+        {
+            if (NotesPanel == null || RunbooksPanel == null) return;
+            UpdateTabStyles(notesActive: false);
+            RunbooksPanel.Visibility = Visibility.Visible;
+            NotesPanel.Visibility = Visibility.Collapsed;
+            RunbooksEditorArea.Visibility = Visibility.Visible;
+            NotesEditorArea.Visibility = Visibility.Collapsed;
+            if (_vm != null)
+                RefreshRunbooks();
+        }
+
+        #endregion
+
+        #region Runbooks
+
+        private void RefreshRunbooks()
+        {
+            if (_vm?.SelectedProject == null) return;
+            RefreshRunbooksList();
+            if (_vm.SelectedProject.Runbooks.Count > 0 && RunbooksList.SelectedIndex < 0)
+                RunbooksList.SelectedIndex = 0;
+            else if (_vm.SelectedProject.Runbooks.Count == 0)
+                ShowRunbookEmptyState();
+        }
+
+        private void RefreshRunbooksList()
+        {
+            if (_vm?.SelectedProject == null) return;
+            var items = _vm.SelectedProject.Runbooks.Select(r => new RunbookListItem(r)).ToList();
+            RunbooksList.ItemsSource = null;
+            RunbooksList.ItemsSource = items;
+            if (_activeRunbook != null)
+                for (int i = 0; i < items.Count; i++)
+                    if (items[i].Runbook.Id == _activeRunbook.Id) { RunbooksList.SelectedIndex = i; break; }
+        }
+
+        private void RunbooksList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoading) return;
+            if (RunbooksList.SelectedItem is RunbookListItem item)
+                LoadRunbook(item.Runbook);
+        }
+
+        private void LoadRunbook(Runbook runbook)
+        {
+            _isLoading = true;
+            _activeRunbook = runbook;
+            RunbookTitleBox.Text = runbook.Title;
+            RunbookDescBox.Text = runbook.Description;
+            RunbookCategoryBox.SelectedIndex = (int)runbook.Category;
+            RunbookCategoryLabel.Text = GetCategoryLabel(runbook.Category);
+            RunbookLastSavedText.Text = $"Last saved: {runbook.UpdatedAt:MMM d, yyyy h:mm tt}";
+            RunbookEmptyState.Visibility = Visibility.Collapsed;
+            RunbookEditorPanel.Visibility = Visibility.Visible;
+            RefreshSteps();
+            _isLoading = false;
+        }
+
+        private void ShowRunbookEmptyState()
+        {
+            RunbookEmptyState.Visibility = Visibility.Visible;
+            RunbookEditorPanel.Visibility = Visibility.Collapsed;
+            _activeRunbook = null;
+        }
+
+        private static string GetCategoryLabel(RunbookCategory category) => category switch
+        {
+            RunbookCategory.GoLive => "Go-Live",
+            _ => category.ToString()
+        };
+
+        private async void AddRunbook_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm?.SelectedProject == null) return;
+            var runbook = new Runbook { Title = "New Runbook" };
+            _vm.SelectedProject.Runbooks.Add(runbook);
+            await _vm.SaveAsync();
+            RefreshRunbooksList();
+            RunbooksList.SelectedItem = RunbooksList.Items.OfType<RunbookListItem>()
+                .FirstOrDefault(i => i.Runbook.Id == runbook.Id);
+        }
+
+        private async void AddRunbookStep_Click(object sender, RoutedEventArgs e)
+        {
+            if (_activeRunbook == null) return;
+            var step = new RunbookStep { Title = $"Step {_activeRunbook.Steps.Count + 1}" };
+            _activeRunbook.Steps.Add(step);
+            _activeRunbook.UpdatedAt = DateTime.Now;
+            RefreshSteps();
+            RunbookLastSavedText.Text = $"Last saved: {_activeRunbook.UpdatedAt:MMM d, yyyy h:mm tt}";
+            await DebouncedSaveAsync();
+        }
+
+        private async void ResetRunbookSteps_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm?.SelectedProject == null || _activeRunbook == null) return;
+            var dialog = new ContentDialog
+            {
+                Title = "Reset Steps",
+                Content = "Set all steps back to Pending?",
+                PrimaryButtonText = "Reset",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                foreach (var step in _activeRunbook.Steps)
+                    step.Status = RunbookStepStatus.Pending;
+                _activeRunbook.UpdatedAt = DateTime.Now;
+                await _vm.SaveAsync();
+                RefreshSteps();
+                RunbookLastSavedText.Text = $"Last saved: {_activeRunbook.UpdatedAt:MMM d, yyyy h:mm tt}";
+            }
+        }
+
+        private async void DeleteRunbook_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm?.SelectedProject == null || _activeRunbook == null) return;
+            var dialog = new ContentDialog
+            {
+                Title = "Delete Runbook",
+                Content = $"Are you sure you want to delete \"{_activeRunbook.Title}\"?",
+                PrimaryButtonText = "Delete",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                _vm.SelectedProject.Runbooks.Remove(_activeRunbook);
+                _activeRunbook = null;
+                await _vm.SaveAsync();
+                RefreshRunbooks();
+            }
+        }
+
+        private async void RunbookTitle_Changed(object sender, TextChangedEventArgs e)
+        {
+            if (_isLoading || _activeRunbook == null) return;
+            _activeRunbook.Title = RunbookTitleBox.Text;
+            _activeRunbook.UpdatedAt = DateTime.Now;
+            RunbookLastSavedText.Text = $"Last saved: {_activeRunbook.UpdatedAt:MMM d, yyyy h:mm tt}";
+            RefreshRunbooksList();
+            await DebouncedSaveAsync();
+        }
+
+        private async void RunbookDesc_Changed(object sender, TextChangedEventArgs e)
+        {
+            if (_isLoading || _activeRunbook == null) return;
+            _activeRunbook.Description = RunbookDescBox.Text;
+            _activeRunbook.UpdatedAt = DateTime.Now;
+            RunbookLastSavedText.Text = $"Last saved: {_activeRunbook.UpdatedAt:MMM d, yyyy h:mm tt}";
+            await DebouncedSaveAsync();
+        }
+
+        private async void RunbookCategory_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoading || _activeRunbook == null) return;
+            if (RunbookCategoryBox.SelectedItem is ComboBoxItem item)
+            {
+                _activeRunbook.Category = Enum.Parse<RunbookCategory>(item.Tag!.ToString()!);
+                RunbookCategoryLabel.Text = GetCategoryLabel(_activeRunbook.Category);
+                _activeRunbook.UpdatedAt = DateTime.Now;
+                await DebouncedSaveAsync();
+            }
+        }
+
+        private void RefreshSteps()
+        {
+            StepItems.Children.Clear();
+            if (_activeRunbook == null) return;
+            for (int i = 0; i < _activeRunbook.Steps.Count; i++)
+                StepItems.Children.Add(BuildStepUI(_activeRunbook.Steps[i], i));
+            UpdateRunbookProgress();
+        }
+
+        private void UpdateRunbookProgress()
+        {
+            if (_activeRunbook == null) return;
+            int total = _activeRunbook.Steps.Count;
+            int done = _activeRunbook.Steps.Count(s => s.Status is RunbookStepStatus.Done or RunbookStepStatus.Skipped);
+            RunbookProgressText.Text = total == 0 ? "No steps yet" : $"{done}/{total} steps done";
+            RunbookProgressBar.Value = total == 0 ? 0 : (double)done / total * 100;
+            RefreshRunbooksList();
+        }
+
+        private UIElement BuildStepUI(RunbookStep step, int index)
+        {
+            var statusColor = GetStepStatusColor(step.Status);
+
+            var container = new Border
+            {
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 26, 26, 36)),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12),
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+
+            var outerGrid = new Grid();
+            outerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+            outerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            outerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // Step number badge
+            var badgeBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(statusColor);
+            var badge = new Border
+            {
+                Width = 26, Height = 26,
+                CornerRadius = new CornerRadius(13),
+                Background = badgeBrush,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 4, 0, 0),
+                Child = new TextBlock
+                {
+                    Text = (index + 1).ToString(),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontSize = 11,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                        Windows.UI.Color.FromArgb(255, 255, 255, 255))
+                }
+            };
+            Grid.SetColumn(badge, 0);
+            outerGrid.Children.Add(badge);
+
+            // Content column
+            var content = new StackPanel { Spacing = 6, Margin = new Thickness(10, 0, 10, 0) };
+
+            // Title row: title textbox + status combo
+            var titleRow = new Grid();
+            titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var titleBox = new TextBox
+            {
+                Text = step.Title,
+                PlaceholderText = "Step title...",
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+                BorderThickness = new Thickness(0),
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                FontSize = 13,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            titleBox.TextChanged += async (s, e) =>
+            {
+                step.Title = titleBox.Text;
+                _activeRunbook!.UpdatedAt = DateTime.Now;
+                RunbookLastSavedText.Text = $"Last saved: {_activeRunbook.UpdatedAt:MMM d, yyyy h:mm tt}";
+                await DebouncedSaveAsync();
+            };
+            Grid.SetColumn(titleBox, 0);
+            titleRow.Children.Add(titleBox);
+
+            var statusComboForeground = new Microsoft.UI.Xaml.Media.SolidColorBrush(statusColor);
+            var statusCombo = new ComboBox
+            {
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 37, 37, 53)),
+                Foreground = statusComboForeground,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(8, 4, 8, 4),
+                VerticalAlignment = VerticalAlignment.Center,
+                MinWidth = 110
+            };
+            // Items must match RunbookStepStatus enum order: Pending=0, InProgress=1, Done=2, Skipped=3, Blocked=4
+            statusCombo.Items.Add(new ComboBoxItem { Content = "Pending", Tag = "Pending" });
+            statusCombo.Items.Add(new ComboBoxItem { Content = "In Progress", Tag = "InProgress" });
+            statusCombo.Items.Add(new ComboBoxItem { Content = "Done", Tag = "Done" });
+            statusCombo.Items.Add(new ComboBoxItem { Content = "Skipped", Tag = "Skipped" });
+            statusCombo.Items.Add(new ComboBoxItem { Content = "Blocked", Tag = "Blocked" });
+            statusCombo.SelectedIndex = (int)step.Status;
+            statusCombo.SelectionChanged += async (s, e) =>
+            {
+                step.Status = (RunbookStepStatus)statusCombo.SelectedIndex;
+                var newColor = GetStepStatusColor(step.Status);
+                badgeBrush.Color = newColor;
+                statusComboForeground.Color = newColor;
+                _activeRunbook!.UpdatedAt = DateTime.Now;
+                UpdateRunbookProgress();
+                RunbookLastSavedText.Text = $"Last saved: {_activeRunbook.UpdatedAt:MMM d, yyyy h:mm tt}";
+                await DebouncedSaveAsync();
+            };
+            Grid.SetColumn(statusCombo, 1);
+            titleRow.Children.Add(statusCombo);
+            content.Children.Add(titleRow);
+
+            // Details textbox (monospace for commands/URLs)
+            var detailsBox = new TextBox
+            {
+                Text = step.Details,
+                PlaceholderText = "Details, commands, URLs...",
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 20, 20, 30)),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 55, 55, 75)),
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+                FontSize = 12,
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
+                Padding = new Thickness(8, 6, 8, 6),
+                CornerRadius = new CornerRadius(4),
+                MinHeight = 48
+            };
+            detailsBox.TextChanged += async (s, e) =>
+            {
+                step.Details = detailsBox.Text;
+                _activeRunbook!.UpdatedAt = DateTime.Now;
+                await DebouncedSaveAsync();
+            };
+            content.Children.Add(detailsBox);
+
+            // Notes + Assigned-to row
+            var notesRow = new Grid();
+            notesRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            notesRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+
+            var notesBox = new TextBox
+            {
+                Text = step.Notes,
+                PlaceholderText = "Notes...",
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+                BorderThickness = new Thickness(0),
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            notesBox.TextChanged += async (s, e) =>
+            {
+                step.Notes = notesBox.Text;
+                _activeRunbook!.UpdatedAt = DateTime.Now;
+                await DebouncedSaveAsync();
+            };
+            Grid.SetColumn(notesBox, 0);
+            notesRow.Children.Add(notesBox);
+
+            var assignedBox = new TextBox
+            {
+                Text = step.AssignedTo,
+                PlaceholderText = "Assigned to...",
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+                BorderThickness = new Thickness(0),
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            assignedBox.TextChanged += async (s, e) =>
+            {
+                step.AssignedTo = assignedBox.Text;
+                _activeRunbook!.UpdatedAt = DateTime.Now;
+                await DebouncedSaveAsync();
+            };
+            Grid.SetColumn(assignedBox, 1);
+            notesRow.Children.Add(assignedBox);
+            content.Children.Add(notesRow);
+
+            Grid.SetColumn(content, 1);
+            outerGrid.Children.Add(content);
+
+            // Up / Down / Delete buttons
+            var btnPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 4,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+
+            var upBtn = new Button
+            {
+                Content = "↑",
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 37, 37, 53)),
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 3, 6, 3),
+                FontSize = 12
+            };
+            upBtn.Click += async (s, e) =>
+            {
+                if (_activeRunbook == null) return;
+                int idx = _activeRunbook.Steps.IndexOf(step);
+                if (idx <= 0) return;
+                _activeRunbook.Steps.RemoveAt(idx);
+                _activeRunbook.Steps.Insert(idx - 1, step);
+                _activeRunbook.UpdatedAt = DateTime.Now;
+                await DebouncedSaveAsync();
+                RefreshSteps();
+            };
+            btnPanel.Children.Add(upBtn);
+
+            var downBtn = new Button
+            {
+                Content = "↓",
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 37, 37, 53)),
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 3, 6, 3),
+                FontSize = 12
+            };
+            downBtn.Click += async (s, e) =>
+            {
+                if (_activeRunbook == null) return;
+                int idx = _activeRunbook.Steps.IndexOf(step);
+                if (idx >= _activeRunbook.Steps.Count - 1) return;
+                _activeRunbook.Steps.RemoveAt(idx);
+                _activeRunbook.Steps.Insert(idx + 1, step);
+                _activeRunbook.UpdatedAt = DateTime.Now;
+                await DebouncedSaveAsync();
+                RefreshSteps();
+            };
+            btnPanel.Children.Add(downBtn);
+
+            var deleteBtn = new Button
+            {
+                Content = new FontIcon
+                {
+                    Glyph = "\uE711",
+                    FontSize = 10,
+                    FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons")
+                },
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 63, 26, 26)),
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 248, 113, 113)),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 3, 6, 3)
+            };
+            deleteBtn.Click += async (s, e) =>
+            {
+                if (_activeRunbook == null) return;
+                _activeRunbook.Steps.Remove(step);
+                _activeRunbook.UpdatedAt = DateTime.Now;
+                await DebouncedSaveAsync();
+                RefreshSteps();
+            };
+            btnPanel.Children.Add(deleteBtn);
+
+            Grid.SetColumn(btnPanel, 2);
+            outerGrid.Children.Add(btnPanel);
+
+            container.Child = outerGrid;
+            return container;
+        }
+
+        private static Windows.UI.Color GetStepStatusColor(RunbookStepStatus status) => status switch
+        {
+            RunbookStepStatus.Done => Windows.UI.Color.FromArgb(255, 16, 185, 129),
+            RunbookStepStatus.InProgress => Windows.UI.Color.FromArgb(255, 245, 158, 11),
+            RunbookStepStatus.Blocked => Windows.UI.Color.FromArgb(255, 239, 68, 68),
+            RunbookStepStatus.Skipped => Windows.UI.Color.FromArgb(255, 107, 114, 128),
+            _ => Windows.UI.Color.FromArgb(255, 75, 85, 99)
+        };
 
         #endregion
     }

@@ -77,9 +77,19 @@ namespace QAssistant.Services
         {
             try
             {
-                // Get CSRF token from login page
-                var loginPage = await _client.GetStringAsync($"{_hacBaseUrl}/j_spring_security_check");
-                var csrf = ExtractCsrfToken(loginPage);
+                // Fetch the CSRF token from the login form page.
+                // Different HAC deployments serve the form at different paths, so try each in order.
+                string? csrf = null;
+                foreach (var path in new[] { "/login", "/hac/login", "/j_spring_security_check" })
+                {
+                    try
+                    {
+                        var page = await _client.GetStringAsync($"{_hacBaseUrl}{path}");
+                        csrf = ExtractCsrfToken(page);
+                        if (csrf != null) break;
+                    }
+                    catch { }
+                }
 
                 var form = new FormUrlEncodedContent(new Dictionary<string, string>
                 {
@@ -103,35 +113,10 @@ namespace QAssistant.Services
         public async Task<List<CronJobEntry>> GetCronJobsAsync()
         {
             EnsureLoggedIn();
-            var results = new List<CronJobEntry>();
 
-            try
-            {
-                var html = await _client.GetStringAsync($"{_hacBaseUrl}/monitoring/cronjobs");
-
-                bool firstRow = true;
-                foreach (Match row in s_htmlRowRegex.Matches(html))
-                {
-                    if (firstRow) { firstRow = false; continue; }
-                    var cells = s_htmlCellRegex.Matches(row.Value);
-                    if (cells.Count < 4) continue;
-
-                    string Clean(string s) => s_htmlTagRegex.Replace(s, "").Trim();
-                    results.Add(new CronJobEntry(
-                        Code: Clean(cells[0].Groups[1].Value),
-                        Status: Clean(cells[1].Groups[1].Value),
-                        LastResult: Clean(cells[2].Groups[1].Value),
-                        NextActivationTime: cells.Count > 3 ? Clean(cells[3].Groups[1].Value) : "-",
-                        TriggerActive: cells.Count > 4 ? Clean(cells[4].Groups[1].Value) : "-"
-                    ));
-                }
-            }
-            catch (Exception ex)
-            {
-                results.Add(new CronJobEntry("Error", ex.Message, "", "", ""));
-            }
-
-            return results;
+            // Try the JSON REST endpoint available in SAP Commerce 2005+ first;
+            // fall back to HTML scraping for older HAC versions.
+            return await TryGetCronJobsViaRestAsync() ?? await ParseCronJobsFromHtmlAsync();
         }
 
         /// <summary>Execute a FlexibleSearch query.</summary>
@@ -141,17 +126,16 @@ namespace QAssistant.Services
 
             try
             {
-                var page = await _client.GetStringAsync($"{_hacBaseUrl}/console/flexsearch");
-                var csrf = ExtractCsrfToken(page);
+                var response = await PostWithCsrfRetryAsync(
+                    "/console/flexsearch",
+                    "/console/flexsearch/execute",
+                    csrf => new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        ["flexibleSearchQuery"] = query,
+                        ["maxCount"] = maxResults.ToString(),
+                        ["_csrf"] = csrf ?? string.Empty
+                    }));
 
-                var form = new FormUrlEncodedContent(new Dictionary<string, string>
-                {
-                    ["flexibleSearchQuery"] = query,
-                    ["maxCount"] = maxResults.ToString(),
-                    ["_csrf"] = csrf ?? string.Empty
-                });
-
-                var response = await _client.PostAsync($"{_hacBaseUrl}/console/flexsearch/execute", form);
                 var json = await response.Content.ReadAsStringAsync();
 
                 using var doc = JsonDocument.Parse(json);
@@ -191,23 +175,37 @@ namespace QAssistant.Services
 
             try
             {
-                var page = await _client.GetStringAsync($"{_hacBaseUrl}/console/impex/import");
-                var csrf = ExtractCsrfToken(page);
+                var response = await PostWithCsrfRetryAsync(
+                    "/console/impex/import",
+                    "/console/impex/import/upload-script",
+                    csrf => new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        ["scriptContent"] = script,
+                        ["encoding"] = "UTF-8",
+                        ["enableCodeExecution"] = enableCodeExecution ? "true" : "false",
+                        ["_csrf"] = csrf ?? string.Empty
+                    }));
 
-                var form = new FormUrlEncodedContent(new Dictionary<string, string>
+                var body = await response.Content.ReadAsStringAsync();
+
+                // Modern HAC (2005+) returns JSON; older versions return HTML
+                if (body.TrimStart().StartsWith('{'))
                 {
-                    ["scriptContent"] = script,
-                    ["encoding"] = "UTF-8",
-                    ["enableCodeExecution"] = enableCodeExecution ? "true" : "false",
-                    ["_csrf"] = csrf ?? string.Empty
-                });
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(body);
+                        var root = doc.RootElement;
+                        bool hasError = root.TryGetProperty("hasError", out var errFlag) && errFlag.GetBoolean();
+                        string log = GetJsonString(root, "initMessage", "exceptionMessage", "log") ?? body;
+                        return new ImpExResult(!hasError, log);
+                    }
+                    catch { }
+                }
 
-                var response = await _client.PostAsync($"{_hacBaseUrl}/console/impex/import/upload-script", form);
-                var log = await response.Content.ReadAsStringAsync();
-                bool success = log.Contains("Import finished successfully", StringComparison.OrdinalIgnoreCase)
+                // HTML / plain-text fallback
+                bool success = body.Contains("Import finished successfully", StringComparison.OrdinalIgnoreCase)
                             || response.IsSuccessStatusCode;
-
-                return new ImpExResult(success, log);
+                return new ImpExResult(success, body);
             }
             catch (Exception ex)
             {
@@ -338,6 +336,147 @@ namespace QAssistant.Services
             return new CatalogSyncDiff(catalogId, stagedCodes.Count, onlineCodes.Count, missing, DateTime.Now);
         }
 
+        // ── REST / HTML parsing helpers ───────────────────────────────
+
+        /// <summary>
+        /// Attempts to retrieve CronJob data from the JSON REST endpoint available
+        /// in SAP Commerce 2005+. Returns null when the endpoint is unavailable or
+        /// returns non-JSON content, signalling an older HAC version.
+        /// </summary>
+        private async Task<List<CronJobEntry>?> TryGetCronJobsViaRestAsync()
+        {
+            try
+            {
+                var response = await _client.GetAsync($"{_hacBaseUrl}/monitoring/cronjobs/data");
+                if (!response.IsSuccessStatusCode) return null;
+
+                var content = await response.Content.ReadAsStringAsync();
+                var trimmed = content.TrimStart();
+                if (!trimmed.StartsWith('{') && !trimmed.StartsWith('[')) return null;
+
+                using var doc = JsonDocument.Parse(content);
+                var root = doc.RootElement;
+
+                // Locate the data array — property name varies across Commerce versions
+                JsonElement dataArray = default;
+                bool found = root.TryGetProperty("cronJobData", out dataArray)
+                          || root.TryGetProperty("cronJobTableData", out dataArray)
+                          || root.TryGetProperty("data", out dataArray);
+
+                if (!found)
+                {
+                    if (root.ValueKind == JsonValueKind.Array)
+                        dataArray = root;
+                    else
+                        return null;
+                }
+
+                var results = new List<CronJobEntry>();
+                foreach (var item in dataArray.EnumerateArray())
+                {
+                    var code = GetJsonString(item, "jobCode", "code") ?? string.Empty;
+                    if (string.IsNullOrEmpty(code)) continue;
+
+                    bool? active = null;
+                    if (item.TryGetProperty("triggerActive", out var ta) || item.TryGetProperty("active", out ta))
+                        active = ta.ValueKind is JsonValueKind.True or JsonValueKind.False ? ta.GetBoolean() : null;
+
+                    results.Add(new CronJobEntry(
+                        Code: code,
+                        Status: GetJsonString(item, "jobStatus", "status") ?? string.Empty,
+                        LastResult: GetJsonString(item, "jobResult", "result") ?? string.Empty,
+                        NextActivationTime: GetJsonString(item, "nextActivationTime", "nextActivation") ?? "-",
+                        TriggerActive: active.HasValue ? active.Value.ToString() : "-"
+                    ));
+                }
+
+                return results.Count > 0 ? results : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Parses CronJob entries from the HAC monitoring HTML page.
+        /// Narrows the search to the first data table to avoid false matches
+        /// on page navigation or other surrounding chrome.
+        /// </summary>
+        private async Task<List<CronJobEntry>> ParseCronJobsFromHtmlAsync()
+        {
+            var results = new List<CronJobEntry>();
+            try
+            {
+                var html = await _client.GetStringAsync($"{_hacBaseUrl}/monitoring/cronjobs");
+
+                // Narrow to the first <table> to avoid matching page chrome rows
+                var tableMatch = Regex.Match(html,
+                    @"<table\b[^>]*>(.*?)</table>",
+                    RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                var searchHtml = tableMatch.Success ? tableMatch.Value : html;
+
+                bool firstRow = true;
+                foreach (Match row in s_htmlRowRegex.Matches(searchHtml))
+                {
+                    if (firstRow) { firstRow = false; continue; }
+                    var cells = s_htmlCellRegex.Matches(row.Value);
+                    if (cells.Count < 4) continue;
+
+                    string Clean(string s) => s_htmlTagRegex.Replace(s, "").Trim();
+                    var code = Clean(cells[0].Groups[1].Value);
+                    if (string.IsNullOrEmpty(code)) continue;
+
+                    results.Add(new CronJobEntry(
+                        Code: code,
+                        Status: Clean(cells[1].Groups[1].Value),
+                        LastResult: Clean(cells[2].Groups[1].Value),
+                        NextActivationTime: cells.Count > 3 ? Clean(cells[3].Groups[1].Value) : "-",
+                        TriggerActive: cells.Count > 4 ? Clean(cells[4].Groups[1].Value) : "-"
+                    ));
+                }
+            }
+            catch (Exception ex)
+            {
+                results.Add(new CronJobEntry("Error", ex.Message, string.Empty, string.Empty, string.Empty));
+            }
+            return results;
+        }
+
+        /// <summary>
+        /// Performs a POST with CSRF protection, automatically retrying once when a
+        /// 403 Forbidden response is received — which indicates the CSRF token expired
+        /// during a long-running session.
+        /// </summary>
+        private async Task<HttpResponseMessage> PostWithCsrfRetryAsync(
+            string csrfPagePath,
+            string postPath,
+            Func<string?, FormUrlEncodedContent> buildForm)
+        {
+            var page = await _client.GetStringAsync($"{_hacBaseUrl}{csrfPagePath}");
+            var csrf = ExtractCsrfToken(page);
+            var response = await _client.PostAsync($"{_hacBaseUrl}{postPath}", buildForm(csrf));
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                // Token expired — re-fetch and retry once
+                page = await _client.GetStringAsync($"{_hacBaseUrl}{csrfPagePath}");
+                csrf = ExtractCsrfToken(page);
+                response = await _client.PostAsync($"{_hacBaseUrl}{postPath}", buildForm(csrf));
+            }
+
+            return response;
+        }
+
+        /// <summary>Returns the string value of the first matching property name found in a JSON element.</summary>
+        private static string? GetJsonString(JsonElement element, params string[] propertyNames)
+        {
+            foreach (var name in propertyNames)
+                if (element.TryGetProperty(name, out var prop) && prop.ValueKind == JsonValueKind.String)
+                    return prop.GetString();
+            return null;
+        }
+
         // ── Helpers ──────────────────────────────────────────────────
 
         private void EnsureLoggedIn()
@@ -348,8 +487,23 @@ namespace QAssistant.Services
 
         private static string? ExtractCsrfToken(string html)
         {
-            var match = Regex.Match(html, @"name=""_csrf""\s+value=""([^""]+)""", RegexOptions.IgnoreCase);
-            return match.Success ? match.Groups[1].Value : null;
+            // Pattern 1: <input name="_csrf" value="TOKEN"> (standard attribute order)
+            var m = Regex.Match(html, @"name=""_csrf""\s+value=""([^""]+)""", RegexOptions.IgnoreCase);
+            if (m.Success) return m.Groups[1].Value;
+
+            // Pattern 2: <input value="TOKEN" name="_csrf"> (reversed attribute order)
+            m = Regex.Match(html, @"value=""([^""]+)""\s+name=""_csrf""", RegexOptions.IgnoreCase);
+            if (m.Success) return m.Groups[1].Value;
+
+            // Pattern 3: <meta name="_csrf" content="TOKEN"> (used for XHR in some HAC versions)
+            m = Regex.Match(html, @"<meta\s+name=""_csrf""\s+content=""([^""]+)""", RegexOptions.IgnoreCase);
+            if (m.Success) return m.Groups[1].Value;
+
+            // Pattern 4: JSON object embedded in a script block
+            m = Regex.Match(html, @"""_csrf""\s*:\s*""([^""]+)""");
+            if (m.Success) return m.Groups[1].Value;
+
+            return null;
         }
     }
 }

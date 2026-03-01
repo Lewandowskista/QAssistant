@@ -25,6 +25,8 @@
                             Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,7"/>
                     <Button x:Name="SapTabImpex" Content="ImpEx" Click="SapTab_Click" Tag="Impex"
                             Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,7"/>
+                    <Button x:Name="SapTabCcv2" Content="CCv2 Deployments" Click="SapTab_Click" Tag="Ccv2"
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,7"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <TextBlock Text="Environment:" Foreground="{ThemeResource TextSecondaryBrush}"
@@ -417,6 +419,57 @@
                 <ScrollViewer Grid.Row="3" Padding="16,8" Background="{ThemeResource SurfaceVariantBrush}">
                     <TextBlock x:Name="ImpexLogText" FontFamily="Consolas" FontSize="11"
                                Foreground="{ThemeResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- CCv2 Deployments panel -->
+            <Grid x:Name="Ccv2Panel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Toolbar -->
+                <Border Grid.Row="0" Background="{ThemeResource SurfaceBrush}"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
+                        Padding="16,8">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button x:Name="Ccv2RefreshBtn" Content="Refresh" Click="RefreshCcv2_Click"
+                                    Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                    CornerRadius="8" Padding="10,7"/>
+                            <TextBlock x:Name="Ccv2StatusText" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="Credentials: Settings → SAP CCv2"
+                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- Scrollable content -->
+                <ScrollViewer Grid.Row="1" Padding="16">
+                    <StackPanel Spacing="20">
+                        <TextBlock x:Name="Ccv2EmptyText"
+                                   Text="Configure CCv2 credentials in Settings → SAP CCv2 to fetch deployment status"
+                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="13"
+                                   HorizontalAlignment="Center" Margin="0,40,0,0"/>
+
+                        <!-- Environment cards -->
+                        <StackPanel x:Name="Ccv2EnvContainer" Spacing="10"/>
+
+                        <!-- Recent deployments table -->
+                        <Border x:Name="Ccv2DeploymentsPanel" Visibility="Collapsed"
+                                Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="10"
+                                BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="RECENT DEPLOYMENTS"
+                                           Foreground="{ThemeResource TextSecondaryBrush}"
+                                           FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
+                                <StackPanel x:Name="Ccv2DeploymentsContainer" Spacing="0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </ScrollViewer>
             </Grid>
 

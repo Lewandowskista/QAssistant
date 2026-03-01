@@ -48,8 +48,21 @@ namespace QAssistant.Models
         public List<TestExecution> TestExecutions { get; set; } = new();
         public List<SavedApiRequest> ApiRequests { get; set; } = new();
         public List<ChecklistTemplate> Checklists { get; set; } = new();
+        public List<Runbook> Runbooks { get; set; } = new();
         public List<QaEnvironment> Environments { get; set; } = new();
         public List<TestDataGroup> TestDataGroups { get; set; } = new();
+
+        /// <summary>
+        /// Named Jira connections for this project. A project may have one entry per
+        /// Jira workspace / project key (e.g. Frontend, Backend, OMS).
+        /// </summary>
+        public List<JiraConnection> JiraConnections { get; set; } = new();
+
+        /// <summary>
+        /// Named Linear connections for this project. A project may have one entry per
+        /// Linear team / workspace.
+        /// </summary>
+        public List<LinearConnection> LinearConnections { get; set; } = new();
 
         /// <summary>
         /// Persisted analysis history for Linear tasks, keyed by ExternalId.

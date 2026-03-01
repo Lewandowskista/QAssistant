@@ -59,15 +59,27 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Test Cases -->
+                <!-- Failed Tests -->
+                <Border Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20,16" BorderBrush="#3F1A1A" BorderThickness="1" MinWidth="160">
+                    <StackPanel Spacing="4">
+                        <FontIcon Glyph="&#xE711;" FontSize="20" FontFamily="Segoe Fluent Icons"
+                                  Foreground="#EF4444" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="FailedTestsCount" Foreground="{ThemeResource TextPrimaryBrush}"
+                                   FontSize="28" FontWeight="Bold" Margin="0,4,0,0"/>
+                        <TextBlock Text="Failed Tests" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Not Run Tests -->
                 <Border Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
                         Padding="20,16" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" MinWidth="160">
                     <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE762;" FontSize="20" FontFamily="Segoe Fluent Icons"
-                                  Foreground="#A78BFA" HorizontalAlignment="Left"/>
-                        <TextBlock x:Name="TestCasesCount" Foreground="{ThemeResource TextPrimaryBrush}"
+                        <FontIcon Glyph="&#xE773;" FontSize="20" FontFamily="Segoe Fluent Icons"
+                                  Foreground="#9CA3AF" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="NotRunCount" Foreground="{ThemeResource TextPrimaryBrush}"
                                    FontSize="28" FontWeight="Bold" Margin="0,4,0,0"/>
-                        <TextBlock Text="Test Cases" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                        <TextBlock Text="Not Run" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
                     </StackPanel>
                 </Border>
 
@@ -96,7 +108,7 @@
                 <Border Grid.Column="0" Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
                         Padding="20" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="TASK BREAKDOWN" Foreground="{ThemeResource TextSecondaryBrush}"
+                        <TextBlock Text="TEST CASE BREAKDOWN" Foreground="{ThemeResource TextSecondaryBrush}"
                                    FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
                         <StackPanel x:Name="TaskBreakdownContainer" Spacing="8"/>
                     </StackPanel>
@@ -137,18 +149,36 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Recent Notes -->
-                <Border Grid.Column="2" Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
-                        Padding="20" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="RECENT NOTES" Foreground="{ThemeResource TextSecondaryBrush}"
-                                   FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
-                        <StackPanel x:Name="RecentNotesContainer" Spacing="8"/>
-                        <TextBlock x:Name="NotesEmptyText" Text="No notes yet"
-                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
-                                   Visibility="Collapsed"/>
-                    </StackPanel>
-                </Border>
+                <!-- Notes + Runbooks (from Notes page) -->
+                <StackPanel Grid.Column="2" Spacing="12">
+
+                    <!-- Recent Notes -->
+                    <Border Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                            Padding="12" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="RECENT NOTES" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="10" FontWeight="SemiBold" CharacterSpacing="150" Margin="8,0,0,4"/>
+                            <StackPanel x:Name="RecentNotesContainer" Spacing="2"/>
+                            <TextBlock x:Name="NotesEmptyText" Text="No notes yet"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                       Visibility="Collapsed" Margin="10,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Active Runbooks -->
+                    <Border Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                            Padding="12" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="ACTIVE RUNBOOKS" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="10" FontWeight="SemiBold" CharacterSpacing="150" Margin="8,0,0,4"/>
+                            <StackPanel x:Name="RunbooksContainer" Spacing="2"/>
+                            <TextBlock x:Name="RunbooksEmptyText" Text="No runbooks yet"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                       Visibility="Collapsed" Margin="10,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
             </Grid>
 
         </StackPanel>

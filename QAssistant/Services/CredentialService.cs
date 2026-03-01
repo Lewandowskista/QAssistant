@@ -27,42 +27,28 @@ namespace QAssistant.Services
             ArgumentNullException.ThrowIfNull(value);
 
             var byteArray = Encoding.UTF8.GetBytes(value);
-            IntPtr targetName = IntPtr.Zero;
-            IntPtr credentialBlob = IntPtr.Zero;
-            IntPtr userName = IntPtr.Zero;
-            IntPtr credPtr = IntPtr.Zero;
-
+            var credentialBlob = Marshal.AllocHGlobal(byteArray.Length);
             try
             {
-                targetName = Marshal.StringToCoTaskMemUni("QAssistant_" + key);
-                credentialBlob = Marshal.AllocCoTaskMem(byteArray.Length);
-                userName = Marshal.StringToCoTaskMemUni("QAssistant");
-
                 Marshal.Copy(byteArray, 0, credentialBlob, byteArray.Length);
 
                 var cred = new CREDENTIAL
                 {
                     Type = 1,
-                    TargetName = targetName,
+                    TargetName = "QAssistant_" + key,
                     CredentialBlob = credentialBlob,
                     CredentialBlobSize = (uint)byteArray.Length,
                     Persist = 2,
-                    UserName = userName
+                    UserName = "QAssistant"
                 };
 
-                credPtr = Marshal.AllocCoTaskMem(Marshal.SizeOf(cred));
-                Marshal.StructureToPtr(cred, credPtr, false);
-
-                if (!CredWrite(credPtr, 0))
+                if (!CredWrite(ref cred, 0))
                     throw new Win32Exception(Marshal.GetLastWin32Error());
             }
             finally
             {
                 Array.Clear(byteArray);
-                if (credPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(credPtr);
-                if (credentialBlob != IntPtr.Zero) Marshal.FreeCoTaskMem(credentialBlob);
-                if (targetName != IntPtr.Zero) Marshal.FreeCoTaskMem(targetName);
-                if (userName != IntPtr.Zero) Marshal.FreeCoTaskMem(userName);
+                Marshal.FreeHGlobal(credentialBlob);
             }
         }
 
@@ -134,7 +120,7 @@ namespace QAssistant.Services
         }
 
         [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern bool CredWrite(IntPtr Credential, uint Flags);
+        private static extern bool CredWrite([In] ref CREDENTIAL userCredential, uint flags);
 
         [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool CredRead(string target, uint type, uint reservedFlag, out IntPtr credentialPtr);
@@ -150,16 +136,16 @@ namespace QAssistant.Services
         {
             public uint Flags;
             public uint Type;
-            public IntPtr TargetName;
-            public IntPtr Comment;
+            [MarshalAs(UnmanagedType.LPWStr)] public string? TargetName;
+            [MarshalAs(UnmanagedType.LPWStr)] public string? Comment;
             public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
             public uint CredentialBlobSize;
             public IntPtr CredentialBlob;
             public uint Persist;
             public uint AttributeCount;
             public IntPtr Attributes;
-            public IntPtr TargetAlias;
-            public IntPtr UserName;
+            [MarshalAs(UnmanagedType.LPWStr)] public string? TargetAlias;
+            [MarshalAs(UnmanagedType.LPWStr)] public string? UserName;
         }
     }
 }

@@ -195,42 +195,77 @@
                                      Foreground="{ThemeResource TextPrimaryBrush}"
                                      BorderBrush="{ThemeResource BorderBrush}"
                                      CornerRadius="8"
-                                     Padding="12,10"/>
+                                     Padding="12,10"
+                                     Visibility="Collapsed"/>
                     </StackPanel>
 
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Team ID" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
-                        <TextBox x:Name="LinearTeamIdBox"
-                                 PlaceholderText="Your Linear Team ID"
-                                 Background="{ThemeResource ApplicationBackgroundBrush}"
-                                 Foreground="{ThemeResource TextPrimaryBrush}"
-                                 BorderBrush="{ThemeResource BorderBrush}"
-                                 CornerRadius="8"
-                                 Padding="12,10"/>
-                        <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
-                                   Text="Go to linear.app → Settings → Team → copy the ID from the URL"/>
-                    </StackPanel>
+                    <TextBlock Text="CONNECTIONS" Foreground="{ThemeResource TextSecondaryBrush}"
+                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
 
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Button Content="Save Linear Keys"
-                                Click="SaveLinear_Click"
-                                Background="{ThemeResource HoverBrush}"
-                                Foreground="{ThemeResource AccentBrush}"
-                                CornerRadius="8"
-                                Padding="10,7"/>
-                        <Button Content="Test Connection"
-                                Click="TestLinear_Click"
-                                Background="{ThemeResource HoverBrush}"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                CornerRadius="8"
-                                Padding="10,7"/>
-                        <Button Content="Disconnect"
-                                Click="DisconnectLinear_Click"
-                                Background="#3F1A1A"
-                                Foreground="#F87171"
-                                CornerRadius="8"
-                                Padding="10,7"/>
-                    </StackPanel>
+                    <StackPanel x:Name="LinearConnectionsList" Spacing="8"/>
+
+                    <Button x:Name="AddLinearBtn" Content="＋ Add Connection"
+                            Click="AddLinear_Click"
+                            Background="{ThemeResource HoverBrush}"
+                            Foreground="{ThemeResource AccentBrush}"
+                            CornerRadius="8" Padding="10,7"
+                            HorizontalAlignment="Left"/>
+
+                    <Border x:Name="LinearConnectionFormPanel" Visibility="Collapsed"
+                            Background="{ThemeResource ApplicationBackgroundBrush}"
+                            CornerRadius="8" Padding="16,14"
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock x:Name="LinearFormTitle" Text="New Connection"
+                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                       FontSize="14" FontWeight="SemiBold"/>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Label" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                                <TextBox x:Name="LinearConnLabelBox"
+                                         PlaceholderText="e.g. Frontend, Backend"
+                                         Background="{ThemeResource SurfaceVariantBrush}"
+                                         Foreground="{ThemeResource TextPrimaryBrush}"
+                                         BorderBrush="{ThemeResource BorderBrush}"
+                                         CornerRadius="8" Padding="12,10"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="API Key" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                                <PasswordBox x:Name="LinearConnApiKeyBox"
+                                             PlaceholderText="lin_api_... (leave blank to keep existing)"
+                                             Background="{ThemeResource SurfaceVariantBrush}"
+                                             Foreground="{ThemeResource TextPrimaryBrush}"
+                                             BorderBrush="{ThemeResource BorderBrush}"
+                                             CornerRadius="8" Padding="12,10"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Team ID" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                                <TextBox x:Name="LinearConnTeamIdBox"
+                                         PlaceholderText="Your Linear Team ID"
+                                         Background="{ThemeResource SurfaceVariantBrush}"
+                                         Foreground="{ThemeResource TextPrimaryBrush}"
+                                         BorderBrush="{ThemeResource BorderBrush}"
+                                         CornerRadius="8" Padding="12,10"/>
+                                <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                           Text="Go to linear.app → Settings → Team → copy the ID from the URL"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Button Content="Save Connection"
+                                        Click="SaveLinear_Click"
+                                        Background="{ThemeResource HoverBrush}"
+                                        Foreground="{ThemeResource AccentBrush}"
+                                        CornerRadius="8" Padding="10,7"/>
+                                <Button Content="Test"
+                                        Click="TestLinear_Click"
+                                        Background="{ThemeResource HoverBrush}"
+                                        Foreground="{ThemeResource TextSecondaryBrush}"
+                                        CornerRadius="8" Padding="10,7"/>
+                                <Button Content="Cancel"
+                                        Click="CancelLinearForm_Click"
+                                        Background="#3F1A1A" Foreground="#F87171"
+                                        CornerRadius="8" Padding="10,7"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
                     <Border x:Name="LinearStatusBorder" Visibility="Collapsed"
                             CornerRadius="8" Padding="12,8">
@@ -262,72 +297,91 @@
                                 VerticalAlignment="Top"/>
                     </Grid>
 
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Domain" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
-                        <TextBox x:Name="JiraDomainBox"
-                                 PlaceholderText="your-company (from your-company.atlassian.net)"
-                                 Background="{ThemeResource ApplicationBackgroundBrush}"
-                                 Foreground="{ThemeResource TextPrimaryBrush}"
-                                 BorderBrush="{ThemeResource BorderBrush}"
-                                 CornerRadius="8"
-                                 Padding="12,10"/>
-                    </StackPanel>
+                    <TextBlock Text="CONNECTIONS" Foreground="{ThemeResource TextSecondaryBrush}"
+                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
 
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Email" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
-                        <TextBox x:Name="JiraEmailBox"
-                                 PlaceholderText="your@email.com"
-                                 Background="{ThemeResource ApplicationBackgroundBrush}"
-                                 Foreground="{ThemeResource TextPrimaryBrush}"
-                                 BorderBrush="{ThemeResource BorderBrush}"
-                                 CornerRadius="8"
-                                 Padding="12,10"/>
-                    </StackPanel>
+                    <StackPanel x:Name="JiraConnectionsList" Spacing="8"/>
 
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="API Token" Foreground="#9CA3AF" FontSize="12"/>
-                        <PasswordBox x:Name="JiraApiTokenBox"
-                                     PlaceholderText="Your Jira API token"
-                                     Background="#0F0F13"
-                                     Foreground="#E2E8F0"
-                                     BorderBrush="#2A2A3A"
-                                     CornerRadius="8"
-                                     Padding="12,10"/>
-                    </StackPanel>
+                    <Button x:Name="AddJiraBtn" Content="＋ Add Connection"
+                            Click="AddJira_Click"
+                            Background="{ThemeResource HoverBrush}"
+                            Foreground="{ThemeResource AccentBrush}"
+                            CornerRadius="8" Padding="10,7"
+                            HorizontalAlignment="Left"/>
 
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Project Key" Foreground="#9CA3AF" FontSize="12"/>
-                        <TextBox x:Name="JiraProjectKeyBox"
-                                 PlaceholderText="e.g. QA, DEV, PROJ"
-                                 Background="#0F0F13"
-                                 Foreground="#E2E8F0"
-                                 BorderBrush="#2A2A3A"
-                                 CornerRadius="8"
-                                 Padding="12,10"/>
-                        <TextBlock Foreground="#6B7280" FontSize="11"
-                                   Text="The short key shown before issue numbers e.g. QA-123"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Button Content="Save Jira Keys"
-                                Click="SaveJira_Click"
-                                Background="{ThemeResource HoverBrush}"
-                                Foreground="{ThemeResource AccentBrush}"
-                                CornerRadius="8"
-                                Padding="10,7"/>
-                        <Button Content="Test Connection"
-                                Click="TestJira_Click"
-                                Background="{ThemeResource HoverBrush}"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                CornerRadius="8"
-                                Padding="10,7"/>
-                        <Button Content="Disconnect"
-                                Click="DisconnectJira_Click"
-                                Background="#3F1A1A"
-                                Foreground="#F87171"
-                                CornerRadius="8"
-                                Padding="10,7"/>
-                    </StackPanel>
+                    <Border x:Name="JiraConnectionFormPanel" Visibility="Collapsed"
+                            Background="{ThemeResource ApplicationBackgroundBrush}"
+                            CornerRadius="8" Padding="16,14"
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock x:Name="JiraFormTitle" Text="New Connection"
+                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                       FontSize="14" FontWeight="SemiBold"/>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Label" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                                <TextBox x:Name="JiraConnLabelBox"
+                                         PlaceholderText="e.g. Frontend, Backend OMS"
+                                         Background="{ThemeResource SurfaceVariantBrush}"
+                                         Foreground="{ThemeResource TextPrimaryBrush}"
+                                         BorderBrush="{ThemeResource BorderBrush}"
+                                         CornerRadius="8" Padding="12,10"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Domain" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                                <TextBox x:Name="JiraConnDomainBox"
+                                         PlaceholderText="your-company (from your-company.atlassian.net)"
+                                         Background="{ThemeResource SurfaceVariantBrush}"
+                                         Foreground="{ThemeResource TextPrimaryBrush}"
+                                         BorderBrush="{ThemeResource BorderBrush}"
+                                         CornerRadius="8" Padding="12,10"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Email" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                                <TextBox x:Name="JiraConnEmailBox"
+                                         PlaceholderText="your@email.com"
+                                         Background="{ThemeResource SurfaceVariantBrush}"
+                                         Foreground="{ThemeResource TextPrimaryBrush}"
+                                         BorderBrush="{ThemeResource BorderBrush}"
+                                         CornerRadius="8" Padding="12,10"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="API Token" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                                <PasswordBox x:Name="JiraConnApiTokenBox"
+                                             PlaceholderText="Your Jira API token (leave blank to keep existing)"
+                                             Background="{ThemeResource SurfaceVariantBrush}"
+                                             Foreground="{ThemeResource TextPrimaryBrush}"
+                                             BorderBrush="{ThemeResource BorderBrush}"
+                                             CornerRadius="8" Padding="12,10"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Project Key" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                                <TextBox x:Name="JiraConnProjectKeyBox"
+                                         PlaceholderText="e.g. QA, DEV, PROJ"
+                                         Background="{ThemeResource SurfaceVariantBrush}"
+                                         Foreground="{ThemeResource TextPrimaryBrush}"
+                                         BorderBrush="{ThemeResource BorderBrush}"
+                                         CornerRadius="8" Padding="12,10"/>
+                                <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                           Text="The short key shown before issue numbers e.g. QA-123"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Button Content="Save Connection"
+                                        Click="SaveJira_Click"
+                                        Background="{ThemeResource HoverBrush}"
+                                        Foreground="{ThemeResource AccentBrush}"
+                                        CornerRadius="8" Padding="10,7"/>
+                                <Button Content="Test"
+                                        Click="TestJira_Click"
+                                        Background="{ThemeResource HoverBrush}"
+                                        Foreground="{ThemeResource TextSecondaryBrush}"
+                                        CornerRadius="8" Padding="10,7"/>
+                                <Button Content="Cancel"
+                                        Click="CancelJiraForm_Click"
+                                        Background="#3F1A1A" Foreground="#F87171"
+                                        CornerRadius="8" Padding="10,7"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
                     <Border x:Name="JiraStatusBorder" Visibility="Collapsed"
                             CornerRadius="8" Padding="12,8">
@@ -379,6 +433,84 @@
                     <Border x:Name="GeminiStatusBorder" Visibility="Collapsed"
                             CornerRadius="8" Padding="12,8">
                         <TextBlock x:Name="GeminiStatusText" FontSize="12"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- SAP CCv2 Section -->
+            <Border Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="12"
+                    BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" Padding="24">
+                <StackPanel Spacing="16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="SAP Commerce Cloud v2 (CCv2)"
+                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                       FontSize="16" FontWeight="SemiBold"/>
+                            <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Text="Enter your subscription code and a Management API token to enable the CCv2 Deployments panel on the SAP page."/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="API Docs"
+                                Click="OpenCcv2Docs_Click"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                CornerRadius="8" Padding="10,7"
+                                VerticalAlignment="Top"/>
+                    </Grid>
+
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Subscription Code" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                        <TextBox x:Name="Ccv2SubscriptionCodeBox"
+                                 PlaceholderText="Your CCv2 subscription code"
+                                 Background="{ThemeResource ApplicationBackgroundBrush}"
+                                 Foreground="{ThemeResource TextPrimaryBrush}"
+                                 BorderBrush="{ThemeResource BorderBrush}"
+                                 CornerRadius="8"
+                                 Padding="12,10"/>
+                        <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                   Text="Found in the SAP Commerce Cloud Portal under your project settings"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="API Token" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                        <PasswordBox x:Name="Ccv2ApiTokenBox"
+                                     PlaceholderText="Bearer token from the CCv2 portal"
+                                     Background="{ThemeResource ApplicationBackgroundBrush}"
+                                     Foreground="{ThemeResource TextPrimaryBrush}"
+                                     BorderBrush="{ThemeResource BorderBrush}"
+                                     CornerRadius="8"
+                                     Padding="12,10"/>
+                        <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                   Text="Generate in Cloud Portal → API Token Management"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="Save CCv2 Credentials"
+                                Click="SaveCcv2_Click"
+                                Background="{ThemeResource HoverBrush}"
+                                Foreground="{ThemeResource AccentBrush}"
+                                CornerRadius="8"
+                                Padding="10,7"/>
+                        <Button Content="Test Connection"
+                                Click="TestCcv2_Click"
+                                Background="{ThemeResource HoverBrush}"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="8"
+                                Padding="10,7"/>
+                        <Button Content="Disconnect"
+                                Click="DisconnectCcv2_Click"
+                                Background="#3F1A1A"
+                                Foreground="#F87171"
+                                CornerRadius="8"
+                                Padding="10,7"/>
+                    </StackPanel>
+
+                    <Border x:Name="Ccv2StatusBorder" Visibility="Collapsed"
+                            CornerRadius="8" Padding="12,8">
+                        <TextBlock x:Name="Ccv2StatusText" FontSize="12"/>
                     </Border>
                 </StackPanel>
             </Border>

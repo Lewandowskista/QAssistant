@@ -21,6 +21,7 @@ using QAssistant.Models;
 using QAssistant.Services;
 using QAssistant.ViewModels;
 using Microsoft.UI;
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -35,6 +36,8 @@ namespace QAssistant.Views
         private bool _isLoading = true;
         private MainViewModel? _vm;
         private Guid _projectId;
+        private Guid? _editingLinearConnectionId;
+        private Guid? _editingJiraConnectionId;
 
         public SettingsPage()
         {
@@ -110,33 +113,21 @@ namespace QAssistant.Views
             if (!string.IsNullOrEmpty(apiKey))
                 AutomationApiKeyBox.Password = apiKey;
 
-            var linearKey = LoadProjectCred("LinearApiKey");
-            if (!string.IsNullOrEmpty(linearKey))
-                LinearApiKeyBox.Password = linearKey;
-
-            var linearTeam = LoadProjectCred("LinearTeamId");
-            if (!string.IsNullOrEmpty(linearTeam))
-                LinearTeamIdBox.Text = linearTeam;
-
-            var jiraDomain = LoadProjectCred("JiraDomain");
-            if (!string.IsNullOrEmpty(jiraDomain))
-                JiraDomainBox.Text = jiraDomain;
-
-            var jiraEmail = LoadProjectCred("JiraEmail");
-            if (!string.IsNullOrEmpty(jiraEmail))
-                JiraEmailBox.Text = jiraEmail;
-
-            var jiraToken = LoadProjectCred("JiraApiToken");
-            if (!string.IsNullOrEmpty(jiraToken))
-                JiraApiTokenBox.Password = jiraToken;
-
-            var jiraProject = LoadProjectCred("JiraProjectKey");
-            if (!string.IsNullOrEmpty(jiraProject))
-                JiraProjectKeyBox.Text = jiraProject;
+            MigrateLegacyCredentials();
+            RenderLinearConnectionsList();
+            RenderJiraConnectionsList();
 
             var geminiKey = LoadProjectCred("GeminiApiKey");
             if (!string.IsNullOrEmpty(geminiKey))
                 GeminiApiKeyBox.Password = geminiKey;
+
+            var ccv2SubCode = CredentialService.LoadCredential("Ccv2SubscriptionCode");
+            if (!string.IsNullOrEmpty(ccv2SubCode))
+                Ccv2SubscriptionCodeBox.Text = ccv2SubCode;
+
+            var ccv2Token = CredentialService.LoadCredential("Ccv2ApiToken");
+            if (!string.IsNullOrEmpty(ccv2Token))
+                Ccv2ApiTokenBox.Password = ccv2Token;
 
             // SAP Commerce Context (global, not per-project — default off)
             var sapContextEnabled = CredentialService.LoadCredential("SapCommerceContextEnabled");
@@ -299,56 +290,198 @@ namespace QAssistant.Views
             await Windows.System.Launcher.LaunchUriAsync(new Uri("https://linear.app/settings/api"));
         }
 
-        private void SaveLinear_Click(object sender, RoutedEventArgs e)
+        private void RenderLinearConnectionsList()
         {
-            if (string.IsNullOrWhiteSpace(LinearApiKeyBox.Password) ||
-                string.IsNullOrWhiteSpace(LinearTeamIdBox.Text))
+            LinearConnectionsList.Children.Clear();
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+
+            if (project.LinearConnections.Count == 0)
             {
-                ShowStatus(LinearStatusBorder, LinearStatusText,
-                    "Please fill in both the API Key and Team ID.", false);
+                LinearConnectionsList.Children.Add(new TextBlock
+                {
+                    Text = "No connections configured.",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 12
+                });
                 return;
             }
 
-            SaveProjectCred("LinearApiKey", LinearApiKeyBox.Password.Trim());
-            SaveProjectCred("LinearTeamId", LinearTeamIdBox.Text.Trim());
-            ShowStatus(LinearStatusBorder, LinearStatusText, "Linear keys saved for this project.", true);
+            foreach (var conn in project.LinearConnections)
+            {
+                var capturedConn = conn;
+                var card = new Border
+                {
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 15, 15, 19)),
+                    BorderBrush = (Brush)Application.Current.Resources["BorderBrush"],
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12, 10, 12, 10)
+                };
+                var row = new Grid();
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var info = new StackPanel { Spacing = 2 };
+                info.Children.Add(new TextBlock
+                {
+                    Text = conn.Label,
+                    Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                    FontSize = 13,
+                    FontWeight = FontWeights.SemiBold
+                });
+                info.Children.Add(new TextBlock
+                {
+                    Text = $"Team: {conn.TeamId}",
+                    Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
+                    FontSize = 11
+                });
+                Grid.SetColumn(info, 0);
+                row.Children.Add(info);
+
+                var btns = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+                var editBtn = new Button
+                {
+                    Content = "Edit",
+                    Background = (Brush)Application.Current.Resources["HoverBrush"],
+                    Foreground = (Brush)Application.Current.Resources["AccentBrush"],
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(10, 5, 10, 5),
+                    FontSize = 12
+                };
+                editBtn.Click += (s, e) => EditLinearConnection(capturedConn.Id);
+
+                var deleteBtn = new Button
+                {
+                    Content = "✕",
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 63, 26, 26)),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113)),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(8, 5, 8, 5),
+                    FontSize = 12
+                };
+                deleteBtn.Click += (s, e) => DeleteLinearConnection(capturedConn.Id);
+
+                btns.Children.Add(editBtn);
+                btns.Children.Add(deleteBtn);
+                Grid.SetColumn(btns, 1);
+                row.Children.Add(btns);
+
+                card.Child = row;
+                LinearConnectionsList.Children.Add(card);
+            }
+        }
+
+        private void AddLinear_Click(object sender, RoutedEventArgs e)
+        {
+            _editingLinearConnectionId = null;
+            LinearFormTitle.Text = "New Connection";
+            LinearConnLabelBox.Text = string.Empty;
+            LinearConnApiKeyBox.Password = string.Empty;
+            LinearConnTeamIdBox.Text = string.Empty;
+            LinearConnectionFormPanel.Visibility = Visibility.Visible;
+            LinearStatusBorder.Visibility = Visibility.Collapsed;
+        }
+
+        private void EditLinearConnection(Guid id)
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+            var conn = project.LinearConnections.FirstOrDefault(c => c.Id == id);
+            if (conn == null) return;
+
+            _editingLinearConnectionId = id;
+            LinearFormTitle.Text = $"Edit: {conn.Label}";
+            LinearConnLabelBox.Text = conn.Label;
+            LinearConnApiKeyBox.Password = string.Empty;
+            LinearConnTeamIdBox.Text = conn.TeamId;
+            LinearConnectionFormPanel.Visibility = Visibility.Visible;
+            LinearStatusBorder.Visibility = Visibility.Collapsed;
+        }
+
+        private void DeleteLinearConnection(Guid id)
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+            project.LinearConnections.RemoveAll(c => c.Id == id);
+            CredentialService.DeleteProjectCredential(project.Id, $"LinearApiKey_{id}");
+            RenderLinearConnectionsList();
+            _ = _vm!.SaveAsync();
+            ShowStatus(LinearStatusBorder, LinearStatusText, "Connection removed.", true);
+        }
+
+        private void SaveLinear_Click(object sender, RoutedEventArgs e)
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+
+            var label = LinearConnLabelBox.Text.Trim();
+            var teamId = LinearConnTeamIdBox.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(teamId))
+            {
+                ShowStatus(LinearStatusBorder, LinearStatusText, "Please fill in Label and Team ID.", false);
+                return;
+            }
+
+            if (_editingLinearConnectionId == null)
+            {
+                if (string.IsNullOrWhiteSpace(LinearConnApiKeyBox.Password))
+                {
+                    ShowStatus(LinearStatusBorder, LinearStatusText, "API Key is required for a new connection.", false);
+                    return;
+                }
+                var conn = new LinearConnection { Label = label, TeamId = teamId };
+                CredentialService.SaveProjectCredential(project.Id, $"LinearApiKey_{conn.Id}", LinearConnApiKeyBox.Password.Trim());
+                project.LinearConnections.Add(conn);
+            }
+            else
+            {
+                var conn = project.LinearConnections.FirstOrDefault(c => c.Id == _editingLinearConnectionId);
+                if (conn == null) return;
+                conn.Label = label;
+                conn.TeamId = teamId;
+                if (!string.IsNullOrWhiteSpace(LinearConnApiKeyBox.Password))
+                    CredentialService.SaveProjectCredential(project.Id, $"LinearApiKey_{conn.Id}", LinearConnApiKeyBox.Password.Trim());
+            }
+
+            _ = _vm!.SaveAsync();
+            RenderLinearConnectionsList();
+            LinearConnectionFormPanel.Visibility = Visibility.Collapsed;
+            _editingLinearConnectionId = null;
+            ShowStatus(LinearStatusBorder, LinearStatusText, "Connection saved.", true);
         }
 
         private async void TestLinear_Click(object sender, RoutedEventArgs e)
         {
-            var key = LoadProjectCred("LinearApiKey");
-            var teamId = LoadProjectCred("LinearTeamId");
+            var key = LinearConnApiKeyBox.Password.Trim();
+            if (string.IsNullOrEmpty(key) && _editingLinearConnectionId.HasValue && _vm?.SelectedProject != null)
+                key = CredentialService.LoadProjectCredential(_vm.SelectedProject.Id, $"LinearApiKey_{_editingLinearConnectionId}") ?? string.Empty;
 
-            if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(teamId))
+            if (string.IsNullOrEmpty(key))
             {
-                ShowStatus(LinearStatusBorder, LinearStatusText,
-                    "Save your Linear keys first.", false);
+                ShowStatus(LinearStatusBorder, LinearStatusText, "Enter an API Key first.", false);
                 return;
             }
 
             ShowStatus(LinearStatusBorder, LinearStatusText, "Testing connection...", true);
-
             try
             {
                 var service = new LinearService(key);
                 var teams = await service.GetTeamsAsync();
-                ShowStatus(LinearStatusBorder, LinearStatusText,
-                    $"Connected! Found {teams.Count} team(s).", true);
+                ShowStatus(LinearStatusBorder, LinearStatusText, $"Connected! Found {teams.Count} team(s).", true);
             }
             catch (Exception ex)
             {
-                ShowStatus(LinearStatusBorder, LinearStatusText,
-                    $"Connection failed: {ex.Message}", false);
+                ShowStatus(LinearStatusBorder, LinearStatusText, $"Connection failed: {ex.Message}", false);
             }
         }
 
-        private void DisconnectLinear_Click(object sender, RoutedEventArgs e)
+        private void CancelLinearForm_Click(object sender, RoutedEventArgs e)
         {
-            DeleteProjectCred("LinearApiKey");
-            DeleteProjectCred("LinearTeamId");
-            LinearApiKeyBox.Password = string.Empty;
-            LinearTeamIdBox.Text = string.Empty;
-            ShowStatus(LinearStatusBorder, LinearStatusText, "Linear disconnected for this project.", true);
+            LinearConnectionFormPanel.Visibility = Visibility.Collapsed;
+            _editingLinearConnectionId = null;
+            LinearStatusBorder.Visibility = Visibility.Collapsed;
         }
 
         // ── Jira ─────────────────────────────────────────────────────
@@ -357,67 +490,263 @@ namespace QAssistant.Views
             await Windows.System.Launcher.LaunchUriAsync(new Uri("https://id.atlassian.com/manage-profile/security/api-tokens"));
         }
 
-        private void SaveJira_Click(object sender, RoutedEventArgs e)
+        private void RenderJiraConnectionsList()
         {
-            if (string.IsNullOrWhiteSpace(JiraDomainBox.Text) ||
-                string.IsNullOrWhiteSpace(JiraEmailBox.Text) ||
-                string.IsNullOrWhiteSpace(JiraApiTokenBox.Password) ||
-                string.IsNullOrWhiteSpace(JiraProjectKeyBox.Text))
+            JiraConnectionsList.Children.Clear();
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+
+            if (project.JiraConnections.Count == 0)
             {
-                ShowStatus(JiraStatusBorder, JiraStatusText,
-                    "Please fill in all Jira fields.", false);
+                JiraConnectionsList.Children.Add(new TextBlock
+                {
+                    Text = "No connections configured.",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 12
+                });
                 return;
             }
 
-            SaveProjectCred("JiraDomain", JiraDomainBox.Text.Trim());
-            SaveProjectCred("JiraEmail", JiraEmailBox.Text.Trim());
-            SaveProjectCred("JiraApiToken", JiraApiTokenBox.Password.Trim());
-            SaveProjectCred("JiraProjectKey", JiraProjectKeyBox.Text.Trim());
-            ShowStatus(JiraStatusBorder, JiraStatusText, "Jira keys saved for this project.", true);
+            foreach (var conn in project.JiraConnections)
+            {
+                var capturedConn = conn;
+                var card = new Border
+                {
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 15, 15, 19)),
+                    BorderBrush = (Brush)Application.Current.Resources["BorderBrush"],
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12, 10, 12, 10)
+                };
+                var row = new Grid();
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var info = new StackPanel { Spacing = 2 };
+                info.Children.Add(new TextBlock
+                {
+                    Text = conn.Label,
+                    Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                    FontSize = 13,
+                    FontWeight = FontWeights.SemiBold
+                });
+                info.Children.Add(new TextBlock
+                {
+                    Text = $"{conn.Domain}.atlassian.net · {conn.ProjectKey}",
+                    Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"],
+                    FontSize = 11
+                });
+                Grid.SetColumn(info, 0);
+                row.Children.Add(info);
+
+                var btns = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+                var editBtn = new Button
+                {
+                    Content = "Edit",
+                    Background = (Brush)Application.Current.Resources["HoverBrush"],
+                    Foreground = (Brush)Application.Current.Resources["AccentBrush"],
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(10, 5, 10, 5),
+                    FontSize = 12
+                };
+                editBtn.Click += (s, e) => EditJiraConnection(capturedConn.Id);
+
+                var deleteBtn = new Button
+                {
+                    Content = "✕",
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 63, 26, 26)),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113)),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(8, 5, 8, 5),
+                    FontSize = 12
+                };
+                deleteBtn.Click += (s, e) => DeleteJiraConnection(capturedConn.Id);
+
+                btns.Children.Add(editBtn);
+                btns.Children.Add(deleteBtn);
+                Grid.SetColumn(btns, 1);
+                row.Children.Add(btns);
+
+                card.Child = row;
+                JiraConnectionsList.Children.Add(card);
+            }
+        }
+
+        private void AddJira_Click(object sender, RoutedEventArgs e)
+        {
+            _editingJiraConnectionId = null;
+            JiraFormTitle.Text = "New Connection";
+            JiraConnLabelBox.Text = string.Empty;
+            JiraConnDomainBox.Text = string.Empty;
+            JiraConnEmailBox.Text = string.Empty;
+            JiraConnApiTokenBox.Password = string.Empty;
+            JiraConnProjectKeyBox.Text = string.Empty;
+            JiraConnectionFormPanel.Visibility = Visibility.Visible;
+            JiraStatusBorder.Visibility = Visibility.Collapsed;
+        }
+
+        private void EditJiraConnection(Guid id)
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+            var conn = project.JiraConnections.FirstOrDefault(c => c.Id == id);
+            if (conn == null) return;
+
+            _editingJiraConnectionId = id;
+            JiraFormTitle.Text = $"Edit: {conn.Label}";
+            JiraConnLabelBox.Text = conn.Label;
+            JiraConnDomainBox.Text = conn.Domain;
+            JiraConnEmailBox.Text = conn.Email;
+            JiraConnApiTokenBox.Password = string.Empty;
+            JiraConnProjectKeyBox.Text = conn.ProjectKey;
+            JiraConnectionFormPanel.Visibility = Visibility.Visible;
+            JiraStatusBorder.Visibility = Visibility.Collapsed;
+        }
+
+        private void DeleteJiraConnection(Guid id)
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+            project.JiraConnections.RemoveAll(c => c.Id == id);
+            CredentialService.DeleteProjectCredential(project.Id, $"JiraApiToken_{id}");
+            RenderJiraConnectionsList();
+            _ = _vm!.SaveAsync();
+            ShowStatus(JiraStatusBorder, JiraStatusText, "Connection removed.", true);
+        }
+
+        private void SaveJira_Click(object sender, RoutedEventArgs e)
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+
+            var label = JiraConnLabelBox.Text.Trim();
+            var domain = JiraConnDomainBox.Text.Trim();
+            var email = JiraConnEmailBox.Text.Trim();
+            var projectKey = JiraConnProjectKeyBox.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(domain) ||
+                string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(projectKey))
+            {
+                ShowStatus(JiraStatusBorder, JiraStatusText, "Please fill in Label, Domain, Email, and Project Key.", false);
+                return;
+            }
+
+            if (_editingJiraConnectionId == null)
+            {
+                if (string.IsNullOrWhiteSpace(JiraConnApiTokenBox.Password))
+                {
+                    ShowStatus(JiraStatusBorder, JiraStatusText, "API Token is required for a new connection.", false);
+                    return;
+                }
+                var conn = new JiraConnection { Label = label, Domain = domain, Email = email, ProjectKey = projectKey };
+                CredentialService.SaveProjectCredential(project.Id, $"JiraApiToken_{conn.Id}", JiraConnApiTokenBox.Password.Trim());
+                project.JiraConnections.Add(conn);
+            }
+            else
+            {
+                var conn = project.JiraConnections.FirstOrDefault(c => c.Id == _editingJiraConnectionId);
+                if (conn == null) return;
+                conn.Label = label;
+                conn.Domain = domain;
+                conn.Email = email;
+                conn.ProjectKey = projectKey;
+                if (!string.IsNullOrWhiteSpace(JiraConnApiTokenBox.Password))
+                    CredentialService.SaveProjectCredential(project.Id, $"JiraApiToken_{conn.Id}", JiraConnApiTokenBox.Password.Trim());
+            }
+
+            _ = _vm!.SaveAsync();
+            RenderJiraConnectionsList();
+            JiraConnectionFormPanel.Visibility = Visibility.Collapsed;
+            _editingJiraConnectionId = null;
+            ShowStatus(JiraStatusBorder, JiraStatusText, "Connection saved.", true);
         }
 
         private async void TestJira_Click(object sender, RoutedEventArgs e)
         {
-            var domain = LoadProjectCred("JiraDomain");
-            var email = LoadProjectCred("JiraEmail");
-            var token = LoadProjectCred("JiraApiToken");
-            var projectKey = LoadProjectCred("JiraProjectKey");
+            var domain = JiraConnDomainBox.Text.Trim();
+            var email = JiraConnEmailBox.Text.Trim();
+            var token = JiraConnApiTokenBox.Password.Trim();
+            if (string.IsNullOrEmpty(token) && _editingJiraConnectionId.HasValue && _vm?.SelectedProject != null)
+                token = CredentialService.LoadProjectCredential(_vm.SelectedProject.Id, $"JiraApiToken_{_editingJiraConnectionId}") ?? string.Empty;
 
-            if (string.IsNullOrEmpty(domain) || string.IsNullOrEmpty(email) ||
-                string.IsNullOrEmpty(token) || string.IsNullOrEmpty(projectKey))
+            if (string.IsNullOrEmpty(domain) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
             {
-                ShowStatus(JiraStatusBorder, JiraStatusText,
-                    "Save your Jira keys first.", false);
+                ShowStatus(JiraStatusBorder, JiraStatusText, "Fill in Domain, Email, and API Token first.", false);
                 return;
             }
 
             ShowStatus(JiraStatusBorder, JiraStatusText, "Testing connection...", true);
-
             try
             {
-                var service = new JiraService(domain, email, token);
+                using var service = new JiraService(domain, email, token);
                 var projects = await service.GetProjectsAsync();
-                ShowStatus(JiraStatusBorder, JiraStatusText,
-                    $"Connected! Found {projects.Count} project(s).", true);
+                ShowStatus(JiraStatusBorder, JiraStatusText, $"Connected! Found {projects.Count} project(s).", true);
             }
             catch (Exception ex)
             {
-                ShowStatus(JiraStatusBorder, JiraStatusText,
-                    $"Connection failed: {ex.Message}", false);
+                ShowStatus(JiraStatusBorder, JiraStatusText, $"Connection failed: {ex.Message}", false);
             }
         }
 
-        private void DisconnectJira_Click(object sender, RoutedEventArgs e)
+        private void CancelJiraForm_Click(object sender, RoutedEventArgs e)
         {
-            DeleteProjectCred("JiraDomain");
-            DeleteProjectCred("JiraEmail");
-            DeleteProjectCred("JiraApiToken");
-            DeleteProjectCred("JiraProjectKey");
-            JiraDomainBox.Text = string.Empty;
-            JiraEmailBox.Text = string.Empty;
-            JiraApiTokenBox.Password = string.Empty;
-            JiraProjectKeyBox.Text = string.Empty;
-            ShowStatus(JiraStatusBorder, JiraStatusText, "Jira disconnected for this project.", true);
+            JiraConnectionFormPanel.Visibility = Visibility.Collapsed;
+            _editingJiraConnectionId = null;
+            JiraStatusBorder.Visibility = Visibility.Collapsed;
+        }
+
+        // ── Legacy credential migration ───────────────────────────────
+        private void MigrateLegacyCredentials()
+        {
+            if (_vm?.SelectedProject == null) return;
+            var project = _vm.SelectedProject;
+            bool dirty = false;
+
+            if (project.LinearConnections.Count == 0)
+            {
+                var apiKey = LoadProjectCred("LinearApiKey");
+                var teamId = LoadProjectCred("LinearTeamId");
+                if (!string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(teamId))
+                {
+                    try
+                    {
+                        var conn = new LinearConnection { Label = "Default", TeamId = teamId };
+                        CredentialService.SaveProjectCredential(project.Id, $"LinearApiKey_{conn.Id}", apiKey);
+                        project.LinearConnections.Add(conn);
+                        dirty = true;
+                    }
+                    catch (System.ComponentModel.Win32Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Migration] Linear credential save failed: {ex.Message}");
+                    }
+                }
+            }
+
+            if (project.JiraConnections.Count == 0)
+            {
+                var domain = LoadProjectCred("JiraDomain");
+                var email = LoadProjectCred("JiraEmail");
+                var token = LoadProjectCred("JiraApiToken");
+                var key = LoadProjectCred("JiraProjectKey");
+                if (!string.IsNullOrEmpty(domain) && !string.IsNullOrEmpty(email) &&
+                    !string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(key))
+                {
+                    try
+                    {
+                        var conn = new JiraConnection { Label = "Default", Domain = domain, Email = email, ProjectKey = key };
+                        CredentialService.SaveProjectCredential(project.Id, $"JiraApiToken_{conn.Id}", token);
+                        project.JiraConnections.Add(conn);
+                        dirty = true;
+                    }
+                    catch (System.ComponentModel.Win32Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Migration] Jira credential save failed: {ex.Message}");
+                    }
+                }
+            }
+
+            if (dirty)
+                _ = _vm.SaveAsync();
         }
 
         private async void OpenGeminiKeys_Click(object sender, RoutedEventArgs e)
@@ -436,6 +765,63 @@ namespace QAssistant.Views
 
             SaveProjectCred("GeminiApiKey", GeminiApiKeyBox.Password.Trim());
             ShowStatus(GeminiStatusBorder, GeminiStatusText, "Google AI Studio API key saved for this project.", true);
+        }
+
+        // ── SAP CCv2 ─────────────────────────────────────────────────
+        private async void OpenCcv2Docs_Click(object sender, RoutedEventArgs e)
+        {
+            await Windows.System.Launcher.LaunchUriAsync(
+                new Uri("https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/9116f1cfd16049c9a5e3ea3ab7e6f204/b5f8e16db98c4c2b9bf81a99f25d8b5b.html"));
+        }
+
+        private void SaveCcv2_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(Ccv2SubscriptionCodeBox.Text) ||
+                string.IsNullOrWhiteSpace(Ccv2ApiTokenBox.Password))
+            {
+                ShowStatus(Ccv2StatusBorder, Ccv2StatusText,
+                    "Please fill in both the Subscription Code and API Token.", false);
+                return;
+            }
+
+            CredentialService.SaveCredential("Ccv2SubscriptionCode", Ccv2SubscriptionCodeBox.Text.Trim());
+            CredentialService.SaveCredential("Ccv2ApiToken", Ccv2ApiTokenBox.Password.Trim());
+            ShowStatus(Ccv2StatusBorder, Ccv2StatusText, "CCv2 credentials saved.", true);
+        }
+
+        private async void TestCcv2_Click(object sender, RoutedEventArgs e)
+        {
+            var subCode = CredentialService.LoadCredential("Ccv2SubscriptionCode");
+            var token = CredentialService.LoadCredential("Ccv2ApiToken");
+
+            if (string.IsNullOrEmpty(subCode) || string.IsNullOrEmpty(token))
+            {
+                ShowStatus(Ccv2StatusBorder, Ccv2StatusText, "Save CCv2 credentials first.", false);
+                return;
+            }
+
+            ShowStatus(Ccv2StatusBorder, Ccv2StatusText, "Testing connection...", true);
+            try
+            {
+                using var svc = new Ccv2ManagementService(subCode, token);
+                var envs = await svc.GetEnvironmentsAsync();
+                ShowStatus(Ccv2StatusBorder, Ccv2StatusText,
+                    $"✓ Connected — {envs.Count} environment(s) found.", true);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus(Ccv2StatusBorder, Ccv2StatusText,
+                    $"Connection failed: {ex.Message}", false);
+            }
+        }
+
+        private void DisconnectCcv2_Click(object sender, RoutedEventArgs e)
+        {
+            CredentialService.DeleteCredential("Ccv2SubscriptionCode");
+            CredentialService.DeleteCredential("Ccv2ApiToken");
+            Ccv2SubscriptionCodeBox.Text = string.Empty;
+            Ccv2ApiTokenBox.Password = string.Empty;
+            ShowStatus(Ccv2StatusBorder, Ccv2StatusText, "CCv2 credentials removed.", true);
         }
 
         // ── Helpers ──────────────────────────────────────────────────

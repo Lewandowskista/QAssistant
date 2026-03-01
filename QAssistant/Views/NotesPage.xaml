@@ -10,162 +10,386 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Notes Sidebar -->
+        <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
         <Border Grid.Column="0" Background="{ThemeResource SurfaceBrush}"
                 BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,1,0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Padding="12,12,8,8"
-                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
-                    <TextBlock Text="NOTES" Foreground="{ThemeResource TextSecondaryBrush}"
-                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"
-                               VerticalAlignment="Center"/>
+                <!-- Tab strip -->
+                <Border Grid.Row="0" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
+                        Padding="8,6">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Button x:Name="NotesTabBtn" Content="Notes"
+                                Click="NotesTab_Click"
+                                Background="{ThemeResource AccentBrush}"
+                                Foreground="{ThemeResource TextPrimaryBrush}"
+                                CornerRadius="8"
+                                FontSize="12" Padding="10,7"/>
+                        <Button x:Name="RunbooksTabBtn" Content="Runbooks"
+                                Click="RunbooksTab_Click"
+                                Background="{ThemeResource HoverBrush}"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="8"
+                                FontSize="12" Padding="10,7"/>
+                    </StackPanel>
                 </Border>
 
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="4" Padding="8,8">
-                        <ListView x:Name="NotesList"
-                                  Background="Transparent" SelectionMode="Single"
-                                  SelectionChanged="NotesList_SelectionChanged"
-                                  CanReorderItems="True" CanDragItems="True"
-                                  AllowDrop="True"
-                                  DragItemsCompleted="NotesList_DragItemsCompleted"
-                                  KeyDown="NotesList_KeyDown">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem">
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Margin" Value="0,2"/>
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="ListViewItem">
-                                                <ListViewItemPresenter
-                                                    SelectedBackground="{ThemeResource ListAccentLowBrush}"
-                                                    SelectedForeground="{ThemeResource TextPrimaryBrush}"
-                                                    SelectedPressedBackground="{ThemeResource ListAccentMediumBrush}"
-                                                    SelectedPointerOverBackground="{ThemeResource ListAccentMediumBrush}"
-                                                    PointerOverBackground="{ThemeResource HoverBrush}"
-                                                    PressedBackground="{ThemeResource BorderBrush}"
-                                                    CornerRadius="6"
-                                                    ContentMargin="10,7"/>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{Binding Title}"
-                                                   Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
-                                        <TextBlock Text="{Binding UpdatedAt}"
-                                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </StackPanel>
-                </ScrollViewer>
+                <!-- Notes sidebar list -->
+                <Grid x:Name="NotesPanel" Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <Button Grid.Row="2" Content="+ New Note"
-                        Click="AddNote_Click"
-                        HorizontalAlignment="Stretch"
-                        Margin="8,4,8,12"
-                        Background="{ThemeResource HoverBrush}"
-                        Foreground="{ThemeResource AccentBrush}"
-                        CornerRadius="8"
-                        Padding="10,7"/>
+                    <Border Grid.Row="0" Padding="12,12,8,8"
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
+                        <TextBlock Text="NOTES" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="4" Padding="8,8">
+                            <ListView x:Name="NotesList"
+                                      Background="Transparent" SelectionMode="Single"
+                                      SelectionChanged="NotesList_SelectionChanged"
+                                      CanReorderItems="True" CanDragItems="True"
+                                      AllowDrop="True"
+                                      DragItemsCompleted="NotesList_DragItemsCompleted"
+                                      KeyDown="NotesList_KeyDown">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0,2"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListViewItem">
+                                                    <ListViewItemPresenter
+                                                        SelectedBackground="{ThemeResource ListAccentLowBrush}"
+                                                        SelectedForeground="{ThemeResource TextPrimaryBrush}"
+                                                        SelectedPressedBackground="{ThemeResource ListAccentMediumBrush}"
+                                                        SelectedPointerOverBackground="{ThemeResource ListAccentMediumBrush}"
+                                                        PointerOverBackground="{ThemeResource HoverBrush}"
+                                                        PressedBackground="{ThemeResource BorderBrush}"
+                                                        CornerRadius="6"
+                                                        ContentMargin="10,7"/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Title}"
+                                                       Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
+                                            <TextBlock Text="{Binding UpdatedAt}"
+                                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <Button Grid.Row="2" Content="+ New Note"
+                            Click="AddNote_Click"
+                            HorizontalAlignment="Stretch"
+                            Margin="8,4,8,12"
+                            Background="{ThemeResource HoverBrush}"
+                            Foreground="{ThemeResource AccentBrush}"
+                            CornerRadius="8"
+                            Padding="10,7"/>
+                </Grid>
+
+                <!-- Runbooks sidebar list -->
+                <Grid x:Name="RunbooksPanel" Grid.Row="1" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Padding="12,12,8,8"
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="RUNBOOKS" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
+                            <TextBlock Text="Deployment &amp; go-live plans"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
+                        </StackPanel>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="4" Padding="8,8">
+                            <ListView x:Name="RunbooksList"
+                                      Background="Transparent" SelectionMode="Single"
+                                      SelectionChanged="RunbooksList_SelectionChanged">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0,2"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListViewItem">
+                                                    <ListViewItemPresenter
+                                                        SelectedBackground="{ThemeResource ListAccentLowBrush}"
+                                                        SelectedForeground="{ThemeResource TextPrimaryBrush}"
+                                                        SelectedPressedBackground="{ThemeResource ListAccentMediumBrush}"
+                                                        SelectedPointerOverBackground="{ThemeResource ListAccentMediumBrush}"
+                                                        PointerOverBackground="{ThemeResource HoverBrush}"
+                                                        PressedBackground="{ThemeResource BorderBrush}"
+                                                        CornerRadius="6"
+                                                        ContentMargin="10,7"/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Title}"
+                                                       Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="{Binding CategoryLabel}"
+                                                           Foreground="{ThemeResource AccentBrush}" FontSize="10"/>
+                                                <TextBlock Text="{Binding StepsLabel}"
+                                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="10"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding UpdatedAtLabel}"
+                                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="10"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <Button Grid.Row="2" Content="+ New Runbook"
+                            Click="AddRunbook_Click"
+                            HorizontalAlignment="Stretch"
+                            Margin="8,4,8,12"
+                            Background="{ThemeResource HoverBrush}"
+                            Foreground="{ThemeResource AccentBrush}"
+                            CornerRadius="8"
+                            Padding="10,7"/>
+                </Grid>
             </Grid>
         </Border>
 
-        <!-- Editor -->
+        <!-- ═══════════════════ EDITOR AREA ═══════════════════ -->
         <Grid Grid.Column="1">
-            <StackPanel x:Name="EmptyState"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Spacing="12">
-                <FontIcon Glyph="&#xE70B;" FontSize="40" FontFamily="Segoe Fluent Icons"
-                          Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                <TextBlock Text="Select a note or create a new one"
-                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="14"
-                           HorizontalAlignment="Center"/>
-            </StackPanel>
 
-            <Grid x:Name="EditorPanel" Visibility="Collapsed">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+            <!-- Notes Editor -->
+            <Grid x:Name="NotesEditorArea">
+                <StackPanel x:Name="EmptyState"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="12">
+                    <FontIcon Glyph="&#xE70B;" FontSize="40" FontFamily="Segoe Fluent Icons"
+                              Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Select a note or create a new one"
+                               Foreground="{ThemeResource TextSecondaryBrush}" FontSize="14"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
 
-                <!-- Title -->
-                <TextBox Grid.Row="0"
-                         x:Name="NoteTitleBox"
-                         PlaceholderText="Note title..."
-                         FontSize="20" FontWeight="SemiBold"
-                         Background="Transparent"
-                         BorderThickness="0,0,0,1"
-                         BorderBrush="{ThemeResource BorderBrush}"
-                         Foreground="{ThemeResource TextPrimaryBrush}"
-                         Padding="20,16"
-                         TextChanged="NoteTitle_Changed"/>
+                <Grid x:Name="EditorPanel" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <!-- Content + inline attachments -->
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                        <TextBox x:Name="NoteContentBox"
-                                 PlaceholderText="Write your note here..."
-                                 AcceptsReturn="True"
-                                 TextWrapping="Wrap"
+                    <!-- Title -->
+                    <TextBox Grid.Row="0"
+                             x:Name="NoteTitleBox"
+                             PlaceholderText="Note title..."
+                             FontSize="20" FontWeight="SemiBold"
+                             Background="Transparent"
+                             BorderThickness="0,0,0,1"
+                             BorderBrush="{ThemeResource BorderBrush}"
+                             Foreground="{ThemeResource TextPrimaryBrush}"
+                             Padding="20,16"
+                             TextChanged="NoteTitle_Changed"/>
+
+                    <!-- Content + inline attachments -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBox x:Name="NoteContentBox"
+                                     PlaceholderText="Write your note here..."
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{ThemeResource TextPrimaryBrush}"
+                                     Padding="20,16"
+                                     FontSize="14"
+                                     MinHeight="200"
+                                     TextChanged="NoteContent_Changed"/>
+
+                            <StackPanel x:Name="AttachmentItems" Spacing="8"
+                                        Margin="20,0,20,16"/>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Footer -->
+                    <Border Grid.Row="2" Background="{ThemeResource SurfaceBrush}"
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,1,0,0"
+                            Padding="20,10">
+                        <Grid>
+                            <TextBlock x:Name="LastSavedText"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                       VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right" Spacing="6">
+                                <Button Content="Paste"
+                                        Click="PasteMedia_Click"
+                                        Background="{ThemeResource HoverBrush}"
+                                        Foreground="{ThemeResource AccentBrush}"
+                                        CornerRadius="8"
+                                        Padding="10,7"/>
+                                <Button Content="+ Attach"
+                                        Click="AttachFile_Click"
+                                        Background="{ThemeResource HoverBrush}"
+                                        Foreground="{ThemeResource AccentBrush}"
+                                        CornerRadius="8"
+                                        Padding="10,7"/>
+                                <Button Content="Delete Note"
+                                        Click="DeleteNote_Click"
+                                        Background="#3F1A1A"
+                                        Foreground="#F87171"
+                                        CornerRadius="8"
+                                        Padding="10,7"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- Runbooks Editor -->
+            <Grid x:Name="RunbooksEditorArea" Visibility="Collapsed">
+                <StackPanel x:Name="RunbookEmptyState"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="12">
+                    <FontIcon Glyph="&#xE762;" FontSize="40" FontFamily="Segoe Fluent Icons"
+                              Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Select a runbook or create a new one"
+                               Foreground="{ThemeResource TextSecondaryBrush}" FontSize="14"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Structured step-by-step plans for deployments and go-lives"
+                               Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                               HorizontalAlignment="Center" TextWrapping="Wrap"
+                               MaxWidth="320" TextAlignment="Center"/>
+                </StackPanel>
+
+                <Grid x:Name="RunbookEditorPanel" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Row 0: Title + Category -->
+                    <Grid Grid.Row="0" Padding="20,14,20,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" x:Name="RunbookTitleBox"
+                                 PlaceholderText="Runbook title..."
+                                 FontSize="20" FontWeight="SemiBold"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  Foreground="{ThemeResource TextPrimaryBrush}"
-                                 Padding="20,16"
-                                 FontSize="14"
-                                 MinHeight="200"
-                                 TextChanged="NoteContent_Changed"/>
-
-                        <StackPanel x:Name="AttachmentItems" Spacing="8"
-                                    Margin="20,0,20,16"/>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- Footer -->
-                <Border Grid.Row="2" Background="{ThemeResource SurfaceBrush}"
-                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,1,0,0"
-                        Padding="20,10">
-                    <Grid>
-                        <TextBlock x:Name="LastSavedText"
-                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
-                                   VerticalAlignment="Center"/>
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Right" Spacing="6">
-                            <Button Content="Paste"
-                                    Click="PasteMedia_Click"
-                                    Background="{ThemeResource HoverBrush}"
-                                    Foreground="{ThemeResource AccentBrush}"
-                                    CornerRadius="8"
-                                    Padding="10,7"/>
-                            <Button Content="+ Attach"
-                                    Click="AttachFile_Click"
-                                    Background="{ThemeResource HoverBrush}"
-                                    Foreground="{ThemeResource AccentBrush}"
-                                    CornerRadius="8"
-                                    Padding="10,7"/>
-                            <Button Content="Delete Note"
-                                    Click="DeleteNote_Click"
-                                    Background="#3F1A1A"
-                                    Foreground="#F87171"
-                                    CornerRadius="8"
-                                    Padding="10,7"/>
-                        </StackPanel>
+                                 TextChanged="RunbookTitle_Changed"/>
+                        <ComboBox Grid.Column="1" x:Name="RunbookCategoryBox"
+                                  Margin="12,0,0,0" VerticalAlignment="Center"
+                                  SelectionChanged="RunbookCategory_Changed">
+                            <ComboBoxItem Content="Deployment" Tag="Deployment"/>
+                            <ComboBoxItem Content="Go-Live" Tag="GoLive"/>
+                            <ComboBoxItem Content="Hotfix" Tag="Hotfix"/>
+                            <ComboBoxItem Content="Rollback" Tag="Rollback"/>
+                            <ComboBoxItem Content="Maintenance" Tag="Maintenance"/>
+                            <ComboBoxItem Content="Custom" Tag="Custom"/>
+                        </ComboBox>
                     </Grid>
-                </Border>
+
+                    <!-- Row 1: Description -->
+                    <TextBox Grid.Row="1"
+                             x:Name="RunbookDescBox"
+                             PlaceholderText="Brief description of this runbook..."
+                             Background="Transparent"
+                             BorderThickness="0,0,0,1"
+                             BorderBrush="{ThemeResource BorderBrush}"
+                             Foreground="{ThemeResource TextPrimaryBrush}"
+                             Padding="20,6,20,12"
+                             FontSize="13"
+                             TextWrapping="Wrap"
+                             TextChanged="RunbookDesc_Changed"/>
+
+                    <!-- Row 2: Progress summary -->
+                    <Border Grid.Row="2" Margin="20,10,20,0"
+                            Background="{ThemeResource SurfaceBrush}"
+                            CornerRadius="8" Padding="12,8"
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <Grid>
+                                <TextBlock x:Name="RunbookProgressText"
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="RunbookCategoryLabel"
+                                           HorizontalAlignment="Right"
+                                           Foreground="{ThemeResource AccentBrush}" FontSize="12"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                            <ProgressBar x:Name="RunbookProgressBar"
+                                         Value="0" Maximum="100"
+                                         Height="6" CornerRadius="3"
+                                         Background="{ThemeResource BorderBrush}"
+                                         Foreground="{ThemeResource AccentBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Row 3: Steps list -->
+                    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+                        <StackPanel x:Name="StepItems" Spacing="6" Padding="20,0,20,16"/>
+                    </ScrollViewer>
+
+                    <!-- Row 4: Footer -->
+                    <Border Grid.Row="4" Background="{ThemeResource SurfaceBrush}"
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,1,0,0"
+                            Padding="20,10">
+                        <Grid>
+                            <TextBlock x:Name="RunbookLastSavedText"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                       VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
+                                <Button Content="Reset Steps" Click="ResetRunbookSteps_Click"
+                                        Background="{ThemeResource HoverBrush}"
+                                        Foreground="{ThemeResource TextSecondaryBrush}"
+                                        CornerRadius="8" Padding="10,7"/>
+                                <Button Content="+ Add Step" Click="AddRunbookStep_Click"
+                                        Background="{ThemeResource HoverBrush}"
+                                        Foreground="{ThemeResource AccentBrush}"
+                                        CornerRadius="8" Padding="10,7"/>
+                                <Button Content="Delete Runbook" Click="DeleteRunbook_Click"
+                                        Background="#3F1A1A" Foreground="#F87171"
+                                        CornerRadius="8" Padding="10,7"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
         </Grid>
     </Grid>

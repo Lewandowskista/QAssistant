@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace QAssistant.Models
 {
@@ -42,5 +43,14 @@ namespace QAssistant.Models
         public string? Labels { get; set; }
         public List<string> AttachmentUrls { get; set; } = [];
         public List<AnalysisEntry> AnalysisHistory { get; set; } = [];
+
+        /// <summary>Runtime-only: display label of the connection that provided this task.</summary>
+        [JsonIgnore]
+        public string? ConnectionLabel { get; set; }
+
+        /// <summary>Runtime-only: ID of the JiraConnection or LinearConnection that provided this task,
+        /// used to route service calls (comments, worklog, status transitions) back to the right credentials.</summary>
+        [JsonIgnore]
+        public Guid? ConnectionId { get; set; }
     }
 }

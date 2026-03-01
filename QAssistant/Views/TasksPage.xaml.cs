@@ -134,46 +134,64 @@ namespace QAssistant.Views
             StatusText.Visibility = Visibility.Visible;
             StatusText.Text = "Fetching Linear issues...";
 
-            var key = LoadProjectCred("LinearApiKey");
-            var teamId = LoadProjectCred("LinearTeamId");
-
-            if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(teamId))
+            var project = _vm?.SelectedProject;
+            if (project == null)
             {
-                StatusText.Text = "No credentials found. Go to Settings.";
+                StatusText.Text = "No project selected.";
+                return;
+            }
+
+            MigrateLegacyLinearCredentials(project);
+
+            if (project.LinearConnections.Count == 0)
+            {
+                StatusText.Text = "No Linear connections found. Go to Settings to connect.";
                 return;
             }
 
             try
             {
-                var service = new LinearService(key);
-                _linearTasks = await service.GetIssuesAsync(teamId);
-
-                try
+                var allTasks = new List<ProjectTask>();
+                foreach (var conn in project.LinearConnections)
                 {
-                    _linearStates = await service.GetWorkflowStatesAsync();
-                }
-                catch { _linearStates = new(); }
+                    var key = CredentialService.LoadProjectCredential(project.Id, $"LinearApiKey_{conn.Id}");
+                    if (string.IsNullOrEmpty(key)) continue;
 
-                // Merge persisted analysis history back into freshly fetched tasks
-                if (_vm?.SelectedProject != null)
-                {
-                    var saved = _vm.SelectedProject.LinearAnalysisHistory;
-                    foreach (var task in _linearTasks)
+                    using var service = new LinearService(key);
+                    var tasks = await service.GetIssuesAsync(conn.TeamId);
+                    foreach (var t in tasks)
                     {
-                        if (!string.IsNullOrEmpty(task.ExternalId) &&
-                            saved.TryGetValue(task.ExternalId, out var history))
-                        {
-                            task.AnalysisHistory = new List<AnalysisEntry>(history);
-                        }
+                        t.ConnectionLabel = conn.Label;
+                        t.ConnectionId = conn.Id;
+                    }
+                    allTasks.AddRange(tasks);
+
+                    if (_linearStates.Count == 0)
+                    {
+                        try { _linearStates = await service.GetWorkflowStatesAsync(); }
+                        catch { _linearStates = new(); }
                     }
                 }
 
+                _linearTasks = allTasks;
+
+                var saved = project.LinearAnalysisHistory;
+                foreach (var task in _linearTasks)
+                {
+                    if (!string.IsNullOrEmpty(task.ExternalId) &&
+                        saved.TryGetValue(task.ExternalId, out var history))
+                        task.AnalysisHistory = new List<AnalysisEntry>(history);
+                }
+
                 if (_linearTasks.Count == 0)
-                    StatusText.Text = "No issues found in this team.";
+                    StatusText.Text = "No issues found.";
                 else
                 {
                     RefreshBoard(_linearTasks);
-                    StatusText.Text = $"Synced {_linearTasks.Count} issues · {DateTime.Now:h:mm tt}";
+                    var src = project.LinearConnections.Count == 1
+                        ? "1 connection"
+                        : $"{project.LinearConnections.Count} connections";
+                    StatusText.Text = $"Synced {_linearTasks.Count} issues from {src} · {DateTime.Now:h:mm tt}";
                 }
             }
             catch (Exception ex)
@@ -214,10 +232,11 @@ namespace QAssistant.Views
             StatusText.Visibility = Visibility.Visible;
             CloseDetailPanel();
 
-            var key = LoadProjectCred("LinearApiKey");
-            if (string.IsNullOrEmpty(key))
+            var project = _vm?.SelectedProject;
+            if (project != null) MigrateLegacyLinearCredentials(project);
+            if (_vm?.SelectedProject?.LinearConnections.Count == 0)
             {
-                StatusText.Text = "No Linear API key found. Go to Settings to connect.";
+                StatusText.Text = "No Linear connections found. Go to Settings to connect.";
                 return;
             }
 
@@ -247,10 +266,11 @@ namespace QAssistant.Views
             StatusText.Visibility = Visibility.Visible;
             CloseDetailPanel();
 
-            var domain = LoadProjectCred("JiraDomain");
-            if (string.IsNullOrEmpty(domain))
+            var project2 = _vm?.SelectedProject;
+            if (project2 != null) MigrateLegacyJiraCredentials(project2);
+            if (_vm?.SelectedProject?.JiraConnections.Count == 0)
             {
-                StatusText.Text = "No Jira credentials found. Go to Settings to connect.";
+                StatusText.Text = "No Jira connections found. Go to Settings to connect.";
                 return;
             }
 
@@ -262,39 +282,58 @@ namespace QAssistant.Views
             StatusText.Visibility = Visibility.Visible;
             StatusText.Text = "Fetching Jira issues...";
 
-            var service = CreateJiraService();
-            var projectKey = LoadProjectCred("JiraProjectKey");
-
-            if (service == null || string.IsNullOrEmpty(projectKey))
+            var project = _vm?.SelectedProject;
+            if (project == null)
             {
-                StatusText.Text = "No credentials found. Go to Settings.";
+                StatusText.Text = "No project selected.";
+                return;
+            }
+
+            MigrateLegacyJiraCredentials(project);
+
+            if (project.JiraConnections.Count == 0)
+            {
+                StatusText.Text = "No Jira connections found. Go to Settings to connect.";
                 return;
             }
 
             try
             {
-                _jiraTasks = await service.GetIssuesAsync(projectKey);
-
-                // Merge persisted analysis history back into freshly fetched tasks
-                if (_vm?.SelectedProject != null)
+                var allTasks = new List<ProjectTask>();
+                foreach (var conn in project.JiraConnections)
                 {
-                    var saved = _vm.SelectedProject.JiraAnalysisHistory;
-                    foreach (var task in _jiraTasks)
+                    var token = CredentialService.LoadProjectCredential(project.Id, $"JiraApiToken_{conn.Id}");
+                    if (string.IsNullOrEmpty(token)) continue;
+
+                    using var service = new JiraService(conn.Domain, conn.Email, token);
+                    var tasks = await service.GetIssuesAsync(conn.ProjectKey);
+                    foreach (var t in tasks)
                     {
-                        if (!string.IsNullOrEmpty(task.ExternalId) &&
-                            saved.TryGetValue(task.ExternalId, out var history))
-                        {
-                            task.AnalysisHistory = new List<AnalysisEntry>(history);
-                        }
+                        t.ConnectionLabel = conn.Label;
+                        t.ConnectionId = conn.Id;
                     }
+                    allTasks.AddRange(tasks);
+                }
+
+                _jiraTasks = allTasks;
+
+                var saved = project.JiraAnalysisHistory;
+                foreach (var task in _jiraTasks)
+                {
+                    if (!string.IsNullOrEmpty(task.ExternalId) &&
+                        saved.TryGetValue(task.ExternalId, out var history))
+                        task.AnalysisHistory = new List<AnalysisEntry>(history);
                 }
 
                 if (_jiraTasks.Count == 0)
-                    StatusText.Text = "No issues found in this project.";
+                    StatusText.Text = "No issues found.";
                 else
                 {
                     RefreshBoard(_jiraTasks);
-                    StatusText.Text = $"Synced {_jiraTasks.Count} issues · {DateTime.Now:h:mm tt}";
+                    var src = project.JiraConnections.Count == 1
+                        ? "1 connection"
+                        : $"{project.JiraConnections.Count} connections";
+                    StatusText.Text = $"Synced {_jiraTasks.Count} issues from {src} · {DateTime.Now:h:mm tt}";
                 }
             }
             catch (Exception ex)
@@ -303,14 +342,70 @@ namespace QAssistant.Views
             }
         }
 
-        private JiraService? CreateJiraService()
+        private JiraService? CreateJiraService(Guid? connectionId = null)
         {
+            var project = _vm?.SelectedProject;
+            if (project == null) return null;
+
+            JiraConnection? conn = connectionId.HasValue
+                ? project.JiraConnections.FirstOrDefault(c => c.Id == connectionId.Value)
+                : null;
+            conn ??= project.JiraConnections.FirstOrDefault();
+            if (conn == null) return null;
+
+            var token = CredentialService.LoadProjectCredential(project.Id, $"JiraApiToken_{conn.Id}");
+            if (string.IsNullOrEmpty(token)) return null;
+            return new JiraService(conn.Domain, conn.Email, token);
+        }
+
+        private string? GetLinearApiKey(Guid? connectionId = null)
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null) return null;
+
+            if (connectionId.HasValue)
+            {
+                var key = CredentialService.LoadProjectCredential(project.Id, $"LinearApiKey_{connectionId.Value}");
+                if (!string.IsNullOrEmpty(key)) return key;
+            }
+
+            foreach (var conn in project.LinearConnections)
+            {
+                var key = CredentialService.LoadProjectCredential(project.Id, $"LinearApiKey_{conn.Id}");
+                if (!string.IsNullOrEmpty(key)) return key;
+            }
+            return null;
+        }
+
+        private void MigrateLegacyLinearCredentials(Project project)
+        {
+            if (project.LinearConnections.Count > 0) return;
+            var apiKey = LoadProjectCred("LinearApiKey");
+            var teamId = LoadProjectCred("LinearTeamId");
+            if (!string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(teamId))
+            {
+                var conn = new LinearConnection { Label = "Default", TeamId = teamId };
+                CredentialService.SaveProjectCredential(project.Id, $"LinearApiKey_{conn.Id}", apiKey);
+                project.LinearConnections.Add(conn);
+                _ = _vm?.SaveAsync();
+            }
+        }
+
+        private void MigrateLegacyJiraCredentials(Project project)
+        {
+            if (project.JiraConnections.Count > 0) return;
             var domain = LoadProjectCred("JiraDomain");
             var email = LoadProjectCred("JiraEmail");
             var token = LoadProjectCred("JiraApiToken");
-            if (string.IsNullOrEmpty(domain) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
-                return null;
-            return new JiraService(domain, email, token);
+            var projectKey = LoadProjectCred("JiraProjectKey");
+            if (!string.IsNullOrEmpty(domain) && !string.IsNullOrEmpty(email) &&
+                !string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(projectKey))
+            {
+                var conn = new JiraConnection { Label = "Default", Domain = domain, Email = email, ProjectKey = projectKey };
+                CredentialService.SaveProjectCredential(project.Id, $"JiraApiToken_{conn.Id}", token);
+                project.JiraConnections.Add(conn);
+                _ = _vm?.SaveAsync();
+            }
         }
 
         private void Task_Click(object sender, ItemClickEventArgs e)
@@ -611,7 +706,7 @@ namespace QAssistant.Views
                 // Linear-hosted upload URLs require the API key to download
                 if (url.Contains("linear.app", StringComparison.OrdinalIgnoreCase))
                 {
-                    var key = LoadProjectCred("LinearApiKey");
+                    var key = GetLinearApiKey();
                     if (!string.IsNullOrEmpty(key))
                         request.Headers.Add("Authorization", key);
                 }
@@ -662,7 +757,7 @@ namespace QAssistant.Views
                     using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
                     if (url.Contains("linear.app", StringComparison.OrdinalIgnoreCase))
                     {
-                        var key = LoadProjectCred("LinearApiKey");
+                        var key = GetLinearApiKey();
                         if (!string.IsNullOrEmpty(key))
                             request.Headers.Add("Authorization", key);
                     }
@@ -1202,7 +1297,7 @@ namespace QAssistant.Views
 
             try
             {
-                var key = LoadProjectCred("LinearApiKey");
+                var key = GetLinearApiKey(_selectedTask?.ConnectionId);
                 if (string.IsNullOrEmpty(key)) return;
 
                 var service = new LinearService(key);
@@ -1236,7 +1331,7 @@ namespace QAssistant.Views
 
             try
             {
-                var service = CreateJiraService();
+                var service = CreateJiraService(_selectedTask?.ConnectionId);
                 if (service == null) return;
 
                 var comments = await service.GetCommentsAsync(issueId);
@@ -1343,13 +1438,13 @@ namespace QAssistant.Views
 
                 if (_isJiraMode)
                 {
-                    var service = CreateJiraService();
+                    var service = CreateJiraService(_selectedTask?.ConnectionId);
                     if (service == null) return;
                     entries = await service.GetChangelogAsync(task.ExternalId);
                 }
                 else if (_isLinearMode)
                 {
-                    var key = LoadProjectCred("LinearApiKey");
+                    var key = GetLinearApiKey(_selectedTask?.ConnectionId);
                     if (string.IsNullOrEmpty(key)) return;
                     var service = new LinearService(key);
                     entries = await service.GetIssueHistoryAsync(task.ExternalId);
@@ -1536,8 +1631,11 @@ namespace QAssistant.Views
         {
             if (_selectedTask == null || _vm?.SelectedProject == null) return;
 
-            _selectedTask.Status = (Models.TaskStatus)DetailStatusPicker.SelectedItem!;
-            _selectedTask.Priority = (TaskPriority)DetailPriorityPicker.SelectedItem!;
+            if (DetailStatusPicker.SelectedItem == null || DetailPriorityPicker.SelectedItem == null)
+                return;
+
+            _selectedTask.Status = (Models.TaskStatus)DetailStatusPicker.SelectedItem;
+            _selectedTask.Priority = (TaskPriority)DetailPriorityPicker.SelectedItem;
 
             if (DetailSetDueDate.IsChecked == true)
             {
@@ -1555,7 +1653,7 @@ namespace QAssistant.Views
             CloseDetailPanel();
 
             // Trigger immediate reminder update
-            App.MainWindowInstance?.ReminderService.TriggerCheck();
+            App.MainWindowInstance?.ReminderService?.TriggerCheck();
         }
 
         private async void DeleteTask_Click(object sender, RoutedEventArgs e)
@@ -1582,7 +1680,7 @@ namespace QAssistant.Views
                 CloseDetailPanel();
 
                 // Trigger immediate reminder update
-                App.MainWindowInstance?.ReminderService.TriggerCheck();
+                App.MainWindowInstance?.ReminderService?.TriggerCheck();
             }
         }
 
@@ -1597,7 +1695,7 @@ namespace QAssistant.Views
                 return;
             }
 
-            var key = LoadProjectCred("LinearApiKey");
+            var key = GetLinearApiKey(_selectedTask?.ConnectionId);
             if (string.IsNullOrEmpty(key)) return;
 
             try
@@ -1626,7 +1724,7 @@ namespace QAssistant.Views
                 return;
             }
 
-            var service = CreateJiraService();
+            var service = CreateJiraService(_selectedTask?.ConnectionId);
             if (service == null) return;
 
             try
@@ -1731,6 +1829,9 @@ namespace QAssistant.Views
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(titleBox.Text))
             {
+                if (statusPicker.SelectedItem == null || priorityPicker.SelectedItem == null)
+                    return;
+
                 DateTime? dueDate = null;
                 if (setDueDate.IsChecked == true)
                 {
@@ -1743,8 +1844,8 @@ namespace QAssistant.Views
                 {
                     Title = titleBox.Text.Trim(),
                     Description = descBox.Text.Trim(),
-                    Status = (Models.TaskStatus)statusPicker.SelectedItem!,
-                    Priority = (TaskPriority)priorityPicker.SelectedItem!,
+                    Status = (Models.TaskStatus)statusPicker.SelectedItem,
+                    Priority = (TaskPriority)priorityPicker.SelectedItem,
                     TicketUrl = ticketBox.Text.Trim(),
                     DueDate = dueDate
                 };
@@ -1753,7 +1854,7 @@ namespace QAssistant.Views
                 RefreshBoard(_vm.SelectedProject.Tasks);
 
                 // Trigger immediate reminder update
-                App.MainWindowInstance?.ReminderService.TriggerCheck();
+                App.MainWindowInstance?.ReminderService?.TriggerCheck();
             }
         }
 
@@ -2022,7 +2123,7 @@ namespace QAssistant.Views
             }
 
             // Trigger immediate reminder update
-            App.MainWindowInstance?.ReminderService.TriggerCheck();
+            App.MainWindowInstance?.ReminderService?.TriggerCheck();
         }
 
         private void ShowRateLimitBanner()

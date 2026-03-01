@@ -61,6 +61,10 @@ namespace QAssistant.Services
     [JsonSerializable(typeof(TestDataGroup))]
     [JsonSerializable(typeof(List<TestDataGroup>))]
     [JsonSerializable(typeof(TestDataEntry))]
+    [JsonSerializable(typeof(JiraConnection))]
+    [JsonSerializable(typeof(List<JiraConnection>))]
+    [JsonSerializable(typeof(LinearConnection))]
+    [JsonSerializable(typeof(List<LinearConnection>))]
     [JsonSerializable(typeof(SapCommerceModule))]
     [JsonSerializable(typeof(SapCommerceModule?))]
     [JsonSourceGenerationOptions(

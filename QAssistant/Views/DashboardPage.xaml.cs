@@ -49,7 +49,7 @@ namespace QAssistant.Views
             if (_vm?.SelectedProject is not { } project) return;
 
             ProjectNameText.Text = project.Name;
-            ProjectSubtitleText.Text = $"Created {project.CreatedAt:MMMM d, yyyy}  ·  {project.Tasks.Count} tasks  ·  {project.TestCases.Count} test cases";
+            ProjectSubtitleText.Text = $"Created {project.CreatedAt:MMMM d, yyyy}  ·  {project.Tasks.Count} tasks  ·  {project.TestCases.Count} test cases  ·  {project.Runbooks.Count} runbooks";
 
             // ── Metric cards ────────────────────────────────────────
             var openTasks = project.Tasks.Count(t => t.Status is not (Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate));
@@ -64,7 +64,12 @@ namespace QAssistant.Views
             int passed = allCases.Count(c => c.Status == TestCaseStatus.Passed);
             int total = allCases.Count;
             PassRateText.Text = total > 0 ? $"{(double)passed / total * 100:F0}%" : "—";
-            TestCasesCount.Text = total.ToString();
+
+            int failedTests = allCases.Count(c => c.Status == TestCaseStatus.Failed);
+            FailedTestsCount.Text = failedTests.ToString();
+
+            int notRun = allCases.Count(c => c.Status == TestCaseStatus.NotRun);
+            NotRunCount.Text = notRun.ToString();
 
             var now = DateTime.Now;
             var overdue = project.Tasks.Count(t =>
@@ -72,36 +77,33 @@ namespace QAssistant.Views
                 t.Status is not (Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate));
             OverdueCount.Text = overdue.ToString();
 
-            // ── Task Breakdown ──────────────────────────────────────
+            // ── Test Case Breakdown ─────────────────────────────────
             TaskBreakdownContainer.Children.Clear();
-            var statusGroups = project.Tasks
-                .GroupBy(t => t.Status)
-                .OrderBy(g => g.Key)
+            var caseGroups = project.TestCases
+                .GroupBy(c => c.Status)
+                .OrderBy(g => (int)g.Key)
                 .ToList();
 
-            foreach (var group in statusGroups)
+            foreach (var group in caseGroups)
             {
                 var (label, hex) = group.Key switch
                 {
-                    Models.TaskStatus.Backlog => ("Backlog", "#9CA3AF"),
-                    Models.TaskStatus.Todo => ("Todo", "#6B7280"),
-                    Models.TaskStatus.InProgress => ("In Progress", "#3B82F6"),
-                    Models.TaskStatus.InReview => ("In Review", "#A78BFA"),
-                    Models.TaskStatus.Done => ("Done", "#10B981"),
-                    Models.TaskStatus.Canceled => ("Canceled", "#EF4444"),
-                    Models.TaskStatus.Duplicate => ("Duplicate", "#F59E0B"),
+                    TestCaseStatus.Passed => ("Passed", "#10B981"),
+                    TestCaseStatus.Failed => ("Failed", "#EF4444"),
+                    TestCaseStatus.Blocked => ("Blocked", "#F59E0B"),
+                    TestCaseStatus.Skipped => ("Skipped", "#6B7280"),
+                    TestCaseStatus.NotRun => ("Not Run", "#9CA3AF"),
                     _ => (group.Key.ToString(), "#6B7280")
                 };
-
-                var row = BuildBarRow(label, group.Count(), project.Tasks.Count, hex);
+                var row = BuildBarRow(label, group.Count(), total, hex);
                 TaskBreakdownContainer.Children.Add(row);
             }
 
-            if (statusGroups.Count == 0)
+            if (caseGroups.Count == 0)
             {
                 TaskBreakdownContainer.Children.Add(new TextBlock
                 {
-                    Text = "No tasks yet",
+                    Text = "No test cases yet",
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
                     FontSize = 12
                 });
@@ -217,24 +219,124 @@ namespace QAssistant.Views
             RecentNotesContainer.Children.Clear();
             var notes = project.Notes.OrderByDescending(n => n.UpdatedAt).Take(5).ToList();
             NotesEmptyText.Visibility = notes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-
             foreach (var note in notes)
             {
-                var noteRow = new StackPanel { Spacing = 2, Margin = new Thickness(0, 2, 0, 2) };
-                noteRow.Children.Add(new TextBlock
+                var noteBtn = new Button
+                {
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Left,
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(10, 7, 10, 7),
+                    BorderThickness = new Thickness(0)
+                };
+                var noteContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+                noteContent.Children.Add(new FontIcon
+                {
+                    Glyph = "\uE70B",
+                    FontSize = 13,
+                    FontFamily = new FontFamily("Segoe Fluent Icons")
+                });
+                noteContent.Children.Add(new TextBlock
                 {
                     Text = note.Title,
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
                     FontSize = 12,
                     TextTrimming = TextTrimming.CharacterEllipsis
                 });
-                noteRow.Children.Add(new TextBlock
+                noteBtn.Content = noteContent;
+                noteBtn.Click += (s, e) => Frame.Navigate(typeof(NotesPage), _vm);
+                RecentNotesContainer.Children.Add(noteBtn);
+            }
+
+            // ── Active Runbooks ─────────────────────────────────────
+            RunbooksContainer.Children.Clear();
+            var runbooks = project.Runbooks
+                .OrderByDescending(r => r.Steps.Any(s => s.Status == RunbookStepStatus.InProgress))
+                .ThenByDescending(r => r.UpdatedAt)
+                .Take(5)
+                .ToList();
+            RunbooksEmptyText.Visibility = runbooks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            foreach (var runbook in runbooks)
+            {
+                int stepTotal = runbook.Steps.Count;
+                int stepDone = runbook.Steps.Count(s => s.Status is RunbookStepStatus.Done or RunbookStepStatus.Skipped);
+                bool hasInProgress = runbook.Steps.Any(s => s.Status == RunbookStepStatus.InProgress);
+                bool hasBlocked = runbook.Steps.Any(s => s.Status == RunbookStepStatus.Blocked);
+
+                string statusHex = hasBlocked ? "#EF4444" : hasInProgress ? "#F59E0B" : stepTotal > 0 && stepDone == stepTotal ? "#10B981" : "#9CA3AF";
+                string statusLabel = hasBlocked ? "Blocked" : hasInProgress ? "In Progress" : stepTotal > 0 && stepDone == stepTotal ? "Complete" : stepTotal == 0 ? "Empty" : "Pending";
+
+                string catLabel = runbook.Category switch
                 {
-                    Text = $"Updated {note.UpdatedAt:MMM d, HH:mm}",
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                    FontSize = 11
+                    RunbookCategory.GoLive => "Go-Live",
+                    _ => runbook.Category.ToString()
+                };
+
+                var rHex = Convert.ToByte(statusHex[1..3], 16);
+                var gHex = Convert.ToByte(statusHex[3..5], 16);
+                var bHex = Convert.ToByte(statusHex[5..7], 16);
+
+                var runbookBtn = new Button
+                {
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(10, 7, 10, 7),
+                    BorderThickness = new Thickness(0)
+                };
+                var innerGrid = new Grid();
+                innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var leftStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center };
+                leftStack.Children.Add(new FontIcon
+                {
+                    Glyph = "\uE9D5",
+                    FontSize = 13,
+                    FontFamily = new FontFamily("Segoe Fluent Icons"),
+                    VerticalAlignment = VerticalAlignment.Center
                 });
-                RecentNotesContainer.Children.Add(noteRow);
+                var infoStack = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Center };
+                infoStack.Children.Add(new TextBlock
+                {
+                    Text = runbook.Title,
+                    FontSize = 12,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                });
+                infoStack.Children.Add(new TextBlock
+                {
+                    Text = $"{catLabel}  ·  {stepDone}/{stepTotal} steps done",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 10
+                });
+                leftStack.Children.Add(infoStack);
+                Grid.SetColumn(leftStack, 0);
+                innerGrid.Children.Add(leftStack);
+
+                var badge = new Border
+                {
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 2, 6, 2),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(30, rHex, gHex, bHex)),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(8, 0, 0, 0)
+                };
+                badge.Child = new TextBlock
+                {
+                    Text = statusLabel,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, rHex, gHex, bHex)),
+                    FontSize = 10
+                };
+                Grid.SetColumn(badge, 1);
+                innerGrid.Children.Add(badge);
+
+                runbookBtn.Content = innerGrid;
+                runbookBtn.Click += (s, e) => Frame.Navigate(typeof(NotesPage), _vm);
+                RunbooksContainer.Children.Add(runbookBtn);
             }
         }
 
