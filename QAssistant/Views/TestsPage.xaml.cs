@@ -54,7 +54,7 @@ namespace QAssistant.Views
         private string _coverageViewMode = "Issue";
         private string _testCaseViewMode = "AllPlans";
         private List<string>? _smokeSubsetCaseIds;
-Copy
+
         private Guid ProjectId => _vm?.SelectedProject?.Id ?? Guid.Empty;
 
         private string? LoadProjectCred(string key) =>
@@ -735,9 +735,8 @@ Copy
             // Wire collapse/expand
             headerButton.Click += (s, _) =>
             {
-                if (_collapsedPlans.Contains(plan.Id))
+                if (_collapsedPlans.Remove(plan.Id))
                 {
-                    _collapsedPlans.Remove(plan.Id);
                     bodyStack.Visibility = Visibility.Visible;
                     chevron.Glyph = "\uE70D";
                 }
@@ -1360,9 +1359,8 @@ Copy
             // Wire collapse/expand
             headerButton.Click += (s, _) =>
             {
-                if (_collapsedExecutionPlans.Contains(planId))
+                if (_collapsedExecutionPlans.Remove(planId))
                 {
-                    _collapsedExecutionPlans.Remove(planId);
                     bodyStack.Visibility = Visibility.Visible;
                     chevron.Glyph = "\uE70D";
                 }
@@ -1508,9 +1506,8 @@ Copy
             // Wire collapse/expand
             headerButton.Click += (s, _) =>
             {
-                if (_collapsedExecutionTestCases.Contains(testCaseId))
+                if (_collapsedExecutionTestCases.Remove(testCaseId))
                 {
-                    _collapsedExecutionTestCases.Remove(testCaseId);
                     bodyStack.Visibility = Visibility.Visible;
                     chevron.Glyph = "\uE70D";
                 }
