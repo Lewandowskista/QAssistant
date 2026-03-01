@@ -224,8 +224,7 @@ namespace QAssistant
             else if (cmd == ID_HIDE) HideMainWindow();
             else if (cmd == ID_EXIT)
             {
-                Shell_NotifyIcon(NIM_DELETE, ref _nid);
-                System.Diagnostics.Process.GetCurrentProcess().Kill();
+                ExitApp();
             }
         }
 
@@ -260,7 +259,7 @@ namespace QAssistant
 
             NotificationService.Instance.Unregister();
 
-            System.Diagnostics.Process.GetCurrentProcess().Kill();
+            Application.Current.Exit();
         }
 
         private Window? m_window;

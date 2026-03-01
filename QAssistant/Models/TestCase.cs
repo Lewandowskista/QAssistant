@@ -19,6 +19,7 @@ namespace QAssistant.Models
 {
     public enum TestCaseStatus { NotRun, Passed, Failed, Blocked, Skipped }
     public enum TestCasePriority { Low, Medium, Major, Blocker }
+    public enum SapCommerceModule { Cart, Checkout, Pricing, Promotions, CatalogSync }
 
     public class TestCase
     {
@@ -36,5 +37,6 @@ namespace QAssistant.Models
         public string SourceIssueId { get; set; } = string.Empty;
         public TaskSource Source { get; set; } = TaskSource.Manual;
         public Guid? TestPlanId { get; set; }
+        public SapCommerceModule? SapModule { get; set; }
     }
 }

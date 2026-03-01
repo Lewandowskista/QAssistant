@@ -36,6 +36,9 @@ namespace QAssistant.Services
             if (!webhook.IsEnabled || string.IsNullOrWhiteSpace(webhook.Url))
                 return;
 
+            if (!Helpers.UriSecurity.IsHttpUrl(webhook.Url))
+                return;
+
             try
             {
                 string payload = webhook.Type switch
@@ -65,8 +68,10 @@ namespace QAssistant.Services
             string title = $"{emoji} Test Plan Complete – {planName}";
             string message = $"*Project:* {projectName}\n*Plan:* {planName}\n*Result:* {passed}/{total} passed ({rate:F0}%)";
 
+            var tasks = new List<Task>();
             foreach (var wh in webhooks)
-                await SendAsync(wh, title, message, color);
+                tasks.Add(SendAsync(wh, title, message, color));
+            await Task.WhenAll(tasks);
         }
 
         public static async Task NotifyHighPriorityDoneAsync(IEnumerable<WebhookConfig> webhooks, string projectName, string taskTitle)
@@ -74,9 +79,11 @@ namespace QAssistant.Services
             string title = "🎯 High-Priority Task Done";
             string message = $"*Project:* {projectName}\n*Task:* {taskTitle}";
 
+            var tasks = new List<Task>();
             foreach (var wh in webhooks)
                 if (wh.NotifyOnHighPriorityDone)
-                    await SendAsync(wh, title, message, "#10B981");
+                    tasks.Add(SendAsync(wh, title, message, "#10B981"));
+            await Task.WhenAll(tasks);
         }
 
         public static async Task NotifyAiAnalysisAsync(IEnumerable<WebhookConfig> webhooks, string projectName, string taskTitle, string summary)
@@ -84,9 +91,11 @@ namespace QAssistant.Services
             string title = "🤖 AI Analysis Complete";
             string message = $"*Project:* {projectName}\n*Task:* {taskTitle}\n{summary}";
 
+            var tasks = new List<Task>();
             foreach (var wh in webhooks)
                 if (wh.NotifyOnAiAnalysis)
-                    await SendAsync(wh, title, message, "#A78BFA");
+                    tasks.Add(SendAsync(wh, title, message, "#A78BFA"));
+            await Task.WhenAll(tasks);
         }
 
         // ── Payload builders ─────────────────────────────────────────

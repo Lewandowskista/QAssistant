@@ -33,11 +33,11 @@
                     <Button Content="Paste Screenshot"
                             Click="PasteScreenshot_Click"
                             Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                            CornerRadius="8" Padding="12,6"/>
+                            CornerRadius="8" Padding="10,7"/>
                     <Button Content="Browse Files"
                             Click="BrowseFiles_Click"
                             Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                            CornerRadius="8" Padding="12,6"/>
+                            CornerRadius="8" Padding="10,7"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -51,6 +51,8 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Spacing="12" Margin="0,80,0,0">
+                    <FontIcon Glyph="&#xE8B7;" FontSize="40" FontFamily="Segoe Fluent Icons"
+                              Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
                     <TextBlock Text="No files yet"
                                Foreground="{ThemeResource TextSecondaryBrush}" FontSize="14"
                                HorizontalAlignment="Center"/>

@@ -47,6 +47,12 @@ namespace QAssistant.Views
         private DispatcherTimer? _rateLimitDismissTimer;
         private ProjectTask? _draggedTask;
         private List<LinearWorkflowState> _linearStates = new();
+        private static readonly HttpClient s_imageClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+
+        // Cached brushes for RenderDescription to avoid per-line allocations
+        private static readonly SolidColorBrush s_descTextBrush = new(Windows.UI.Color.FromArgb(255, 226, 232, 240));
+        private static readonly SolidColorBrush s_descMutedBrush = new(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+        private static readonly SolidColorBrush s_descAccentBrush = new(Windows.UI.Color.FromArgb(255, 167, 139, 250));
 
         private Guid ProjectId => _vm?.SelectedProject?.Id ?? Guid.Empty;
 
@@ -91,13 +97,14 @@ namespace QAssistant.Views
             {
                 var list = tasks?.ToList() ?? new List<ProjectTask>();
 
-                var backlog = list.Where(t => t.Status == Models.TaskStatus.Backlog).ToList();
-                var todo = list.Where(t => t.Status == Models.TaskStatus.Todo).ToList();
-                var inProgress = list.Where(t => t.Status == Models.TaskStatus.InProgress).ToList();
-                var inReview = list.Where(t => t.Status == Models.TaskStatus.InReview).ToList();
-                var done = list.Where(t => t.Status == Models.TaskStatus.Done).ToList();
-                var canceled = list.Where(t => t.Status == Models.TaskStatus.Canceled).ToList();
-                var duplicate = list.Where(t => t.Status == Models.TaskStatus.Duplicate).ToList();
+                var grouped = list.ToLookup(t => t.Status);
+                var backlog = grouped[Models.TaskStatus.Backlog].ToList();
+                var todo = grouped[Models.TaskStatus.Todo].ToList();
+                var inProgress = grouped[Models.TaskStatus.InProgress].ToList();
+                var inReview = grouped[Models.TaskStatus.InReview].ToList();
+                var done = grouped[Models.TaskStatus.Done].ToList();
+                var canceled = grouped[Models.TaskStatus.Canceled].ToList();
+                var duplicate = grouped[Models.TaskStatus.Duplicate].ToList();
 
                 BacklogList.ItemsSource = backlog;
                 TodoList.ItemsSource = todo;
@@ -448,7 +455,7 @@ namespace QAssistant.Views
                 para.Inlines.Add(new Run
                 {
                     Text = "No description provided.",
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+                    Foreground = s_descMutedBrush
                 });
                 DetailDescription.Blocks.Add(para);
                 return;
@@ -466,7 +473,7 @@ namespace QAssistant.Views
                         Text = line[2..],
                         FontSize = 16,
                         FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+                        Foreground = s_descTextBrush
                     });
                 }
                 else if (line.StartsWith("## "))
@@ -476,7 +483,7 @@ namespace QAssistant.Views
                         Text = line[3..],
                         FontSize = 14,
                         FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+                        Foreground = s_descTextBrush
                     });
                 }
                 else if (line.StartsWith("- ") || line.StartsWith("* "))
@@ -484,7 +491,7 @@ namespace QAssistant.Views
                     para.Inlines.Add(new Run
                     {
                         Text = "• " + line[2..],
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+                        Foreground = s_descTextBrush
                     });
                 }
                 else if (line.StartsWith("[code block]"))
@@ -493,7 +500,7 @@ namespace QAssistant.Views
                     {
                         Text = "{ code block }",
                         FontFamily = new FontFamily("Consolas"),
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
+                        Foreground = s_descAccentBrush
                     });
                 }
                 else if (string.IsNullOrWhiteSpace(line))
@@ -506,7 +513,7 @@ namespace QAssistant.Views
                     para.Inlines.Add(new Run
                     {
                         Text = line,
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+                        Foreground = s_descTextBrush
                     });
                 }
 
@@ -599,17 +606,19 @@ namespace QAssistant.Views
 
             try
             {
-                using var httpClient = new HttpClient();
+                using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
 
                 // Linear-hosted upload URLs require the API key to download
                 if (url.Contains("linear.app", StringComparison.OrdinalIgnoreCase))
                 {
                     var key = LoadProjectCred("LinearApiKey");
                     if (!string.IsNullOrEmpty(key))
-                        httpClient.DefaultRequestHeaders.Add("Authorization", key);
+                        request.Headers.Add("Authorization", key);
                 }
 
-                var bytes = await httpClient.GetByteArrayAsync(new Uri(url));
+                using var response = await s_imageClient.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+                var bytes = await response.Content.ReadAsByteArrayAsync();
 
                 using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
                 await stream.WriteAsync(bytes.AsBuffer());
@@ -650,15 +659,17 @@ namespace QAssistant.Views
                     if (!Helpers.UriSecurity.IsSafeHttpUrl(url))
                         continue;
 
-                    using var httpClient = new HttpClient();
+                    using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
                     if (url.Contains("linear.app", StringComparison.OrdinalIgnoreCase))
                     {
                         var key = LoadProjectCred("LinearApiKey");
                         if (!string.IsNullOrEmpty(key))
-                            httpClient.DefaultRequestHeaders.Add("Authorization", key);
+                            request.Headers.Add("Authorization", key);
                     }
 
-                    var bytes = await httpClient.GetByteArrayAsync(new Uri(url));
+                    using var response = await s_imageClient.SendAsync(request);
+                    response.EnsureSuccessStatusCode();
+                    var bytes = await response.Content.ReadAsByteArrayAsync();
                     if (bytes.Length > maxBytesPerImage) continue;
 
                     var mimeType = GetMimeTypeFromUrl(url);

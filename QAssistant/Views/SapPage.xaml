@@ -14,19 +14,19 @@
         <!-- Toolbar with sub-tabs + environment picker -->
         <Border Grid.Row="0" Background="{ThemeResource SurfaceBrush}"
                 BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
-                Padding="16,10">
-            <Grid>
+                Padding="16,8,16,10">
+            <StackPanel Spacing="8">
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Button x:Name="SapTabCronjobs" Content="CronJobs" Click="SapTab_Click" Tag="Cronjobs"
-                            Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource AccentBrush}" CornerRadius="6" Padding="10,6"/>
+                            Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource AccentBrush}" CornerRadius="6" Padding="10,7"/>
                     <Button x:Name="SapTabCatalog" Content="Catalog Sync" Click="SapTab_Click" Tag="Catalog"
-                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,7"/>
                     <Button x:Name="SapTabFlexSearch" Content="FlexSearch" Click="SapTab_Click" Tag="FlexSearch"
-                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,7"/>
                     <Button x:Name="SapTabImpex" Content="ImpEx" Click="SapTab_Click" Tag="Impex"
-                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,7"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <TextBlock Text="Environment:" Foreground="{ThemeResource TextSecondaryBrush}"
                                FontSize="12" VerticalAlignment="Center"/>
                     <ComboBox x:Name="SapEnvPicker" MinWidth="160"
@@ -36,11 +36,11 @@
                               SelectionChanged="SapEnvPicker_SelectionChanged"/>
                     <Button x:Name="SapConnectBtn" Content="Connect" Click="SapConnect_Click"
                             Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                            CornerRadius="8" Padding="14,6"/>
+                            CornerRadius="8" Padding="10,7"/>
                     <TextBlock x:Name="SapConnStatus" Foreground="{ThemeResource TextSecondaryBrush}"
                                FontSize="11" VerticalAlignment="Center"/>
                 </StackPanel>
-            </Grid>
+            </StackPanel>
         </Border>
 
         <!-- Sub-panel content -->
@@ -50,26 +50,95 @@
             <Grid x:Name="CronjobsPanel">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
+
+                <!-- Toolbar: refresh + filters + alert check -->
                 <Border Grid.Row="0" Background="{ThemeResource SurfaceBrush}"
                         BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
                         Padding="16,8">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Button Content="Refresh Jobs" Click="RefreshCronJobs_Click"
-                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                                CornerRadius="8" Padding="14,6"/>
-                        <TextBlock x:Name="CronJobStatusText" Foreground="{ThemeResource TextSecondaryBrush}"
-                                   FontSize="12" VerticalAlignment="Center"/>
+                    <StackPanel Spacing="6">
+                        <Grid>
+                            <Button Content="Refresh" Click="RefreshCronJobs_Click"
+                                    Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                    CornerRadius="8" Padding="10,7" VerticalAlignment="Center"/>
+                            <Button Content="Check Alerts" Click="CheckCriticalAlerts_Click"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                    CornerRadius="6" Padding="10,5" FontSize="12"/>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button x:Name="CronFilterAll" Content="All" Click="CronFilter_Click" Tag="All"
+                                    Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource AccentBrush}"
+                                    CornerRadius="6" Padding="10,5"/>
+                            <Button x:Name="CronFilterRunning" Content="Running" Click="CronFilter_Click" Tag="Running"
+                                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                    CornerRadius="6" Padding="10,5"/>
+                            <Button x:Name="CronFilterFailed" Content="Failed" Click="CronFilter_Click" Tag="Failed"
+                                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                    CornerRadius="6" Padding="10,5"/>
+                            <Button x:Name="CronFilterCritical" Content="Critical" Click="CronFilter_Click" Tag="Critical"
+                                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                    CornerRadius="6" Padding="10,5"/>
+                            <TextBlock x:Name="CronJobStatusText" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="12" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
-                <ScrollViewer Grid.Row="1" Padding="16">
-                    <StackPanel x:Name="CronJobsContainer" Spacing="6">
+
+                <!-- Critical alerts banner (hidden until failures detected) -->
+                <Border x:Name="CronAlertsBanner" Grid.Row="1" Visibility="Collapsed"
+                        BorderBrush="#EF4444" BorderThickness="0,0,0,2" Padding="16,10">
+                    <Border.Background>
+                        <SolidColorBrush Color="#1A0A0A"/>
+                    </Border.Background>
+                    <Grid>
+                        <StackPanel x:Name="CronAlertsContainer" Spacing="4" Margin="0,0,40,0"/>
+                        <Button Content="✕" Click="CloseCronAlerts_Click"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                Padding="8,4" FontSize="12" CornerRadius="4"/>
+                    </Grid>
+                </Border>
+
+                <!-- Job list -->
+                <ScrollViewer Grid.Row="2" Padding="16">
+                    <StackPanel x:Name="CronJobsContainer" Spacing="0">
                         <TextBlock x:Name="CronJobEmptyText"
                                    Text="Connect to a HAC environment to monitor CronJobs"
                                    Foreground="{ThemeResource TextSecondaryBrush}" FontSize="13"
                                    HorizontalAlignment="Center" Margin="0,60,0,0"/>
                     </StackPanel>
+                </ScrollViewer>
+
+                <!-- History panel header (hidden by default) -->
+                <Border x:Name="CronHistoryHeader" Grid.Row="3" Visibility="Collapsed"
+                        Background="{ThemeResource SurfaceBrush}"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,1,0,1"
+                        Padding="16,8">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock x:Name="CronHistoryHeaderText" Text="CronJob History"
+                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                       FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="CronHistoryStatusText"
+                                       Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="11" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button Content="✕ Close" Click="CloseCronHistory_Click"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,5" FontSize="11"/>
+                    </Grid>
+                </Border>
+
+                <!-- History entries -->
+                <ScrollViewer x:Name="CronHistoryScrollView" Grid.Row="4" Visibility="Collapsed"
+                              MaxHeight="220" Padding="16,8">
+                    <StackPanel x:Name="CronHistoryContainer" Spacing="0"/>
                 </ScrollViewer>
             </Grid>
 
@@ -77,25 +146,169 @@
             <Grid x:Name="CatalogPanel" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
+
+                <!-- Toolbar -->
                 <Border Grid.Row="0" Background="{ThemeResource SurfaceBrush}"
                         BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
                         Padding="16,8">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Button Content="Refresh Versions" Click="RefreshCatalog_Click"
-                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                                CornerRadius="8" Padding="14,6"/>
-                        <TextBlock x:Name="CatalogStatusText" Foreground="{ThemeResource TextSecondaryBrush}"
-                                   FontSize="12" VerticalAlignment="Center"/>
-                    </StackPanel>
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <Button Content="Refresh Versions" Click="RefreshCatalog_Click"
+                                    Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                    CornerRadius="8" Padding="10,7"/>
+                            <TextBlock x:Name="CatalogStatusText" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <TextBlock Text="Catalog:" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="12" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="SyncCatalogPicker" MinWidth="180"
+                                      PlaceholderText="Select catalog..."
+                                      Background="{ThemeResource SurfaceBrush}"
+                                      Foreground="{ThemeResource TextPrimaryBrush}"
+                                      BorderBrush="{ThemeResource BorderBrush}"/>
+                            <Button Content="Validate Sync" Click="ValidateSync_Click"
+                                    Background="{ThemeResource AccentBrush}" Foreground="White"
+                                    CornerRadius="8" Padding="10,7"/>
+                            <TextBlock x:Name="SyncStatusText" Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
                 </Border>
-                <ScrollViewer Grid.Row="1" Padding="16">
-                    <StackPanel x:Name="CatalogContainer" Spacing="6">
-                        <TextBlock x:Name="CatalogEmptyText"
-                                   Text="Connect to a HAC environment to view catalog versions"
-                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="13"
-                                   HorizontalAlignment="Center" Margin="0,60,0,0"/>
+
+                <!-- Out-of-sync alert banner -->
+                <Border x:Name="SyncAlertBanner" Grid.Row="1" Visibility="Collapsed"
+                        BorderBrush="#F59E0B" BorderThickness="0,0,0,2" Padding="16,10">
+                    <Border.Background>
+                        <SolidColorBrush Color="#1A1200"/>
+                    </Border.Background>
+                    <Grid>
+                        <StackPanel x:Name="SyncAlertContainer" Spacing="4" Margin="0,0,40,0"/>
+                        <Button Content="✕" Click="CloseSyncAlert_Click"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                Padding="8,4" FontSize="12" CornerRadius="4"/>
+                    </Grid>
+                </Border>
+
+                <!-- Scrollable content -->
+                <ScrollViewer Grid.Row="2" Padding="16">
+                    <StackPanel Spacing="20">
+
+                        <!-- Version list -->
+                        <StackPanel x:Name="CatalogContainer" Spacing="6">
+                            <TextBlock x:Name="CatalogEmptyText"
+                                       Text="Connect to a HAC environment to view catalog versions"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="13"
+                                       HorizontalAlignment="Center" Margin="0,40,0,0"/>
+                        </StackPanel>
+
+                        <!-- Sync diff results (shown after validation) -->
+                        <Border x:Name="SyncDiffPanel" Visibility="Collapsed"
+                                Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="10"
+                                BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" Padding="16">
+                            <StackPanel Spacing="12">
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="SYNC VALIDATION" Foreground="{ThemeResource TextSecondaryBrush}"
+                                                   FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="SyncDiffCatalogLabel"
+                                                   Foreground="{ThemeResource AccentBrush}" FontSize="12"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="SyncDiffTimestamp"
+                                               Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Count summary cards -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="{ThemeResource SurfaceBrush}"
+                                            CornerRadius="8" Padding="12,10" Margin="0,0,6,0">
+                                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                            <TextBlock Text="STAGED" Foreground="{ThemeResource TextSecondaryBrush}"
+                                                       FontSize="9" FontWeight="SemiBold" CharacterSpacing="120" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="SyncDiffStagedCount" Text="—"
+                                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                                       FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="products" Foreground="{ThemeResource TextSecondaryBrush}"
+                                                       FontSize="11" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Background="{ThemeResource SurfaceBrush}"
+                                            CornerRadius="8" Padding="12,10" Margin="0,0,6,0">
+                                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                            <TextBlock Text="ONLINE" Foreground="{ThemeResource TextSecondaryBrush}"
+                                                       FontSize="9" FontWeight="SemiBold" CharacterSpacing="120" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="SyncDiffOnlineCount" Text="—"
+                                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                                       FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="products" Foreground="{ThemeResource TextSecondaryBrush}"
+                                                       FontSize="11" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Background="{ThemeResource SurfaceBrush}"
+                                            CornerRadius="8" Padding="12,10" Margin="0,0,6,0">
+                                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                            <TextBlock Text="DELTA" Foreground="{ThemeResource TextSecondaryBrush}"
+                                                       FontSize="9" FontWeight="SemiBold" CharacterSpacing="120" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="SyncDiffDelta" Text="—"
+                                                       FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="missing" Foreground="{ThemeResource TextSecondaryBrush}"
+                                                       FontSize="11" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="3" x:Name="SyncStatusBadge" CornerRadius="8" Padding="14,10">
+                                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                            <TextBlock Text="STATUS" Foreground="{ThemeResource TextSecondaryBrush}"
+                                                       FontSize="9" FontWeight="SemiBold" CharacterSpacing="120" HorizontalAlignment="Center"/>
+                                            <TextBlock x:Name="SyncStatusBadgeText"
+                                                       FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Missing products list -->
+                                <StackPanel x:Name="MissingProductsSection" Visibility="Collapsed" Spacing="8">
+                                    <Border Height="1" Background="{ThemeResource BorderBrush}"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="MISSING IN ONLINE"
+                                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                                   FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"
+                                                   VerticalAlignment="Center"/>
+                                        <Border Background="{ThemeResource HoverBrush}" CornerRadius="6" Padding="6,2">
+                                            <TextBlock x:Name="MissingCountBadge" Text="0"
+                                                       Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                                        <StackPanel x:Name="MissingProductsContainer" Spacing="3"/>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Sync history (per-environment tracking) -->
+                        <Border x:Name="SyncHistoryPanel" Visibility="Collapsed"
+                                Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="10"
+                                BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="SYNC HISTORY" Foreground="{ThemeResource TextSecondaryBrush}"
+                                           FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
+                                <StackPanel x:Name="SyncHistoryContainer" Spacing="0"/>
+                            </StackPanel>
+                        </Border>
+
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
@@ -142,7 +355,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Content="Execute" Click="RunFlexSearch_Click"
                                     Background="{ThemeResource AccentBrush}" Foreground="White"
-                                    CornerRadius="8" Padding="16,6"/>
+                                    CornerRadius="8" Padding="10,7"/>
                             <TextBlock x:Name="FlexStatusText" Foreground="{ThemeResource TextSecondaryBrush}"
                                        FontSize="12" VerticalAlignment="Center"/>
                         </StackPanel>
@@ -180,10 +393,10 @@
                         </ComboBox>
                         <Button Content="Validate Syntax" Click="ValidateImpex_Click"
                                 Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                                CornerRadius="8" Padding="14,6"/>
+                                CornerRadius="8" Padding="10,7"/>
                         <Button Content="Import to HAC" Click="ImportImpex_Click"
                                 Background="{ThemeResource AccentBrush}" Foreground="White"
-                                CornerRadius="8" Padding="14,6"/>
+                                CornerRadius="8" Padding="10,7"/>
                     </StackPanel>
                 </Border>
                 <TextBox Grid.Row="1"

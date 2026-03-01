@@ -61,6 +61,8 @@ namespace QAssistant.Services
     [JsonSerializable(typeof(TestDataGroup))]
     [JsonSerializable(typeof(List<TestDataGroup>))]
     [JsonSerializable(typeof(TestDataEntry))]
+    [JsonSerializable(typeof(SapCommerceModule))]
+    [JsonSerializable(typeof(SapCommerceModule?))]
     [JsonSourceGenerationOptions(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNameCaseInsensitive = true,
@@ -80,7 +82,7 @@ namespace QAssistant.Services
         private const string EncryptedPrefix = "ENC1:";
         private static readonly SemaphoreSlim s_fileLock = new(1, 1);
 
-        public StorageService()
+        private StorageService()
         {
             try
             {
@@ -178,7 +180,7 @@ namespace QAssistant.Services
 
                 if (!fileContent.StartsWith(EncryptedPrefix, StringComparison.Ordinal))
                 {
-                    try { await SaveProjectsAsync(result); }
+                    try { await SaveProjectsInternalAsync(result); }
                     catch (Exception saveEx) { LogMessage($"Migration save failed: {saveEx.Message}"); }
                 }
 
@@ -200,6 +202,22 @@ namespace QAssistant.Services
         public async Task SaveProjectsAsync(List<Project> projects)
         {
             await s_fileLock.WaitAsync();
+            try
+            {
+                await SaveProjectsInternalAsync(projects);
+            }
+            finally
+            {
+                s_fileLock.Release();
+            }
+        }
+
+        /// <summary>
+        /// Performs the actual save without acquiring <see cref="s_fileLock"/>.
+        /// Must only be called while the lock is already held.
+        /// </summary>
+        private async Task SaveProjectsInternalAsync(List<Project> projects)
+        {
             try
             {
                 // Ensure directory exists before writing
@@ -234,10 +252,6 @@ namespace QAssistant.Services
                 LogMessage($"SaveProjectsAsync error: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                 Debug.WriteLine($"StorageService SaveProjectsAsync error: {ex.Message}\n{ex.StackTrace}");
                 throw;
-            }
-            finally
-            {
-                s_fileLock.Release();
             }
         }
 

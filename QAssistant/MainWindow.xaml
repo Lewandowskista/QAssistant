@@ -149,7 +149,7 @@
 
         <!-- PROJECTS SIDEBAR -->
         <Border Grid.Row="1" Grid.Column="0"
-                Background="{ThemeResource SurfaceVariantBrush}"
+                Background="{ThemeResource SurfaceBrush}"
                 BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,1,0">
             <Grid>
                 <Grid.RowDefinitions>
@@ -158,65 +158,73 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="PROJECTS"
-                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="9" FontWeight="SemiBold"
-                           Margin="16,16,16,8" CharacterSpacing="180"/>
+                <!-- Projects Header -->
+                <Border Grid.Row="0" Padding="12,12,8,8"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
+                    <TextBlock Text="PROJECTS" Foreground="{ThemeResource TextSecondaryBrush}"
+                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"
+                               VerticalAlignment="Center"/>
+                </Border>
 
-                <ListView Grid.Row="1"
-          x:Name="ProjectList"
-          SelectionChanged="ProjectList_SelectionChanged"
-          RightTapped="ProjectList_RightTapped"
-          Background="Transparent"
-          SelectionMode="Single"
-          CanReorderItems="True"
-          CanDragItems="True"
-          AllowDrop="True"
-          DragItemsCompleted="ProjectList_DragItemsCompleted">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="Padding" Value="8,6"/>
-                            <Setter Property="Margin" Value="6,2"/>
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListViewItem">
-                                        <ListViewItemPresenter
-                                            SelectedBackground="{ThemeResource ListAccentLowBrush}"
-                                            SelectedForeground="{ThemeResource TextPrimaryBrush}"
-                                            SelectedPressedBackground="{ThemeResource ListAccentMediumBrush}"
-                                            SelectedPointerOverBackground="{ThemeResource ListAccentMediumBrush}"
-                                            PointerOverBackground="{ThemeResource HoverBrush}"
-                                            PressedBackground="{ThemeResource BorderBrush}"
-                                            CornerRadius="8"
-                                            ContentMargin="8,6"/>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                <Border Width="4" Height="20" CornerRadius="2"
-                                        Background="{Binding ColorBrush}"/>
-                                <TextBlock Text="{Binding Name}"
-                                           Foreground="{ThemeResource TextPrimaryBrush}" FontSize="13"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                <!-- Project List -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="4" Padding="8,8">
+                        <ListView x:Name="ProjectList"
+                                  SelectionChanged="ProjectList_SelectionChanged"
+                                  RightTapped="ProjectList_RightTapped"
+                                  Background="Transparent"
+                                  SelectionMode="Single"
+                                  CanReorderItems="True"
+                                  CanDragItems="True"
+                                  AllowDrop="True"
+                                  DragItemsCompleted="ProjectList_DragItemsCompleted">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Margin" Value="0,2"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListViewItem">
+                                                <ListViewItemPresenter
+                                                    SelectedBackground="{ThemeResource ListAccentLowBrush}"
+                                                    SelectedForeground="{ThemeResource TextPrimaryBrush}"
+                                                    SelectedPressedBackground="{ThemeResource ListAccentMediumBrush}"
+                                                    SelectedPointerOverBackground="{ThemeResource ListAccentMediumBrush}"
+                                                    PointerOverBackground="{ThemeResource HoverBrush}"
+                                                    PressedBackground="{ThemeResource BorderBrush}"
+                                                    CornerRadius="6"
+                                                    ContentMargin="10,7"/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <Border Width="4" Height="16" CornerRadius="2"
+                                                Background="{Binding ColorBrush}"/>
+                                        <TextBlock Text="{Binding Name}"
+                                                   Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </ScrollViewer>
 
                 <Button Grid.Row="2"
                         Content="+ New Project"
                         Click="AddProject_Click"
                         HorizontalAlignment="Stretch"
-                        Margin="12,8,12,16"
+                        Margin="8,4,8,12"
                         Background="{ThemeResource HoverBrush}"
                         Foreground="{ThemeResource AccentBrush}"
                         CornerRadius="8"
-                        Padding="12,8"/>
+                        Padding="10,7"/>
             </Grid>
         </Border>
 
@@ -356,6 +364,15 @@
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <FontIcon Glyph="&#xE943;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
                                 <TextBlock Text="API" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="NavSap" Click="NavItem_Click" Tag="SAP"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE8EF;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="SAP HAC" FontSize="12"/>
                             </StackPanel>
                         </Button>
 

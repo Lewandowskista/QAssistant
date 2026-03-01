@@ -41,6 +41,12 @@
 	<ItemGroup>
 	  <None Remove="Views\TestsPage.xaml" />
 	</ItemGroup>
+	<ItemGroup>
+	  <None Remove="Views\CsvImportDialog.xaml" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Page Remove="Views\CsvImportDialog.xaml" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<Content Include="Assets\SplashScreen.scale-200.png" />
@@ -77,6 +83,11 @@
 	</ItemGroup>
 	<ItemGroup>
 	  <Page Update="Views\TestsPage.xaml">
+		<Generator>MSBuild:Compile</Generator>
+	  </Page>
+	</ItemGroup>
+	<ItemGroup>
+	  <Page Include="Views\CsvImportDialog.xaml">
 		<Generator>MSBuild:Compile</Generator>
 	  </Page>
 	</ItemGroup>

@@ -17,63 +17,116 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using QAssistant.Models;
 
 namespace QAssistant.Services
 {
     public record NotificationItem(string Title, string Message, string Category, Guid ProjectId, Guid TaskId, DateTime? DueDate);
 
-    public class ReminderService
+    public class ReminderService : IDisposable
     {
         private Timer? _precisionTimer;
         private Timer? _dailySummaryTimer;
         private Func<List<Project>>? _getProjects;
         private Action<List<NotificationItem>>? _showBanners;
+        private readonly object _lock = new();
         private readonly HashSet<Guid> _notifiedOverdue = new();
         private readonly HashSet<Guid> _notifiedUpcoming = new();
         private readonly HashSet<Guid> _notifiedLater = new();
+        private bool _disposed;
 
         private string _lastBannerState = string.Empty;
 
         public void Start(Func<List<Project>> getProjects, Action<List<NotificationItem>> showBanners)
         {
-            _getProjects = getProjects;
-            _showBanners = showBanners;
+            ArgumentNullException.ThrowIfNull(getProjects);
+            ArgumentNullException.ThrowIfNull(showBanners);
+
+            lock (_lock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+
+                StopCore();
+
+                _getProjects = getProjects;
+                _showBanners = showBanners;
+            }
 
             // Check immediately on start
             CheckDueTasks();
 
-            // Check every minute for precision reminders
-            _precisionTimer = new Timer(_ => CheckDueTasks(), null,
-                TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(1));
+            lock (_lock)
+            {
+                // Guard: Stop() or Dispose() may have been called while CheckDueTasks() ran
+                if (_getProjects == null || _disposed) return;
 
-            // Schedule daily summary at 9am
-            ScheduleDailySummary();
+                // Check every minute for precision reminders
+                _precisionTimer = new Timer(_ => SafeTimerCallback(CheckDueTasks), null,
+                    TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(1));
+
+                // Schedule daily summary at 9am
+                ScheduleDailySummaryCore();
+            }
         }
 
         public void Stop()
         {
+            lock (_lock)
+            {
+                StopCore();
+            }
+        }
+
+        private void StopCore()
+        {
             _precisionTimer?.Dispose();
+            _precisionTimer = null;
             _dailySummaryTimer?.Dispose();
+            _dailySummaryTimer = null;
+            _getProjects = null;
+            _showBanners = null;
+            _notifiedOverdue.Clear();
+            _notifiedUpcoming.Clear();
+            _notifiedLater.Clear();
+            _lastBannerState = string.Empty;
+        }
+
+        public void Dispose()
+        {
+            lock (_lock)
+            {
+                if (_disposed) return;
+                _disposed = true;
+                StopCore();
+            }
+            GC.SuppressFinalize(this);
         }
 
         public void TriggerCheck() => CheckDueTasks();
 
         private void CheckDueTasks()
         {
-            if (_getProjects == null || _showBanners == null) return;
+            Func<List<Project>>? getProjects;
+            Action<List<NotificationItem>>? showBanners;
+            lock (_lock)
+            {
+                if (_disposed) return;
+                getProjects = _getProjects;
+                showBanners = _showBanners;
+            }
+            if (getProjects == null || showBanners == null) return;
 
             // Snapshot project/task data to avoid cross-thread InvalidOperationException.
             List<(ProjectTask Task, Project Project)> taskPairs;
             try
             {
-                taskPairs = _getProjects()
+                taskPairs = getProjects()
                     .SelectMany(p => p.Tasks.ToList().Select(t => (Task: t, Project: p)))
                     .ToList();
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"ReminderService.CheckDueTasks snapshot error: {ex.Message}");
                 return;
             }
 
@@ -83,75 +136,101 @@ namespace QAssistant.Services
             var todayItems = new List<NotificationItem>();
             var laterItems = new List<NotificationItem>();
 
-            foreach (var (task, project) in taskPairs)
+            bool shouldUpdate;
+            bool hasNewOverdue = false, hasNewToday = false, hasNewLater = false;
+
+            lock (_lock)
             {
-                if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate)
+                if (_disposed || _getProjects == null) return;
+
+                foreach (var (task, project) in taskPairs)
                 {
-                    _notifiedOverdue.Remove(task.Id);
-                    _notifiedUpcoming.Remove(task.Id);
-                    _notifiedLater.Remove(task.Id);
-                    continue;
+                    if (task.Status is Models.TaskStatus.Done or Models.TaskStatus.Canceled or Models.TaskStatus.Duplicate)
+                    {
+                        _notifiedOverdue.Remove(task.Id);
+                        _notifiedUpcoming.Remove(task.Id);
+                        _notifiedLater.Remove(task.Id);
+                        continue;
+                    }
+
+                    if (task.DueDate == null)
+                    {
+                        _notifiedOverdue.Remove(task.Id);
+                        _notifiedUpcoming.Remove(task.Id);
+                        _notifiedLater.Remove(task.Id);
+                        continue;
+                    }
+
+                    var due = task.DueDate.Value;
+
+                    if (due <= now)
+                    {
+                        overdueItems.Add(new("Overdue", task.Title, "Overdue", project.Id, task.Id, due));
+                        _notifiedUpcoming.Remove(task.Id);
+                        _notifiedLater.Remove(task.Id);
+                    }
+                    else if (due.Date == today)
+                    {
+                        todayItems.Add(new("Due Today", $"{task.Title} — {due:HH:mm}", "DueToday", project.Id, task.Id, due));
+                        _notifiedOverdue.Remove(task.Id);
+                        _notifiedLater.Remove(task.Id);
+                    }
+                    else
+                    {
+                        laterItems.Add(new("Upcoming", task.Title, "Later", project.Id, task.Id, due));
+                        _notifiedOverdue.Remove(task.Id);
+                        _notifiedUpcoming.Remove(task.Id);
+                    }
                 }
 
-                if (task.DueDate == null)
+                // Combine all categories, prioritized, limit to 5
+                var allItemsPreview = overdueItems
+                    .Concat(todayItems)
+                    .Concat(laterItems)
+                    .Take(5);
+                var stateKey = string.Join("|", allItemsPreview.Select(i => $"{i.TaskId}:{i.Category}"));
+                shouldUpdate = stateKey != _lastBannerState;
+                if (shouldUpdate)
+                    _lastBannerState = stateKey;
+
+                // Track NEWLY notified items (one toast per category)
+                foreach (var item in overdueItems)
                 {
-                    _notifiedOverdue.Remove(task.Id);
-                    _notifiedUpcoming.Remove(task.Id);
-                    _notifiedLater.Remove(task.Id);
-                    continue;
+                    if (_notifiedOverdue.Add(item.TaskId)) hasNewOverdue = true;
+                }
+                foreach (var item in todayItems)
+                {
+                    if (_notifiedUpcoming.Add(item.TaskId)) hasNewToday = true;
+                }
+                foreach (var item in laterItems)
+                {
+                    if (_notifiedLater.Add(item.TaskId)) hasNewLater = true;
                 }
 
-                var due = task.DueDate.Value;
-
-                if (due <= now)
-                {
-                    overdueItems.Add(new("Overdue", task.Title, "Overdue", project.Id, task.Id, due));
-                    _notifiedUpcoming.Remove(task.Id);
-                    _notifiedLater.Remove(task.Id);
-                }
-                else if (due.Date == today)
-                {
-                    todayItems.Add(new("Due Today", $"{task.Title} — {due:HH:mm}", "DueToday", project.Id, task.Id, due));
-                    _notifiedOverdue.Remove(task.Id);
-                    _notifiedLater.Remove(task.Id);
-                }
-                else
-                {
-                    laterItems.Add(new("Upcoming", task.Title, "Later", project.Id, task.Id, due));
-                    _notifiedOverdue.Remove(task.Id);
-                    _notifiedUpcoming.Remove(task.Id);
-                }
+                // Prune stale GUIDs for tasks no longer in the data set to prevent unbounded growth
+                var activeTaskIds = new HashSet<Guid>(taskPairs.Select(tp => tp.Task.Id));
+                _notifiedOverdue.IntersectWith(activeTaskIds);
+                _notifiedUpcoming.IntersectWith(activeTaskIds);
+                _notifiedLater.IntersectWith(activeTaskIds);
             }
 
-            // Combine all categories, prioritized, limit to 5
+            // Combine outside lock for external calls
             var allItems = overdueItems
                 .Concat(todayItems)
                 .Concat(laterItems)
                 .Take(5)
                 .ToList();
 
-            // Update UI banners if state changed
-            var stateKey = string.Join("|", allItems.Select(i => $"{i.TaskId}:{i.Category}"));
-            if (stateKey != _lastBannerState)
+            if (shouldUpdate)
             {
-                _showBanners(allItems);
-                _lastBannerState = stateKey;
-            }
-
-            // Show Toast for NEWLY notified items (one per category)
-            bool hasNewOverdue = false, hasNewToday = false, hasNewLater = false;
-
-            foreach (var item in overdueItems)
-            {
-                if (_notifiedOverdue.Add(item.TaskId)) hasNewOverdue = true;
-            }
-            foreach (var item in todayItems)
-            {
-                if (_notifiedUpcoming.Add(item.TaskId)) hasNewToday = true;
-            }
-            foreach (var item in laterItems)
-            {
-                if (_notifiedLater.Add(item.TaskId)) hasNewLater = true;
+                try
+                {
+                    showBanners(allItems);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ReminderService.CheckDueTasks showBanners error: {ex.Message}");
+                }
             }
 
             if (hasNewOverdue && overdueItems.Count > 0)
@@ -175,20 +254,28 @@ namespace QAssistant.Services
             if (laterItems.Count == 0) NotificationService.Instance.RemoveToast("Later");
         }
 
-        private void ScheduleDailySummary()
+        private void ScheduleDailySummaryCore()
         {
             var now = DateTime.Now;
             var next9am = DateTime.Today.AddHours(9);
             if (now > next9am) next9am = next9am.AddDays(1);
 
             var delay = next9am - now;
-            _dailySummaryTimer = new Timer(_ => ShowDailySummary(), null,
+            _dailySummaryTimer = new Timer(_ => SafeTimerCallback(ShowDailySummary), null,
                 delay, TimeSpan.FromHours(24));
         }
 
         private void ShowDailySummary()
         {
-            if (_getProjects == null || _showBanners == null) return;
+            Func<List<Project>>? getProjects;
+            Action<List<NotificationItem>>? showBanners;
+            lock (_lock)
+            {
+                if (_disposed) return;
+                getProjects = _getProjects;
+                showBanners = _showBanners;
+            }
+            if (getProjects == null || showBanners == null) return;
 
             var today = DateTime.Today;
             var now = DateTime.Now;
@@ -197,12 +284,13 @@ namespace QAssistant.Services
             List<ProjectTask> allTasks;
             try
             {
-                allTasks = _getProjects()
+                allTasks = getProjects()
                     .SelectMany(p => p.Tasks.ToList())
                     .ToList();
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"ReminderService.ShowDailySummary snapshot error: {ex.Message}");
                 return;
             }
 
@@ -225,7 +313,26 @@ namespace QAssistant.Services
             if (overdue > 0) parts.Add($"{overdue} overdue");
             if (total > 0) parts.Add($"{total} total pending");
 
-            _showBanners([new("Daily Summary", string.Join(" · ", parts), "Summary", Guid.Empty, Guid.Empty, null)]);
+            try
+            {
+                showBanners([new("Daily Summary", string.Join(" · ", parts), "Summary", Guid.Empty, Guid.Empty, null)]);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ReminderService.ShowDailySummary showBanners error: {ex.Message}");
+            }
+        }
+
+        private static void SafeTimerCallback(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ReminderService timer callback error: {ex.Message}");
+            }
         }
     }
 }

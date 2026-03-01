@@ -70,10 +70,13 @@ namespace QAssistant.Services
 
             sb.AppendLine("Execution ID,Test Case ID,Test Case Title,Test Plan ID,Result,Actual Result,Notes,Executed At");
 
+            var testCaseLookup = project.TestCases.ToDictionary(c => c.Id);
+            var testPlanLookup = project.TestPlans.ToDictionary(p => p.Id);
+
             foreach (var exec in executions.OrderByDescending(e => e.ExecutedAt))
             {
-                var tc = project.TestCases.FirstOrDefault(c => c.Id == exec.TestCaseId);
-                var plan = project.TestPlans.FirstOrDefault(p => p.Id == exec.TestPlanId);
+                testCaseLookup.TryGetValue(exec.TestCaseId, out var tc);
+                testPlanLookup.TryGetValue(exec.TestPlanId, out var plan);
 
                 sb.Append(CsvEscape(exec.ExecutionId)).Append(',');
                 sb.Append(CsvEscape(tc?.TestCaseId ?? "N/A")).Append(',');
@@ -142,13 +145,21 @@ namespace QAssistant.Services
 
             // Summary metrics
             int totalPlans = plans.Count;
-            var relevantCases = plans.SelectMany(p => allCases.Where(tc => tc.TestPlanId == p.Id)).ToList();
+            var casesByPlan = allCases.ToLookup(tc => tc.TestPlanId);
+            var relevantCases = plans.SelectMany(p => casesByPlan[p.Id]).ToList();
             int totalCases = relevantCases.Count;
-            int passed = relevantCases.Count(c => c.Status == TestCaseStatus.Passed);
-            int failed = relevantCases.Count(c => c.Status == TestCaseStatus.Failed);
-            int blocked = relevantCases.Count(c => c.Status == TestCaseStatus.Blocked);
-            int skipped = relevantCases.Count(c => c.Status == TestCaseStatus.Skipped);
-            int notRun = relevantCases.Count(c => c.Status == TestCaseStatus.NotRun);
+            int passed = 0, failed = 0, blocked = 0, skipped = 0, notRun = 0;
+            foreach (var c in relevantCases)
+            {
+                switch (c.Status)
+                {
+                    case TestCaseStatus.Passed: passed++; break;
+                    case TestCaseStatus.Failed: failed++; break;
+                    case TestCaseStatus.Blocked: blocked++; break;
+                    case TestCaseStatus.Skipped: skipped++; break;
+                    case TestCaseStatus.NotRun: notRun++; break;
+                }
+            }
             double passRate = totalCases > 0 ? (double)passed / totalCases * 100 : 0;
             int totalExecs = allExecs.Count;
 
@@ -185,7 +196,7 @@ namespace QAssistant.Services
 
             foreach (var plan in plans.OrderByDescending(p => p.CreatedAt))
             {
-                var casesInPlan = allCases.Where(tc => tc.TestPlanId == plan.Id).ToList();
+                var casesInPlan = casesByPlan[plan.Id].ToList();
                 int planPassed = casesInPlan.Count(c => c.Status == TestCaseStatus.Passed);
                 int planFailed = casesInPlan.Count(c => c.Status == TestCaseStatus.Failed);
                 double planRate = casesInPlan.Count > 0 ? (double)planPassed / casesInPlan.Count * 100 : 0;
@@ -268,6 +279,8 @@ namespace QAssistant.Services
                 page.DrawText("DATE", margin + 380, y);
                 y -= 20;
 
+                var caseLookup = allCases.ToDictionary(c => c.Id);
+
                 foreach (var exec in recentExecs)
                 {
                     if (y < 60)
@@ -276,7 +289,7 @@ namespace QAssistant.Services
                         y = 760;
                     }
 
-                    var tc = allCases.FirstOrDefault(c => c.Id == exec.TestCaseId);
+                    caseLookup.TryGetValue(exec.TestCaseId, out var tc);
 
                     page.SetFont("Courier", 8);
                     page.SetColor(0.3f, 0.3f, 0.35f);
@@ -332,10 +345,17 @@ namespace QAssistant.Services
 
                 // Priority failure breakdown
                 var failedCases = relevantCases.Where(c => c.Status == TestCaseStatus.Failed).ToList();
-                int blockerFailed = failedCases.Count(c => c.Priority == TestCasePriority.Blocker);
-                int majorFailed = failedCases.Count(c => c.Priority == TestCasePriority.Major);
-                int mediumFailed = failedCases.Count(c => c.Priority == TestCasePriority.Medium);
-                int lowFailed = failedCases.Count(c => c.Priority == TestCasePriority.Low);
+                int blockerFailed = 0, majorFailed = 0, mediumFailed = 0, lowFailed = 0;
+                foreach (var c in failedCases)
+                {
+                    switch (c.Priority)
+                    {
+                        case TestCasePriority.Blocker: blockerFailed++; break;
+                        case TestCasePriority.Major: majorFailed++; break;
+                        case TestCasePriority.Medium: mediumFailed++; break;
+                        case TestCasePriority.Low: lowFailed++; break;
+                    }
+                }
                 int totalFailed = failedCases.Count;
 
                 page.SetFont("Helvetica-Bold", 11);

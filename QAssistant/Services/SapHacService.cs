@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -25,7 +26,20 @@ using System.Threading.Tasks;
 namespace QAssistant.Services
 {
     public record CronJobEntry(string Code, string Status, string LastResult, string NextActivationTime, string TriggerActive);
+    public record CronJobHistoryEntry(string JobCode, string Status, string Result, string StartTime, string EndTime, string Duration);
     public record CatalogVersionInfo(string CatalogId, string Version, int ItemCount, string Status);
+    public record CatalogSyncDiff(
+        string CatalogId,
+        int StagedCount,
+        int OnlineCount,
+        List<string> MissingInOnline,
+        DateTime CheckedAt)
+    {
+        public int Delta => StagedCount - OnlineCount;
+        public bool IsInSync => Delta == 0 && MissingInOnline.Count == 0;
+        public string SyncStatus => IsInSync ? "In Sync" : Delta > 0 ? "Out of Sync" : "Online Ahead";
+    }
+
     public record FlexibleSearchResult(List<string> Headers, List<List<string>> Rows, string Error);
     public record ImpExResult(bool Success, string Log);
 
@@ -38,6 +52,10 @@ namespace QAssistant.Services
         private readonly HttpClient _client;
         private readonly string _hacBaseUrl;
         private bool _loggedIn;
+
+        private static readonly Regex s_htmlRowRegex = new(@"<tr[^>]*>(.*?)</tr>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex s_htmlCellRegex = new(@"<t[dh][^>]*>(.*?)</t[dh]>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex s_htmlTagRegex = new(@"<[^>]+>", RegexOptions.Compiled);
 
         public SapHacService(string hacBaseUrl)
         {
@@ -90,19 +108,14 @@ namespace QAssistant.Services
             {
                 var html = await _client.GetStringAsync($"{_hacBaseUrl}/monitoring/cronjobs");
 
-                // Parse table rows from the HTML response
-                var rowPattern = new Regex(@"<tr[^>]*>(.*?)</tr>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
-                var cellPattern = new Regex(@"<t[dh][^>]*>(.*?)</t[dh]>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
-                var tagPattern = new Regex(@"<[^>]+>");
-
                 bool firstRow = true;
-                foreach (Match row in rowPattern.Matches(html))
+                foreach (Match row in s_htmlRowRegex.Matches(html))
                 {
                     if (firstRow) { firstRow = false; continue; }
-                    var cells = cellPattern.Matches(row.Value);
+                    var cells = s_htmlCellRegex.Matches(row.Value);
                     if (cells.Count < 4) continue;
 
-                    string Clean(string s) => tagPattern.Replace(s, "").Trim();
+                    string Clean(string s) => s_htmlTagRegex.Replace(s, "").Trim();
                     results.Add(new CronJobEntry(
                         Code: Clean(cells[0].Groups[1].Value),
                         Status: Clean(cells[1].Groups[1].Value),
@@ -201,6 +214,73 @@ namespace QAssistant.Services
             }
         }
 
+        /// <summary>
+        /// Job code substrings that are considered critical. A job is critical when its
+        /// code contains any entry here (case-insensitive). Used by alert detection.
+        /// </summary>
+        public static readonly string[] CriticalJobCodes =
+        [
+            "solrindexer", "catalogsync", "updateindex", "processTask",
+            "fullindex", "cleanUpCronJob", "triggerReIndex", "syncCronJob"
+        ];
+
+        /// <summary>Returns CronJob entries whose code matches a known critical job pattern.</summary>
+        public async Task<List<CronJobEntry>> GetCriticalJobStatusAsync()
+        {
+            var all = await GetCronJobsAsync();
+            return all
+                .Where(j => CriticalJobCodes.Any(c => j.Code.Contains(c, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+        }
+
+        /// <summary>
+        /// Retrieves CronJobHistory entries via FlexibleSearch.
+        /// Pass <paramref name="jobCode"/> to scope to a single job, or null for the most recent across all jobs.
+        /// </summary>
+        public async Task<List<CronJobHistoryEntry>> GetCronJobHistoryAsync(string? jobCode = null, int maxEntries = 50)
+        {
+            EnsureLoggedIn();
+            var safeCode = jobCode?.Replace("'", "''");
+            var whereClause = string.IsNullOrWhiteSpace(safeCode)
+                ? ""
+                : $" WHERE {{cj.code}}='{safeCode}'";
+
+            var query = $"SELECT {{cj.code}},{{cjh.startTime}},{{cjh.endTime}},{{cjh.status}},{{cjh.result}} FROM {{CronJobHistory AS cjh JOIN CronJob AS cj ON {{cjh.cronjob}}={{cj.pk}}}}{whereClause} ORDER BY {{cjh.startTime}} DESC";
+
+            var result = await RunFlexibleSearchAsync(query, maxEntries);
+            var list = new List<CronJobHistoryEntry>();
+            if (!string.IsNullOrEmpty(result.Error))
+                return list;
+
+            foreach (var row in result.Rows)
+            {
+                if (row.Count < 5) continue;
+                list.Add(new CronJobHistoryEntry(
+                    JobCode:   row[0],
+                    Status:    row[3],
+                    Result:    row[4],
+                    StartTime: row[1],
+                    EndTime:   row[2],
+                    Duration:  ComputeDuration(row[1], row[2])
+                ));
+            }
+            return list;
+        }
+
+        private static string ComputeDuration(string startTime, string endTime)
+        {
+            if (DateTime.TryParse(startTime, out var s) && DateTime.TryParse(endTime, out var e) && e > s)
+            {
+                var d = e - s;
+                return d.TotalHours >= 1
+                    ? $"{(int)d.TotalHours}h {d.Minutes}m"
+                    : d.TotalMinutes >= 1
+                    ? $"{(int)d.TotalMinutes}m {d.Seconds}s"
+                    : $"{d.Seconds}s";
+            }
+            return "-";
+        }
+
         /// <summary>Get catalog version item counts via FlexibleSearch.</summary>
         public async Task<List<CatalogVersionInfo>> GetCatalogVersionsAsync()
         {
@@ -214,6 +294,47 @@ namespace QAssistant.Services
                     list.Add(new CatalogVersionInfo(row[0], row[1], int.TryParse(row[2], out var n) ? n : 0, "OK"));
             }
             return list;
+        }
+
+        /// <summary>Returns all catalog IDs defined in this Commerce instance.</summary>
+        public async Task<List<string>> GetCatalogIdsAsync()
+        {
+            const string query = "SELECT {c.id} FROM {Catalog AS c} ORDER BY {c.id}";
+            var result = await RunFlexibleSearchAsync(query, 50);
+            return result.Rows
+                .Where(r => r.Count > 0 && !string.IsNullOrEmpty(r[0]))
+                .Select(r => r[0])
+                .ToList();
+        }
+
+        /// <summary>
+        /// Compare Staged vs Online item counts for a given catalog and collect product codes
+        /// present in Staged but absent from Online (capped at <paramref name="maxMissing"/>).
+        /// </summary>
+        public async Task<CatalogSyncDiff> GetCatalogSyncDiffAsync(string catalogId, int maxMissing = 200)
+        {
+            EnsureLoggedIn();
+            var safeId = catalogId.Replace("'", "''");
+
+            var stagedQ = "SELECT {p.code} FROM {Product AS p JOIN CatalogVersion AS cv ON {p.catalogVersion}={cv.pk}} WHERE {cv.catalog(id)}='" + safeId + "' AND {cv.version}='Staged'";
+            var onlineQ = "SELECT {p.code} FROM {Product AS p JOIN CatalogVersion AS cv ON {p.catalogVersion}={cv.pk}} WHERE {cv.catalog(id)}='" + safeId + "' AND {cv.version}='Online'";
+
+            var stagedResult = await RunFlexibleSearchAsync(stagedQ, 5000);
+            var onlineResult = await RunFlexibleSearchAsync(onlineQ, 5000);
+
+            var stagedCodes = stagedResult.Rows
+                .Where(r => r.Count > 0 && !string.IsNullOrEmpty(r[0]))
+                .Select(r => r[0])
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var onlineCodes = onlineResult.Rows
+                .Where(r => r.Count > 0 && !string.IsNullOrEmpty(r[0]))
+                .Select(r => r[0])
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var missing = stagedCodes.Except(onlineCodes).Take(maxMissing).ToList();
+
+            return new CatalogSyncDiff(catalogId, stagedCodes.Count, onlineCodes.Count, missing, DateTime.Now);
         }
 
         // ── Helpers ──────────────────────────────────────────────────

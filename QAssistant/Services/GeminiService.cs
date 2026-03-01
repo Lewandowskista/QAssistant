@@ -137,10 +137,17 @@ namespace QAssistant.Services
             // Test coverage snapshot
             if (project.TestCases.Count > 0)
             {
-                var passed = project.TestCases.Count(tc => tc.Status == TestCaseStatus.Passed);
-                var failed = project.TestCases.Count(tc => tc.Status == TestCaseStatus.Failed);
-                var blocked = project.TestCases.Count(tc => tc.Status == TestCaseStatus.Blocked);
-                var notRun = project.TestCases.Count(tc => tc.Status == TestCaseStatus.NotRun);
+                int passed = 0, failed = 0, blocked = 0, notRun = 0;
+                foreach (var tc in project.TestCases)
+                {
+                    switch (tc.Status)
+                    {
+                        case TestCaseStatus.Passed: passed++; break;
+                        case TestCaseStatus.Failed: failed++; break;
+                        case TestCaseStatus.Blocked: blocked++; break;
+                        case TestCaseStatus.NotRun: notRun++; break;
+                    }
+                }
                 sb.AppendLine($" test_coverage:total={project.TestCases.Count},passed={passed},failed={failed},blocked={blocked},not_run={notRun}");
             }
 
@@ -310,7 +317,7 @@ namespace QAssistant.Services
             sb.AppendLine("@task:generate_test_cases");
             sb.AppendLine("@perspective:qa_engineer—generate tests a QA engineer would write for regression,smoke,functional,integration suites");
             sb.AppendLine("@source:" + sourceName);
-            sb.AppendLine("@out_fmt:json_array[{testCaseId,title,preConditions,testSteps,testData,expectedResult,priority}]");
+            sb.AppendLine("@out_fmt:json_array[{testCaseId,title,preConditions,testSteps,testData,expectedResult,priority,sourceIssueId}]");
             sb.AppendLine("@out_rules:raw_json_only|no_markdown_wrap|no_code_block");
             sb.AppendLine("@rules:comprehensive|all_fields_required|specific_actionable|realistic_test_data|cover_positive_negative_edge|no_generic|env_aware|use_known_test_data_when_applicable");
             if (!string.IsNullOrWhiteSpace(designDocContent))
@@ -337,6 +344,7 @@ namespace QAssistant.Services
             sb.AppendLine(" testData:specific_values");
             sb.AppendLine(" expectedResult:pass_criteria");
             sb.AppendLine(" priority:one_of(Blocker,Major,Medium,Low)_based_on_issue_severity_and_impact");
+            sb.AppendLine(" sourceIssueId:exact_id_of_the_source_issue_this_test_case_covers(IssueIdentifier_field_value)");
             sb.AppendLine("}");
             sb.AppendLine("---");
 
@@ -416,6 +424,7 @@ namespace QAssistant.Services
                     TestData = Truncate(GetJsonString(element, "testData") ?? "", MaxFieldLength),
                     ExpectedResult = Truncate(GetJsonString(element, "expectedResult") ?? "", MaxFieldLength),
                     Priority = ParsePriority(GetJsonString(element, "priority")),
+                    SourceIssueId = Truncate(GetJsonString(element, "sourceIssueId") ?? "", 100),
                     Source = source,
                     GeneratedAt = DateTime.Now
                 };
@@ -527,10 +536,17 @@ namespace QAssistant.Services
 
             // Failed test cases grouped by priority
             var failedCases = testCases.Where(tc => tc.Status == TestCaseStatus.Failed).ToList();
-            var blockerFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Blocker);
-            var majorFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Major);
-            var mediumFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Medium);
-            var lowFailed = failedCases.Count(tc => tc.Priority == TestCasePriority.Low);
+            int blockerFailed = 0, majorFailed = 0, mediumFailed = 0, lowFailed = 0;
+            foreach (var tc in failedCases)
+            {
+                switch (tc.Priority)
+                {
+                    case TestCasePriority.Blocker: blockerFailed++; break;
+                    case TestCasePriority.Major: majorFailed++; break;
+                    case TestCasePriority.Medium: mediumFailed++; break;
+                    case TestCasePriority.Low: lowFailed++; break;
+                }
+            }
 
             sb.AppendLine("failure_summary{");
             sb.AppendLine($" total_test_cases:{testCases.Count}");
@@ -586,17 +602,155 @@ namespace QAssistant.Services
             // Test plan details in TOON array notation
             if (testPlans.Count > 0)
             {
+                var casesByPlan = testCases.ToLookup(tc => tc.TestPlanId);
                 sb.AppendLine("test_plans[");
                 foreach (var plan in testPlans.Take(50))
                 {
-                    var planCaseCount = testCases.Count(tc => tc.TestPlanId == plan.Id);
-                    var planFailedCount = testCases.Count(tc => tc.TestPlanId == plan.Id && tc.Status == TestCaseStatus.Failed);
+                    var planCases = casesByPlan[plan.Id];
+                    int planCaseCount = 0, planFailedCount = 0;
+                    foreach (var tc in planCases)
+                    {
+                        planCaseCount++;
+                        if (tc.Status == TestCaseStatus.Failed) planFailedCount++;
+                    }
                     sb.AppendLine($" {{id:{SanitizeToonValue(plan.TestPlanId, 100)},name:{SanitizeToonValue(plan.Name, 200)},cases:{planCaseCount},failed:{planFailedCount},source:{plan.Source}}}");
                 }
                 sb.AppendLine("]");
             }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Builds a TOON prompt that asks Gemini to select a minimal smoke-test subset
+        /// (up to 30 IDs) from the supplied candidate test cases.
+        /// The response is expected to be a raw JSON array of test case ID strings.
+        ///
+        /// Token optimisation: a single <c>@schema</c> directive declares field and value
+        /// abbreviations used in every entry of the <c>done[]</c> and <c>tc[]</c> blocks,
+        /// yielding ≈ 70–80 chars saved per test case (≈ 2 000 tokens at 100 TCs).
+        /// Key mappings:  t=title, p=priority, s=status, iss=source_issue_id.
+        /// Priority tokens: B=Blocker, MAJ=Major, MED=Medium, L=Low.
+        /// Status tokens:   F=Failed, P=Passed, BL=Blocked, SK=Skipped (NR=NotRun omitted as default).
+        /// </summary>
+        public static string BuildSmokeSubsetPrompt(
+            IReadOnlyList<TestCase> candidates,
+            IReadOnlyList<ProjectTask> doneTasks,
+            Project? project = null)
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine("@role:sr_qa_engineer");
+            sb.AppendLine("@task:smoke_subset_selection");
+            sb.AppendLine("@goal:minimal_tc_set_max_regression_coverage");
+            sb.AppendLine("@out_fmt:json_array_of_strings");
+            sb.AppendLine("@out_rules:raw_json_only|no_wrap|ids_only|max_30");
+            sb.AppendLine("@sel_rules:prefer(B>MAJ>MED>L)|cover_distinct_areas|no_dupes|exact_ids");
+            // Schema declaration — enables abbreviated keys/values in all data blocks below
+            sb.AppendLine("@schema:t=title|p=priority(B=Blocker,MAJ=Major,MED=Medium,L=Low)|s=status(F=Failed,P=Passed,BL=Blocked,SK=Skipped)|iss=source_issue_id");
+            sb.AppendLine("---");
+
+            AppendQaContext(sb, project);
+
+            if (doneTasks.Count > 0)
+            {
+                sb.AppendLine("done[");
+                foreach (var task in doneTasks.Take(50))
+                    sb.AppendLine($" {{id:{SanitizeToonValue(task.IssueIdentifier, 60)},t:{SanitizeToonValue(task.Title, 120)},p:{AbbreviateTaskPriority(task.Priority)}}}");
+                sb.AppendLine("]");
+            }
+
+            // tc[] entries omit s: when status is NotRun (the default) and omit iss: when empty,
+            // keeping each line as short as possible while preserving all selector-relevant signal.
+            sb.AppendLine("tc[");
+            foreach (var tc in candidates.Take(200))
+            {
+                sb.Append($" {{id:{SanitizeToonValue(tc.TestCaseId, 50)},t:{SanitizeToonValue(tc.Title, 100)},p:{AbbreviateTestCasePriority(tc.Priority)}");
+                if (tc.Status != TestCaseStatus.NotRun)
+                    sb.Append($",s:{AbbreviateStatus(tc.Status)}");
+                if (!string.IsNullOrEmpty(tc.SourceIssueId))
+                    sb.Append($",iss:{SanitizeToonValue(tc.SourceIssueId, 60)}");
+                sb.AppendLine("}");
+            }
+            sb.AppendLine("]");
+
+            return sb.ToString();
+        }
+
+        // ── TOON abbreviation helpers ─────────────────────────────────────────
+
+        private static string AbbreviateTestCasePriority(TestCasePriority priority) => priority switch
+        {
+            TestCasePriority.Blocker => "B",
+            TestCasePriority.Major   => "MAJ",
+            TestCasePriority.Medium  => "MED",
+            TestCasePriority.Low     => "L",
+            _                        => "MED"
+        };
+
+        // Critical task priority maps to Blocker in QA domain severity terms
+        private static string AbbreviateTaskPriority(TaskPriority priority) => priority switch
+        {
+            TaskPriority.Critical => "B",
+            TaskPriority.High     => "MAJ",
+            TaskPriority.Medium   => "MED",
+            TaskPriority.Low      => "L",
+            _                     => "MED"
+        };
+
+        private static string AbbreviateStatus(TestCaseStatus status) => status switch
+        {
+            TestCaseStatus.Failed  => "F",
+            TestCaseStatus.Passed  => "P",
+            TestCaseStatus.Blocked => "BL",
+            TestCaseStatus.Skipped => "SK",
+            _                      => "NR"
+        };
+
+        /// <summary>
+        /// Parses the smoke subset response from Gemini into a list of test case ID strings.
+        /// Handles optional markdown wrappers and returns an empty list on parse failure.
+        /// </summary>
+        public static List<string> ParseSmokeSubsetIds(string response)
+        {
+            var json = response.Trim();
+
+            // Strip optional markdown code block wrapper
+            if (json.StartsWith("```"))
+            {
+                var startIdx = json.IndexOf('\n');
+                if (startIdx >= 0)
+                {
+                    startIdx++;
+                    var endIdx = json.LastIndexOf("```");
+                    if (endIdx > startIdx)
+                        json = json[startIdx..endIdx].Trim();
+                }
+            }
+
+            var extracted = ExtractFirstJsonArray(json);
+            if (string.IsNullOrEmpty(extracted))
+                return [];
+
+            try
+            {
+                using var doc = JsonDocument.Parse(extracted);
+                var ids = new List<string>();
+                foreach (var element in doc.RootElement.EnumerateArray())
+                {
+                    if (element.ValueKind == JsonValueKind.String)
+                    {
+                        var id = element.GetString();
+                        if (!string.IsNullOrWhiteSpace(id))
+                            ids.Add(id.Trim());
+                    }
+                }
+                return ids;
+            }
+            catch (JsonException)
+            {
+                return [];
+            }
         }
 
         public async Task<string> AnalyzeIssueAsync(string prompt, IReadOnlyList<(string MimeType, string Base64Data)>? images = null, string? modelName = null)

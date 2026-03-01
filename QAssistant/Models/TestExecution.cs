@@ -27,5 +27,6 @@ namespace QAssistant.Models
         public string ActualResult { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
         public DateTime ExecutedAt { get; set; } = DateTime.Now;
+        public bool IsArchived { get; set; } = false;
     }
 }

@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using QAssistant.Models;
 using QAssistant.Services;
 using QAssistant.ViewModels;
@@ -35,6 +36,9 @@ namespace QAssistant.Views
         private string _activeTab = "Cronjobs";
         private SapHacService? _hacService;
         private QaEnvironment? _selectedEnv;
+        private List<CronJobEntry> _allCronJobs = [];
+        private string _currentCronFilter = "All";
+        private List<(string EnvName, CatalogSyncDiff Diff)> _syncHistory = [];
 
         public SapPage() { this.InitializeComponent(); }
 
@@ -134,9 +138,10 @@ namespace QAssistant.Views
             CronJobStatusText.Text = "Loading...";
             try
             {
-                var jobs = await _hacService.GetCronJobsAsync();
-                RenderCronJobs(jobs);
-                CronJobStatusText.Text = $"{jobs.Count} jobs";
+                _allCronJobs = await _hacService.GetCronJobsAsync();
+                ApplyFilterAndRender();
+                CheckAndShowCriticalAlerts(_allCronJobs);
+                CronJobStatusText.Text = $"{_allCronJobs.Count} jobs";
             }
             catch (Exception ex) { CronJobStatusText.Text = $"Error: {ex.Message}"; }
         }
@@ -146,18 +151,19 @@ namespace QAssistant.Views
             CronJobsContainer.Children.Clear();
             CronJobEmptyText.Visibility = jobs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
-            // Header
-            var header = BuildCronJobRow("Code", "Status", "Last Result", "Next Run", "Trigger", isHeader: true);
+            var header = BuildCronJobRow("Code", "Status", "Last Result", "Next Run", "Trigger", null, isHeader: true);
             CronJobsContainer.Children.Add(header);
 
             foreach (var job in jobs)
             {
-                var row = BuildCronJobRow(job.Code, job.Status, job.LastResult, job.NextActivationTime, job.TriggerActive);
+                var localJob = job;
+                var row = BuildCronJobRow(job.Code, job.Status, job.LastResult, job.NextActivationTime, job.TriggerActive,
+                    () => _ = LoadCronJobHistoryAsync(localJob.Code));
                 CronJobsContainer.Children.Add(row);
             }
         }
 
-        private static UIElement BuildCronJobRow(string code, string status, string lastResult, string next, string trigger, bool isHeader = false)
+        private static UIElement BuildCronJobRow(string code, string status, string lastResult, string next, string trigger, Action? onHistoryClick = null, bool isHeader = false)
         {
             var grid = new Grid
             {
@@ -168,6 +174,7 @@ namespace QAssistant.Views
             };
             for (int i = 0; i < 5; i++)
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = i == 0 ? new GridLength(2, GridUnitType.Star) : new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             Windows.UI.Color statusColor = status switch
             {
@@ -202,6 +209,220 @@ namespace QAssistant.Views
             Add(next, 3);
             Add(trigger, 4);
 
+            if (isHeader)
+            {
+                Add("", 5);
+            }
+            else if (onHistoryClick != null)
+            {
+                var histBtn = new Button
+                {
+                    Content = "History",
+                    FontSize = 11,
+                    Padding = new Thickness(8, 3, 8, 3),
+                    CornerRadius = new CornerRadius(4),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 30, 30, 45)),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                histBtn.Click += (_, _) => onHistoryClick();
+                Grid.SetColumn(histBtn, 5);
+                grid.Children.Add(histBtn);
+            }
+
+            return new Border
+            {
+                Child = grid,
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(0, 0, 0, 1)
+            };
+        }
+
+        // ── CronJob filter / alert / history ─────────────────────────
+
+        private void CronFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            _currentCronFilter = btn.Tag.ToString()!;
+            UpdateCronFilterButtons();
+            ApplyFilterAndRender();
+        }
+
+        private void UpdateCronFilterButtons()
+        {
+            var filterBtns = new[] { CronFilterAll, CronFilterRunning, CronFilterFailed, CronFilterCritical };
+            var tags = new[] { "All", "Running", "Failed", "Critical" };
+            for (int i = 0; i < filterBtns.Length; i++)
+            {
+                bool active = tags[i] == _currentCronFilter;
+                filterBtns[i].Background = active
+                    ? (Brush)Application.Current.Resources["ListAccentLowBrush"]
+                    : new SolidColorBrush(Colors.Transparent);
+                filterBtns[i].Foreground = active
+                    ? (Brush)Application.Current.Resources["AccentBrush"]
+                    : (Brush)Application.Current.Resources["TextSecondaryBrush"];
+            }
+        }
+
+        private void ApplyFilterAndRender()
+        {
+            var filtered = _currentCronFilter switch
+            {
+                "Running"  => _allCronJobs.Where(j => j.Status.Contains("RUNNING", StringComparison.OrdinalIgnoreCase)).ToList(),
+                "Failed"   => _allCronJobs.Where(j =>
+                                  j.LastResult.Contains("ERROR",   StringComparison.OrdinalIgnoreCase) ||
+                                  j.LastResult.Contains("FAILURE", StringComparison.OrdinalIgnoreCase) ||
+                                  j.Status.Contains("ERROR",   StringComparison.OrdinalIgnoreCase) ||
+                                  j.Status.Contains("ABORTED", StringComparison.OrdinalIgnoreCase)).ToList(),
+                "Critical" => _allCronJobs.Where(j =>
+                                  SapHacService.CriticalJobCodes.Any(c =>
+                                      j.Code.Contains(c, StringComparison.OrdinalIgnoreCase))).ToList(),
+                _          => _allCronJobs
+            };
+            RenderCronJobs(filtered);
+        }
+
+        private async void CheckCriticalAlerts_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hacService == null) { CronJobStatusText.Text = "Not connected"; return; }
+            CronJobStatusText.Text = "Checking critical jobs...";
+            try
+            {
+                var critical = await _hacService.GetCriticalJobStatusAsync();
+                CheckAndShowCriticalAlerts(critical);
+                CronJobStatusText.Text = _allCronJobs.Count > 0 ? $"{_allCronJobs.Count} jobs" : "Alert check complete";
+            }
+            catch (Exception ex) { CronJobStatusText.Text = $"Error: {ex.Message}"; }
+        }
+
+        private void CheckAndShowCriticalAlerts(List<CronJobEntry> jobs)
+        {
+            var failed = jobs
+                .Where(j => SapHacService.CriticalJobCodes.Any(c =>
+                                j.Code.Contains(c, StringComparison.OrdinalIgnoreCase))
+                         && (j.LastResult.Contains("ERROR",   StringComparison.OrdinalIgnoreCase) ||
+                             j.LastResult.Contains("FAILURE", StringComparison.OrdinalIgnoreCase) ||
+                             j.Status.Contains("ERROR",   StringComparison.OrdinalIgnoreCase) ||
+                             j.Status.Contains("ABORTED", StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            CronAlertsBanner.Visibility = failed.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            CronAlertsContainer.Children.Clear();
+            if (failed.Count == 0) return;
+
+            CronAlertsContainer.Children.Add(new TextBlock
+            {
+                Text = $"⚠  {failed.Count} critical job(s) require attention",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 239, 68, 68)),
+                FontSize = 12,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+
+            foreach (var job in failed)
+            {
+                CronAlertsContainer.Children.Add(new TextBlock
+                {
+                    Text = $"  • {job.Code}  —  Status: {job.Status}  |  Last Result: {job.LastResult}",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 252, 165, 165)),
+                    FontSize = 12
+                });
+            }
+        }
+
+        private void CloseCronAlerts_Click(object sender, RoutedEventArgs e)
+            => CronAlertsBanner.Visibility = Visibility.Collapsed;
+
+        private void CloseCronHistory_Click(object sender, RoutedEventArgs e)
+        {
+            CronHistoryHeader.Visibility = Visibility.Collapsed;
+            CronHistoryScrollView.Visibility = Visibility.Collapsed;
+        }
+
+        private async Task LoadCronJobHistoryAsync(string jobCode)
+        {
+            if (_hacService == null) return;
+            CronHistoryHeaderText.Text = $"History — {jobCode}";
+            CronHistoryStatusText.Text = "Loading...";
+            CronHistoryHeader.Visibility = Visibility.Visible;
+            CronHistoryScrollView.Visibility = Visibility.Visible;
+            CronHistoryContainer.Children.Clear();
+            try
+            {
+                var history = await _hacService.GetCronJobHistoryAsync(jobCode);
+                RenderCronJobHistory(history);
+                CronHistoryStatusText.Text = $"({history.Count} entries)";
+            }
+            catch (Exception ex) { CronHistoryStatusText.Text = $"Error: {ex.Message}"; }
+        }
+
+        private void RenderCronJobHistory(List<CronJobHistoryEntry> history)
+        {
+            CronHistoryContainer.Children.Clear();
+            if (history.Count == 0)
+            {
+                CronHistoryContainer.Children.Add(new TextBlock
+                {
+                    Text = "No history entries found",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    FontSize = 12,
+                    Margin = new Thickness(0, 8, 0, 0)
+                });
+                return;
+            }
+
+            CronHistoryContainer.Children.Add(BuildHistoryRow("Status", "Result", "Start Time", "End Time", "Duration", isHeader: true));
+            foreach (var entry in history)
+                CronHistoryContainer.Children.Add(BuildHistoryRow(entry.Status, entry.Result, entry.StartTime, entry.EndTime, entry.Duration));
+        }
+
+        private static UIElement BuildHistoryRow(string status, string result, string start, string end, string duration, bool isHeader = false)
+        {
+            var grid = new Grid
+            {
+                Padding = new Thickness(12, 6, 12, 6),
+                Background = isHeader
+                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36))
+                    : new SolidColorBrush(Colors.Transparent)
+            };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.5, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.5, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+
+            Windows.UI.Color resultColor = result switch
+            {
+                var r when r.Contains("SUCCESS", StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 16, 185, 129),
+                var r when r.Contains("ERROR",   StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 239, 68, 68),
+                var r when r.Contains("FAILURE", StringComparison.OrdinalIgnoreCase) => Windows.UI.Color.FromArgb(255, 239, 68, 68),
+                _ => Windows.UI.Color.FromArgb(255, 107, 114, 128)
+            };
+
+            void Add(string text, int col, bool colored = false)
+            {
+                var tb = new TextBlock
+                {
+                    Text = text,
+                    FontSize = isHeader ? 11 : 12,
+                    FontWeight = isHeader ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal,
+                    Foreground = colored
+                        ? new SolidColorBrush(resultColor)
+                        : new SolidColorBrush(isHeader
+                            ? Windows.UI.Color.FromArgb(255, 107, 114, 128)
+                            : Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(tb, col);
+                grid.Children.Add(tb);
+            }
+
+            Add(status, 0);
+            Add(result, 1, !isHeader);
+            Add(start, 2);
+            Add(end, 3);
+            Add(duration, 4);
+
             return new Border
             {
                 Child = grid,
@@ -221,6 +442,7 @@ namespace QAssistant.Views
                 var versions = await _hacService.GetCatalogVersionsAsync();
                 RenderCatalog(versions);
                 CatalogStatusText.Text = $"{versions.Count} catalog versions";
+                await LoadCatalogPickerAsync();
             }
             catch (Exception ex) { CatalogStatusText.Text = $"Error: {ex.Message}"; }
         }
@@ -291,6 +513,150 @@ namespace QAssistant.Views
                 }
             }
         }
+
+        // ── Catalog Sync Validator ────────────────────────────────────
+
+        private async Task LoadCatalogPickerAsync()
+        {
+            if (_hacService == null) return;
+            try
+            {
+                var ids = await _hacService.GetCatalogIdsAsync();
+                SyncCatalogPicker.ItemsSource = ids;
+                if (ids.Count > 0 && SyncCatalogPicker.SelectedIndex < 0)
+                    SyncCatalogPicker.SelectedIndex = 0;
+            }
+            catch { /* leave picker empty */ }
+        }
+
+        private async void ValidateSync_Click(object sender, RoutedEventArgs e)
+        {
+            if (_hacService == null) { SyncStatusText.Text = "Not connected"; return; }
+            if (SyncCatalogPicker.SelectedItem is not string catalogId)
+            {
+                SyncStatusText.Text = "Select a catalog first";
+                return;
+            }
+
+            SyncStatusText.Text = "Validating...";
+            try
+            {
+                var diff = await _hacService.GetCatalogSyncDiffAsync(catalogId);
+                _syncHistory.Insert(0, (_selectedEnv?.Name ?? "Unknown", diff));
+                RenderSyncDiff(diff);
+                RenderSyncHistory();
+                ShowSyncAlert(diff);
+                SyncStatusText.Text = $"Done — {diff.SyncStatus}";
+            }
+            catch (Exception ex) { SyncStatusText.Text = $"Error: {ex.Message}"; }
+        }
+
+        private void RenderSyncDiff(CatalogSyncDiff diff)
+        {
+            SyncDiffPanel.Visibility = Visibility.Visible;
+            SyncDiffCatalogLabel.Text = diff.CatalogId;
+            SyncDiffTimestamp.Text = diff.CheckedAt.ToString("yyyy-MM-dd HH:mm:ss");
+            SyncDiffStagedCount.Text = diff.StagedCount.ToString("N0");
+            SyncDiffOnlineCount.Text = diff.OnlineCount.ToString("N0");
+
+            bool inSync = diff.IsInSync;
+            SyncDiffDelta.Text = diff.Delta.ToString("N0");
+            SyncDiffDelta.Foreground = new SolidColorBrush(inSync
+                ? Windows.UI.Color.FromArgb(255, 16, 185, 129)
+                : Windows.UI.Color.FromArgb(255, 239, 68, 68));
+
+            SyncStatusBadge.Background = new SolidColorBrush(inSync
+                ? Windows.UI.Color.FromArgb(255, 14, 43, 26)
+                : Windows.UI.Color.FromArgb(255, 45, 14, 14));
+            SyncStatusBadgeText.Text = diff.SyncStatus;
+            SyncStatusBadgeText.Foreground = new SolidColorBrush(inSync
+                ? Windows.UI.Color.FromArgb(255, 16, 185, 129)
+                : Windows.UI.Color.FromArgb(255, 239, 68, 68));
+
+            MissingProductsSection.Visibility = diff.MissingInOnline.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            MissingCountBadge.Text = diff.MissingInOnline.Count.ToString();
+            MissingProductsContainer.Children.Clear();
+            foreach (var code in diff.MissingInOnline)
+            {
+                MissingProductsContainer.Children.Add(new TextBlock
+                {
+                    Text = $"  {code}",
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 252, 165, 165)),
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize = 12
+                });
+            }
+        }
+
+        private void RenderSyncHistory()
+        {
+            if (_syncHistory.Count == 0) return;
+            SyncHistoryPanel.Visibility = Visibility.Visible;
+            SyncHistoryContainer.Children.Clear();
+            SyncHistoryContainer.Children.Add(BuildSyncHistoryRow("Environment", "Catalog", "Staged", "Online", "Delta", "Status", "Checked At", isHeader: true));
+            foreach (var (envName, diff) in _syncHistory.Take(20))
+                SyncHistoryContainer.Children.Add(BuildSyncHistoryRow(envName, diff.CatalogId, diff.StagedCount.ToString("N0"), diff.OnlineCount.ToString("N0"), diff.Delta.ToString("N0"), diff.SyncStatus, diff.CheckedAt.ToString("HH:mm:ss")));
+        }
+
+        private static UIElement BuildSyncHistoryRow(string env, string catalog, string staged, string online, string delta, string status, string checkedAt, bool isHeader = false)
+        {
+            var grid = new Grid { Padding = new Thickness(10, 6, 10, 6) };
+            var widths = new[] { 1.2, 1.2, 0.8, 0.8, 0.7, 0.9, 1.0 };
+            foreach (var w in widths)
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w, GridUnitType.Star) });
+
+            bool isInSync = status == "In Sync";
+            Windows.UI.Color statusColor = isInSync
+                ? Windows.UI.Color.FromArgb(255, 16, 185, 129)
+                : Windows.UI.Color.FromArgb(255, 239, 68, 68);
+            Windows.UI.Color defaultColor = isHeader
+                ? Windows.UI.Color.FromArgb(255, 107, 114, 128)
+                : Windows.UI.Color.FromArgb(255, 226, 232, 240);
+
+            var values = new[] { env, catalog, staged, online, delta, status, checkedAt };
+            for (int i = 0; i < values.Length; i++)
+            {
+                var tb = new TextBlock
+                {
+                    Text = values[i],
+                    FontSize = isHeader ? 11 : 12,
+                    FontWeight = isHeader ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal,
+                    Foreground = new SolidColorBrush(i == 5 && !isHeader ? statusColor : defaultColor),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(tb, i);
+                grid.Children.Add(tb);
+            }
+
+            return new Border
+            {
+                Child = grid,
+                Background = isHeader
+                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36))
+                    : new SolidColorBrush(Colors.Transparent),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(0, 0, 0, 1)
+            };
+        }
+
+        private void ShowSyncAlert(CatalogSyncDiff diff)
+        {
+            SyncAlertBanner.Visibility = Visibility.Collapsed;
+            if (diff.IsInSync) return;
+            SyncAlertContainer.Children.Clear();
+            SyncAlertContainer.Children.Add(new TextBlock
+            {
+                Text = $"⚠  Catalog '{diff.CatalogId}': {diff.Delta} product(s) in Staged not found in Online",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 245, 158, 11)),
+                FontSize = 12,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            SyncAlertBanner.Visibility = Visibility.Visible;
+        }
+
+        private void CloseSyncAlert_Click(object sender, RoutedEventArgs e)
+            => SyncAlertBanner.Visibility = Visibility.Collapsed;
 
         // ── FlexSearch ────────────────────────────────────────────────
 

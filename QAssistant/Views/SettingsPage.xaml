@@ -46,7 +46,7 @@
                     <Button x:Name="RefreshProjectsButton" Content="Refresh Projects Sidebar"
                     Click="RefreshProjects_Click"
                     Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                    CornerRadius="8" Padding="12,8"
+                    CornerRadius="8" Padding="10,7"
                     HorizontalAlignment="Left"/>
                     <TextBlock Text="If projects don't appear, click this button to manually refresh the sidebar."
                            Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
@@ -124,7 +124,7 @@
                             Background="{ThemeResource HoverBrush}"
                             Foreground="{ThemeResource AccentBrush}"
                             CornerRadius="8"
-                            Padding="16,8"/>
+                            Padding="10,7"/>
 
                     <StackPanel Spacing="8">
                         <TextBlock Text="API Key" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
@@ -139,7 +139,7 @@
                                    Text="All requests must include: Authorization: Bearer &lt;key&gt;"/>
                         <Button Content="Regenerate Key" Click="RegenerateApiKey_Click"
                                 Background="#3F1A1A" Foreground="#F87171"
-                                CornerRadius="8" Padding="12,8"/>
+                                CornerRadius="8" Padding="10,7"/>
                     </StackPanel>
 
                     <Border x:Name="AutomationApiStatusBorder" Visibility="Collapsed"
@@ -183,7 +183,7 @@
                         <Button Grid.Column="1" Content="Get API Key"
                                 Click="OpenLinearKeys_Click"
                                 Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                                CornerRadius="8" Padding="12,8"
+                                CornerRadius="8" Padding="10,7"
                                 VerticalAlignment="Top"/>
                     </Grid>
 
@@ -217,19 +217,19 @@
                                 Background="{ThemeResource HoverBrush}"
                                 Foreground="{ThemeResource AccentBrush}"
                                 CornerRadius="8"
-                                Padding="16,8"/>
+                                Padding="10,7"/>
                         <Button Content="Test Connection"
                                 Click="TestLinear_Click"
                                 Background="{ThemeResource HoverBrush}"
                                 Foreground="{ThemeResource TextSecondaryBrush}"
                                 CornerRadius="8"
-                                Padding="16,8"/>
+                                Padding="10,7"/>
                         <Button Content="Disconnect"
                                 Click="DisconnectLinear_Click"
                                 Background="#3F1A1A"
                                 Foreground="#F87171"
                                 CornerRadius="8"
-                                Padding="16,8"/>
+                                Padding="10,7"/>
                     </StackPanel>
 
                     <Border x:Name="LinearStatusBorder" Visibility="Collapsed"
@@ -258,7 +258,7 @@
                         <Button Grid.Column="1" Content="Get API Token"
                                 Click="OpenJiraKeys_Click"
                                 Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                                CornerRadius="8" Padding="12,8"
+                                CornerRadius="8" Padding="10,7"
                                 VerticalAlignment="Top"/>
                     </Grid>
 
@@ -311,22 +311,22 @@
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <Button Content="Save Jira Keys"
                                 Click="SaveJira_Click"
-                                Background="#252535"
-                                Foreground="#A78BFA"
+                                Background="{ThemeResource HoverBrush}"
+                                Foreground="{ThemeResource AccentBrush}"
                                 CornerRadius="8"
-                                Padding="16,8"/>
+                                Padding="10,7"/>
                         <Button Content="Test Connection"
                                 Click="TestJira_Click"
-                                Background="#252535"
-                                Foreground="#6B7280"
+                                Background="{ThemeResource HoverBrush}"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
                                 CornerRadius="8"
-                                Padding="16,8"/>
+                                Padding="10,7"/>
                         <Button Content="Disconnect"
                                 Click="DisconnectJira_Click"
                                 Background="#3F1A1A"
                                 Foreground="#F87171"
                                 CornerRadius="8"
-                                Padding="16,8"/>
+                                Padding="10,7"/>
                     </StackPanel>
 
                     <Border x:Name="JiraStatusBorder" Visibility="Collapsed"
@@ -354,8 +354,8 @@
                         </StackPanel>
                         <Button Grid.Column="1" Content="Get API Key"
                                 Click="OpenGeminiKeys_Click"
-                                Background="#252535" Foreground="#A78BFA"
-                                CornerRadius="8" Padding="12,8"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                CornerRadius="8" Padding="10,7"
                                 VerticalAlignment="Top"/>
                     </Grid>
 
@@ -371,10 +371,10 @@
                     </StackPanel>
 
                     <Button Content="Save API Key" Click="SaveGeminiKey_Click"
-                            Background="#252535"
-                            Foreground="#A78BFA"
+                            Background="{ThemeResource HoverBrush}"
+                            Foreground="{ThemeResource AccentBrush}"
                             CornerRadius="8"
-                            Padding="16,8"/>
+                            Padding="10,7"/>
 
                     <Border x:Name="GeminiStatusBorder" Visibility="Collapsed"
                             CornerRadius="8" Padding="12,8">
@@ -393,10 +393,10 @@
                                TextWrapping="Wrap"
                                Text="View storage paths and logs to help debug data persistence issues."/>
                     <Button Content="View Storage Diagnostics" Click="ViewStorageDiagnostics_Click"
-                            Background="#252535"
-                            Foreground="#A78BFA"
+                            Background="{ThemeResource HoverBrush}"
+                            Foreground="{ThemeResource AccentBrush}"
                             CornerRadius="8"
-                            Padding="16,8"/>
+                            Padding="10,7"/>
                 </StackPanel>
             </Border>
 
@@ -424,8 +424,8 @@
 
                     <Button x:Name="OpenLogButton" Content="Open Log File"
                     Click="OpenLogFile_Click"
-                    Background="#252535" Foreground="#A78BFA"
-                    CornerRadius="8" Padding="12,8"/>
+                    Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                    CornerRadius="8" Padding="10,7"/>
                         </StackPanel>
                     </Border>
 

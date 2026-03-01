@@ -830,12 +830,15 @@ namespace QAssistant
                 case "API":
                     ContentFrame.Navigate(typeof(ApiPlaygroundPage), ViewModel);
                     break;
+                case "SAP":
+                    ContentFrame.Navigate(typeof(SapPage), ViewModel);
+                    break;
             }
         }
 
         private void UpdateNavStyles()
         {
-            var navButtons = new[] { NavDashboard, NavLinks, NavNotes, NavFiles, NavTasks, NavTests, NavTestData, NavEnvironments, NavApi };
+            var navButtons = new[] { NavDashboard, NavLinks, NavNotes, NavFiles, NavTasks, NavTests, NavTestData, NavEnvironments, NavApi, NavSap };
             foreach (var btn in navButtons)
             {
                 bool active = btn.Tag.ToString() == ViewModel.ActiveTab;

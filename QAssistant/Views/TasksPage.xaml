@@ -24,17 +24,17 @@
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Button x:Name="ManualModeBtn" Content="Manual" Click="ManualMode_Click"
                             Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource AccentBrush}"
-                            CornerRadius="6" Padding="10,6"/>
+                            CornerRadius="6" Padding="10,7"/>
                     <Button x:Name="LinearModeBtn" Content="Linear" Click="LinearMode_Click"
                             Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                            CornerRadius="6" Padding="10,6"/>
+                            CornerRadius="6" Padding="10,7"/>
                     <Button x:Name="JiraModeBtn" Content="Jira" Click="JiraMode_Click"
                             Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                            CornerRadius="6" Padding="10,6"/>
+                            CornerRadius="6" Padding="10,7"/>
                     <Button x:Name="RefreshBtn" Content="Refresh" Click="Refresh_Click"
                             Visibility="Collapsed"
                             Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
-                            CornerRadius="6" Padding="10,6"/>
+                            CornerRadius="8" Padding="10,7"/>
                     <TextBlock x:Name="StatusText" Foreground="{ThemeResource TextSecondaryBrush}"
                                FontSize="12" VerticalAlignment="Center"
                                Visibility="Collapsed"/>
@@ -42,7 +42,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                     <Button x:Name="AddTaskBtn" Content="+ New Task" Click="AddTask_Click"
                             Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
-                            CornerRadius="8" Padding="12,6"/>
+                            CornerRadius="8" Padding="10,7"/>
                     <Button x:Name="ShortcutHintBtn" Click="ShortcutHint_Click"
                             Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                             CornerRadius="6" Padding="8,6"

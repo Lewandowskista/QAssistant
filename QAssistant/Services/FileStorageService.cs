@@ -49,7 +49,7 @@ namespace QAssistant.Services
             try
             {
                 var fileName = Path.GetFileName(sourcePath);
-                var ext = Path.GetExtension(sourcePath).ToLower();
+                var ext = Path.GetExtension(sourcePath);
 
                 if (s_blockedExtensions.Contains(ext))
                     return null;
@@ -76,7 +76,7 @@ namespace QAssistant.Services
         {
             try
             {
-                var ext = Path.GetExtension(fileName).ToLower();
+                var ext = Path.GetExtension(fileName);
 
                 if (s_blockedExtensions.Contains(ext))
                     return null;
@@ -104,7 +104,7 @@ namespace QAssistant.Services
             try
             {
                 var fullPath = Path.GetFullPath(attachment.FilePath);
-                if (!fullPath.StartsWith(_filesFolder, StringComparison.OrdinalIgnoreCase))
+                if (!fullPath.StartsWith(_filesFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                     return;
 
                 if (File.Exists(fullPath))
@@ -118,7 +118,7 @@ namespace QAssistant.Services
             try
             {
                 var fullPath = Path.GetFullPath(attachment.FilePath);
-                if (!fullPath.StartsWith(_filesFolder, StringComparison.OrdinalIgnoreCase))
+                if (!fullPath.StartsWith(_filesFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                     return;
 
                 if (!File.Exists(fullPath)) return;

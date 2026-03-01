@@ -44,8 +44,11 @@ namespace QAssistant.Views
         private bool _criticalityExpanded;
         private string? _criticalityAssessmentText;
         private bool _showArchived;
+        private bool _showArchivedRuns;
         private string? _designDocumentContent;
         private string? _designDocumentName;
+        private string _coverageViewMode = "Issue";
+        private List<string>? _smokeSubsetCaseIds;
 
         private Guid ProjectId => _vm?.SelectedProject?.Id ?? Guid.Empty;
 
@@ -84,7 +87,7 @@ namespace QAssistant.Views
 
         private void UpdateSubTabStyles()
         {
-            var tabs = new[] { TestCaseGenBtn, TestRunsBtn, ReportsBtn };
+            var tabs = new[] { TestCaseGenBtn, TestRunsBtn, ReportsBtn, CoverageMatrixBtn, RegressionBuilderBtn };
             foreach (var tab in tabs)
             {
                 bool active = tab.Tag.ToString() == _activeSubTab;
@@ -102,17 +105,29 @@ namespace QAssistant.Views
             TestCaseGenerationPanel.Visibility = _activeSubTab == "TestCaseGeneration" ? Visibility.Visible : Visibility.Collapsed;
             TestRunsPanel.Visibility = _activeSubTab == "TestRuns" ? Visibility.Visible : Visibility.Collapsed;
             ReportsPanel.Visibility = _activeSubTab == "Reports" ? Visibility.Visible : Visibility.Collapsed;
+            CoverageMatrixPanel.Visibility = _activeSubTab == "CoverageMatrix" ? Visibility.Visible : Visibility.Collapsed;
+            RegressionBuilderPanel.Visibility = _activeSubTab == "RegressionBuilder" ? Visibility.Visible : Visibility.Collapsed;
 
             if (_activeSubTab == "TestRuns")
                 RenderExecutionHistory();
             if (_activeSubTab == "Reports")
                 RenderReportsDashboard();
+            if (_activeSubTab == "CoverageMatrix")
+                RenderCoverageMatrix();
+            if (_activeSubTab == "RegressionBuilder")
+                RenderRegressionBuilder();
         }
 
         private void ShowArchivedToggle_Click(object sender, RoutedEventArgs e)
         {
             _showArchived = ShowArchivedToggle.IsChecked == true;
             RenderTestPlans();
+        }
+
+        private void ShowArchivedRunsToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _showArchivedRuns = ShowArchivedRunsToggle.IsChecked == true;
+            RenderExecutionHistory();
         }
 
         private async void UploadDesignDoc_Click(object sender, RoutedEventArgs e)
@@ -385,6 +400,82 @@ namespace QAssistant.Views
         }
 
         // â”€â”€ Render: Test Plans (collapsible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+        // ── Import CSV / Excel ────────────────────────────────────────────────
+
+        private async void ImportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var picker = new FileOpenPicker();
+            picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            picker.FileTypeFilter.Add(".csv");
+            picker.FileTypeFilter.Add(".xlsx");
+            InitializeWithWindow.Initialize(picker, App.MainWindowHandle);
+
+            var file = await picker.PickSingleFileAsync();
+            if (file == null) return;
+
+            ParsedCsvData parsed;
+            try
+            {
+                parsed = CsvImportService.Parse(file.Path);
+            }
+            catch (Exception ex)
+            {
+                GenerationStatusText.Text = $"Failed to read file: {ex.Message}";
+                return;
+            }
+
+            if (parsed.Headers.Count == 0 || parsed.Rows.Count == 0)
+            {
+                GenerationStatusText.Text = "No data found in the selected file.";
+                return;
+            }
+
+            var dialog = new CsvImportDialog(parsed, file.Name)
+            {
+                XamlRoot = this.XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            var columnMap = dialog.ColumnMapping;
+            var planName = string.IsNullOrWhiteSpace(dialog.PlanName)
+                ? NormalizeForDisplay($"CSV Import \u00B7 {DateTime.Now:MMM d, yyyy h:mm tt}")
+                : dialog.PlanName;
+
+            var project = _vm.SelectedProject;
+            var plan = new TestPlan
+            {
+                TestPlanId = NextTestPlanId(),
+                Name = planName,
+                Description = NormalizeForDisplay($"Imported from {file.Name} \u00B7 {parsed.Rows.Count} row(s)."),
+                Source = TaskSource.Manual
+            };
+            project.TestPlans.Add(plan);
+
+            int imported = 0;
+            foreach (var row in parsed.Rows)
+            {
+                var tc = CsvImportService.MapToTestCase(row, columnMap);
+                if (string.IsNullOrWhiteSpace(tc.Title)) continue;
+
+                if (string.IsNullOrWhiteSpace(tc.TestCaseId))
+                    tc.TestCaseId = NextTestCaseId();
+
+                tc.TestPlanId = plan.Id;
+                tc.Source = TaskSource.Manual;
+                project.TestCases.Add(tc);
+                imported++;
+            }
+
+            await _vm.SaveAsync();
+
+            GenerationStatusText.Text = NormalizeForDisplay($"Imported {imported} test case(s) into {plan.TestPlanId} \u00B7 {DateTime.Now:h:mm tt}");
+            RenderTestPlans();
+        }
 
         private void RenderTestPlans()
         {
@@ -782,10 +873,10 @@ namespace QAssistant.Views
             cardStack.Children.Add(headerGrid);
 
             // â”€â”€ Traceability label â”€â”€
-            var traceText = $"{tc.TestCaseId} â†’ {plan.TestPlanId}";
+            var traceText = $"{tc.TestCaseId} → {plan.TestPlanId}";
             var execCount = _vm?.SelectedProject?.TestExecutions.Count(te => te.TestCaseId == tc.Id) ?? 0;
             if (execCount > 0)
-                traceText += $" Â· {execCount} execution(s)";
+                traceText += $" · {execCount} execution(s)";
 
             cardStack.Children.Add(new TextBlock
             {
@@ -916,7 +1007,7 @@ namespace QAssistant.Views
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(new TextBlock
             {
-                Text = $"{tc.TestCaseId} â†’ {plan.TestPlanId}",
+                Text = $"{tc.TestCaseId} → {plan.TestPlanId}",
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 12,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
@@ -1003,7 +1094,6 @@ namespace QAssistant.Views
             }
 
             ExecutionEmptyState.Visibility = Visibility.Collapsed;
-            ExecutionCountText.Text = $"{executions.Count} execution(s)";
 
             // Group executions by test plan as expandable dropdowns
             var grouped = executions
@@ -1011,7 +1101,16 @@ namespace QAssistant.Views
                 .OrderByDescending(g => g.Max(e => e.ExecutedAt))
                 .ToList();
 
-            foreach (var group in grouped)
+            int archivedGroupCount = grouped.Count(g => g.All(e => e.IsArchived));
+            int activeGroupCount = grouped.Count - archivedGroupCount;
+            var archiveInfo = archivedGroupCount > 0 ? $" \u00B7 {archivedGroupCount} archived" : "";
+            ExecutionCountText.Text = NormalizeForDisplay($"{activeGroupCount} run group(s) \u00B7 {executions.Count} execution(s){archiveInfo}");
+
+            var visibleGroups = _showArchivedRuns
+                ? grouped
+                : grouped.Where(g => !g.All(e => e.IsArchived)).ToList();
+
+            foreach (var group in visibleGroups)
             {
                 var plan = project.TestPlans.FirstOrDefault(p => p.Id == group.Key);
                 var planExecs = group.OrderByDescending(e => e.ExecutedAt).ToList();
@@ -1028,6 +1127,7 @@ namespace QAssistant.Views
         {
             var planId = plan?.Id ?? Guid.Empty;
             bool collapsed = _collapsedExecutionPlans.Contains(planId);
+            bool isAllArchived = planExecs.All(e => e.IsArchived);
 
             var outerStack = new StackPanel { Spacing = 0 };
 
@@ -1081,6 +1181,24 @@ namespace QAssistant.Views
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175))
                 }
             });
+            if (isAllArchived)
+            {
+                titleRow.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 2, 6, 2),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 45, 32, 16)),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Child = new TextBlock
+                    {
+                        Text = "ARCHIVED",
+                        FontSize = 9,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+                        CharacterSpacing = 100
+                    }
+                });
+            }
             titleStack.Children.Add(titleRow);
 
             // Status summary for this plan's executions
@@ -1118,15 +1236,37 @@ namespace QAssistant.Views
             headerGrid.Children.Add(titleStack);
 
             var latestExec = planExecs.First();
-            var timestampText = new TextBlock
+            var runActionPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+            runActionPanel.Children.Add(new TextBlock
             {
                 Text = latestExec.ExecutedAt.ToString("MMM d, yyyy"),
                 FontSize = 11,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            });
+
+            var archiveRunBtn = BuildPlanActionButton(isAllArchived ? "\uE7A7" : "\uE7B8",
+                isAllArchived ? "Unarchive run" : "Archive run");
+            archiveRunBtn.Click += async (s, _) => await ToggleArchiveExecutionGroupAsync(planId);
+            runActionPanel.Children.Add(archiveRunBtn);
+
+            var deleteRunBtn = BuildPlanActionButton("\uE74D", "Delete all executions in this run");
+            deleteRunBtn.PointerEntered += (s, _) =>
+            {
+                if (deleteRunBtn.Content is FontIcon icon)
+                    icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113));
             };
-            Grid.SetColumn(timestampText, 2);
-            headerGrid.Children.Add(timestampText);
+            deleteRunBtn.PointerExited += (s, _) =>
+            {
+                if (deleteRunBtn.Content is FontIcon icon)
+                    icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            };
+            deleteRunBtn.Click += async (s, _) => await DeleteExecutionGroupAsync(planId, plan?.TestPlanId);
+            runActionPanel.Children.Add(deleteRunBtn);
+
+            Grid.SetColumn(runActionPanel, 2);
+            headerGrid.Children.Add(runActionPanel);
 
             var headerButton = new Button
             {
@@ -1184,6 +1324,7 @@ namespace QAssistant.Views
                 BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
                 BorderThickness = new Thickness(1),
                 Margin = new Thickness(0, 0, 0, 8),
+                Opacity = isAllArchived ? 0.6 : 1.0,
                 Child = outerStack
             };
         }
@@ -1582,7 +1723,7 @@ namespace QAssistant.Views
 
             var cardStack = new StackPanel { Spacing = 6 };
 
-            // â”€â”€ Traceability header: TE â†’ TC â†’ TP â”€â”€
+            // â”€â”€ Traceability header: TE → TC → TP â”€â”€
             var traceRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             traceRow.Children.Add(MakeTraceBadge(exec.ExecutionId, GetStatusBrush(exec.Result)));
             traceRow.Children.Add(new TextBlock
@@ -1605,7 +1746,45 @@ namespace QAssistant.Views
             traceRow.Children.Add(MakeTraceBadge(
                 plan?.TestPlanId ?? "?",
                 new SolidColorBrush(Windows.UI.Color.FromArgb(255, 56, 189, 248))));
-            cardStack.Children.Add(traceRow);
+
+            var capturedExec = exec;
+            var traceHeaderGrid = new Grid();
+            traceHeaderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            traceHeaderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(traceRow, 0);
+            traceHeaderGrid.Children.Add(traceRow);
+
+            var deleteExecBtn = new Button
+            {
+                Background = new SolidColorBrush(Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(6, 4, 6, 4),
+                CornerRadius = new CornerRadius(4),
+                VerticalAlignment = VerticalAlignment.Center,
+                Content = new FontIcon
+                {
+                    Glyph = "\uE74D",
+                    FontSize = 12,
+                    FontFamily = new FontFamily("Segoe Fluent Icons"),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+                }
+            };
+            ToolTipService.SetToolTip(deleteExecBtn, "Delete this execution record");
+            deleteExecBtn.PointerEntered += (s, _) =>
+            {
+                if (deleteExecBtn.Content is FontIcon icon)
+                    icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 248, 113, 113));
+            };
+            deleteExecBtn.PointerExited += (s, _) =>
+            {
+                if (deleteExecBtn.Content is FontIcon icon)
+                    icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            };
+            deleteExecBtn.Click += async (s, _) => await DeleteSingleExecutionAsync(capturedExec);
+            Grid.SetColumn(deleteExecBtn, 1);
+            traceHeaderGrid.Children.Add(deleteExecBtn);
+
+            cardStack.Children.Add(traceHeaderGrid);
 
             // Test case title
             if (tc != null)
@@ -1774,7 +1953,7 @@ namespace QAssistant.Views
             }
 
             await _vm.SaveAsync();
-            GenerationStatusText.Text = $"Duplicated {sourcePlan.TestPlanId} â†’ {newPlan.TestPlanId} ({sourceCases.Count} case(s))";
+            GenerationStatusText.Text = $"Duplicated {sourcePlan.TestPlanId} → {newPlan.TestPlanId} ({sourceCases.Count} case(s))";
             RenderTestPlans();
         }
 
@@ -1834,7 +2013,7 @@ namespace QAssistant.Views
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(new TextBlock
             {
-                Text = $"{plan.TestPlanId} Â· {cases.Count} test case(s)",
+                Text = $"{plan.TestPlanId} · {cases.Count} test case(s)",
                 FontFamily = new FontFamily("Consolas"),
                 FontSize = 12,
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
@@ -1940,6 +2119,68 @@ namespace QAssistant.Views
             _vm?.SelectedProject?.TestCases.Remove(tc);
             if (_vm != null) await _vm.SaveAsync();
             RenderTestPlans();
+        }
+
+        private async System.Threading.Tasks.Task DeleteSingleExecutionAsync(TestExecution exec)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var dialog = new ContentDialog
+            {
+                Title = "Delete Execution",
+                Content = $"Delete execution {exec.ExecutionId}?\nThis cannot be undone.",
+                PrimaryButtonText = "Delete",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            _vm.SelectedProject.TestExecutions.Remove(exec);
+            await _vm.SaveAsync();
+            RenderExecutionHistory();
+        }
+
+        private async System.Threading.Tasks.Task DeleteExecutionGroupAsync(Guid planId, string? planDisplayId)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var execs = _vm.SelectedProject.TestExecutions.Where(e => e.TestPlanId == planId).ToList();
+            var dialog = new ContentDialog
+            {
+                Title = "Delete Test Run",
+                Content = $"Delete all {execs.Count} execution(s) for {planDisplayId ?? "this plan"}?\nThis cannot be undone.",
+                PrimaryButtonText = "Delete",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            _vm.SelectedProject.TestExecutions.RemoveAll(e => e.TestPlanId == planId);
+            await _vm.SaveAsync();
+            RenderExecutionHistory();
+        }
+
+        private async System.Threading.Tasks.Task ToggleArchiveExecutionGroupAsync(Guid planId)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var execs = _vm.SelectedProject.TestExecutions.Where(e => e.TestPlanId == planId).ToList();
+            if (execs.Count == 0) return;
+
+            bool allArchived = execs.All(e => e.IsArchived);
+            foreach (var e in execs)
+                e.IsArchived = !allArchived;
+
+            await _vm.SaveAsync();
+            RenderExecutionHistory();
         }
 
         private async void ClearAllTestCases_Click(object sender, RoutedEventArgs e)
@@ -2251,7 +2492,7 @@ namespace QAssistant.Views
                 ReportsContainer.Children.Add(planCard);
             }
 
-            ReportStatusText.Text = $"Summary Â· {totalPlans} plan(s) Â· {totalCases} case(s)";
+            ReportStatusText.Text = $"Summary · {totalPlans} plan(s) · {totalCases} case(s)";
         }
 
         private void RenderTestCasesCsvPreview(Project project, List<TestPlan> filteredPlans, List<TestCase> filteredCases)
@@ -2322,7 +2563,7 @@ namespace QAssistant.Views
             previewCard.Child = stack;
             ReportsContainer.Children.Add(previewCard);
 
-            ReportStatusText.Text = $"CSV Â· {filteredCases.Count} case(s) ready to export";
+            ReportStatusText.Text = $"CSV · {filteredCases.Count} case(s) ready to export";
         }
 
         private void RenderExecutionsCsvPreview(Project project, List<TestExecution> filteredExecs, List<TestCase> filteredCases, List<TestPlan> filteredPlans)
@@ -2393,7 +2634,7 @@ namespace QAssistant.Views
             previewCard.Child = stack;
             ReportsContainer.Children.Add(previewCard);
 
-            ReportStatusText.Text = $"CSV Â· {filteredExecs.Count} execution(s) ready to export";
+            ReportStatusText.Text = $"CSV · {filteredExecs.Count} execution(s) ready to export";
         }
 
         // â”€â”€ Reports: Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -2734,6 +2975,786 @@ namespace QAssistant.Views
             _ => new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53))
         };
 
+        // ── Coverage Matrix ───────────────────────────────────────────────
+
+        private void CoverageViewMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn)
+            {
+                _coverageViewMode = btn.Tag.ToString()!;
+                UpdateCoverageViewModeStyles();
+                RenderCoverageMatrix();
+            }
+        }
+
+        private void UpdateCoverageViewModeStyles()
+        {
+            var btns = new[] { CoverageByIssueBtn, CoverageByModuleBtn };
+            foreach (var btn in btns)
+            {
+                bool active = btn.Tag.ToString() == _coverageViewMode;
+                btn.Background = active
+                    ? (Brush)Application.Current.Resources["ListAccentLowBrush"]
+                    : new SolidColorBrush(Colors.Transparent);
+                btn.Foreground = active
+                    ? (Brush)Application.Current.Resources["AccentBrush"]
+                    : (Brush)Application.Current.Resources["TextSecondaryBrush"];
+            }
+        }
+
+        private void RenderCoverageMatrix()
+        {
+            CoverageMatrixContainer.Children.Clear();
+            UpdateCoverageViewModeStyles();
+
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+
+            if (project.TestCases.Count == 0 && project.Tasks.Count == 0)
+            {
+                CoverageEmptyState.Visibility = Visibility.Visible;
+                CoverageMatrixContainer.Children.Add(CoverageEmptyState);
+                CoverageStatusText.Text = string.Empty;
+                return;
+            }
+
+            CoverageEmptyState.Visibility = Visibility.Collapsed;
+
+            if (_coverageViewMode == "SapModule")
+                RenderSapModuleCoverage(project);
+            else
+                RenderIssuesCoverage(project);
+        }
+
+        private void RenderIssuesCoverage(Project project)
+        {
+            var tasks = project.Tasks;
+            var testCases = project.TestCases;
+
+            if (tasks.Count == 0)
+            {
+                CoverageMatrixContainer.Children.Add(new Border
+                {
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                    CornerRadius = new CornerRadius(12),
+                    Padding = new Thickness(24),
+                    BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                    BorderThickness = new Thickness(1),
+                    Child = new StackPanel
+                    {
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Spacing = 8,
+                        Margin = new Thickness(0, 12, 0, 12),
+                        Children =
+                        {
+                            new TextBlock
+                            {
+                                Text = "No issues loaded",
+                                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+                                FontSize = 14,
+                                HorizontalAlignment = HorizontalAlignment.Center
+                            },
+                            new TextBlock
+                            {
+                                Text = "Fetch issues from Jira or Linear on the Tasks page to map requirements to test coverage.",
+                                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 75, 85, 99)),
+                                FontSize = 12,
+                                HorizontalAlignment = HorizontalAlignment.Center,
+                                TextWrapping = TextWrapping.Wrap,
+                                MaxWidth = 420,
+                                TextAlignment = TextAlignment.Center
+                            }
+                        }
+                    }
+                });
+
+                int linked = testCases.Count(tc => !string.IsNullOrEmpty(tc.SourceIssueId));
+                CoverageStatusText.Text = NormalizeForDisplay($"{testCases.Count} test case(s) \u00B7 {linked} linked to issues");
+                return;
+            }
+
+            // Build coverage map: task key → list of test cases
+            var coverageMap = new Dictionary<string, List<TestCase>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var task in tasks)
+            {
+                var key = GetTaskKey(task);
+                coverageMap[key] = testCases.Where(tc => TestCaseBelongsToTask(tc, task)).ToList();
+            }
+
+            int coveredIssues = coverageMap.Values.Count(v => v.Count > 0);
+            int totalIssues = tasks.Count;
+            double pct = totalIssues > 0 ? (double)coveredIssues / totalIssues * 100 : 0;
+
+            CoverageStatusText.Text = NormalizeForDisplay($"{coveredIssues}/{totalIssues} issues covered \u00B7 {pct:F0}%");
+
+            CoverageMatrixContainer.Children.Add(BuildCoverageSummaryCard(coveredIssues, totalIssues, testCases.Count));
+            CoverageMatrixContainer.Children.Add(BuildCoverageLegend());
+
+            var untested = tasks.Where(t => (coverageMap.GetValueOrDefault(GetTaskKey(t))?.Count ?? 0) == 0).ToList();
+            var underTested = tasks.Where(t => (coverageMap.GetValueOrDefault(GetTaskKey(t))?.Count ?? 0) == 1).ToList();
+            var wellTested = tasks.Where(t => (coverageMap.GetValueOrDefault(GetTaskKey(t))?.Count ?? 0) >= 2).ToList();
+
+            if (untested.Count > 0)
+                CoverageMatrixContainer.Children.Add(BuildIssueCoverageSection("UNTESTED", untested, coverageMap,
+                    Windows.UI.Color.FromArgb(255, 248, 113, 113)));
+            if (underTested.Count > 0)
+                CoverageMatrixContainer.Children.Add(BuildIssueCoverageSection("UNDER-TESTED", underTested, coverageMap,
+                    Windows.UI.Color.FromArgb(255, 251, 191, 36)));
+            if (wellTested.Count > 0)
+                CoverageMatrixContainer.Children.Add(BuildIssueCoverageSection("WELL-TESTED", wellTested, coverageMap,
+                    Windows.UI.Color.FromArgb(255, 52, 211, 153)));
+        }
+
+        private static string GetTaskKey(ProjectTask task) =>
+            !string.IsNullOrEmpty(task.IssueIdentifier) ? task.IssueIdentifier
+            : task.ExternalId ?? task.Id.ToString();
+
+        private static bool TestCaseBelongsToTask(TestCase tc, ProjectTask task)
+        {
+            if (!string.IsNullOrEmpty(tc.SourceIssueId))
+            {
+                return string.Equals(tc.SourceIssueId, task.IssueIdentifier, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(tc.SourceIssueId, task.ExternalId, StringComparison.OrdinalIgnoreCase);
+            }
+
+            // Keyword-overlap fallback for test cases generated before sourceIssueId was tracked
+            if (string.IsNullOrEmpty(tc.Title) || string.IsNullOrEmpty(task.Title))
+                return false;
+
+            var tcWords = new HashSet<string>(
+                tc.Title.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Where(w => w.Length > 3), StringComparer.Ordinal);
+
+            int matches = task.Title.ToLowerInvariant()
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => w.Length > 3)
+                .Count(w => tcWords.Contains(w));
+
+            return matches >= 2;
+        }
+
+        private static Border BuildCoverageSummaryCard(int covered, int total, int totalTestCases)
+        {
+            int untested = total - covered;
+            double pct = total > 0 ? (double)covered / total * 100 : 0;
+
+            var stack = new StackPanel { Spacing = 12 };
+            stack.Children.Add(new TextBlock
+            {
+                Text = "REQUIREMENTS COVERAGE OVERVIEW",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                FontSize = 10,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                CharacterSpacing = 150
+            });
+
+            var metricsGrid = new Grid();
+            metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            metricsGrid.ColumnSpacing = 12;
+
+            AddCoverageMetricCell(metricsGrid, 0, "Total Issues", total.ToString(), "#94A3B8");
+            AddCoverageMetricCell(metricsGrid, 1, "Covered", covered.ToString(), "#34D399");
+            AddCoverageMetricCell(metricsGrid, 2, "Untested", untested.ToString(), "#F87171");
+            AddCoverageMetricCell(metricsGrid, 3, "Coverage", $"{pct:F1}%",
+                pct >= 70 ? "#34D399" : pct >= 40 ? "#FBBF24" : "#F87171");
+            stack.Children.Add(metricsGrid);
+
+            stack.Children.Add(new TextBlock
+            {
+                Text = $"Overall: {covered} of {total} issue(s) have at least 1 test case  ·  {totalTestCases} total test case(s)",
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+            });
+
+            var barGrid = new Grid();
+            barGrid.Children.Add(new Border
+            {
+                Height = 10,
+                CornerRadius = new CornerRadius(5),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53))
+            });
+
+            if (pct > 0)
+            {
+                var fillColor = pct >= 70
+                    ? Windows.UI.Color.FromArgb(255, 52, 211, 153)
+                    : pct >= 40
+                        ? Windows.UI.Color.FromArgb(255, 251, 191, 36)
+                        : Windows.UI.Color.FromArgb(255, 248, 113, 113);
+
+                var barFill = new Border
+                {
+                    Height = 10,
+                    CornerRadius = new CornerRadius(5),
+                    Background = new SolidColorBrush(fillColor),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Width = 0
+                };
+                barGrid.Children.Add(barFill);
+                barGrid.SizeChanged += (s, e) => barFill.Width = e.NewSize.Width * pct / 100;
+            }
+
+            stack.Children.Add(barGrid);
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(20),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Child = stack
+            };
+        }
+
+        private static void AddCoverageMetricCell(Grid parent, int column, string label, string value, string colorHex)
+        {
+            var hex = colorHex.StartsWith('#') ? colorHex[1..] : colorHex;
+            byte r = Convert.ToByte(hex[0..2], 16);
+            byte g = Convert.ToByte(hex[2..4], 16);
+            byte b = Convert.ToByte(hex[4..6], 16);
+            var color = Windows.UI.Color.FromArgb(255, r, g, b);
+
+            var cell = new StackPanel { Spacing = 4 };
+            cell.Children.Add(new TextBlock
+            {
+                Text = value,
+                FontSize = 22,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                Foreground = new SolidColorBrush(color)
+            });
+            cell.Children.Add(new TextBlock
+            {
+                Text = label,
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+            });
+
+            Grid.SetColumn(cell, column);
+            parent.Children.Add(cell);
+        }
+
+        private static Border BuildCoverageLegend()
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
+
+            (string Text, Windows.UI.Color Bg, Windows.UI.Color Fg)[] items =
+            [
+                ("Untested (0 TCs)", Windows.UI.Color.FromArgb(255, 127, 29, 29), Windows.UI.Color.FromArgb(255, 248, 113, 113)),
+                ("Under-tested (1 TC)", Windows.UI.Color.FromArgb(255, 45, 32, 16), Windows.UI.Color.FromArgb(255, 251, 191, 36)),
+                ("Well-tested (2+ TCs)", Windows.UI.Color.FromArgb(255, 6, 78, 59), Windows.UI.Color.FromArgb(255, 52, 211, 153))
+            ];
+
+            foreach (var (text, bg, fg) in items)
+            {
+                var item = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+                item.Children.Add(new Border
+                {
+                    Width = 12,
+                    Height = 12,
+                    CornerRadius = new CornerRadius(3),
+                    Background = new SolidColorBrush(bg),
+                    BorderBrush = new SolidColorBrush(fg),
+                    BorderThickness = new Thickness(1),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                item.Children.Add(new TextBlock
+                {
+                    Text = text,
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                row.Children.Add(item);
+            }
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(16, 10, 16, 10),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Child = row
+            };
+        }
+
+        private static Border BuildIssueCoverageSection(string label, List<ProjectTask> tasks,
+            Dictionary<string, List<TestCase>> coverageMap, Windows.UI.Color sectionColor)
+        {
+            var stack = new StackPanel { Spacing = 6 };
+
+            var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 0, 4) };
+            headerRow.Children.Add(new Border
+            {
+                Width = 10,
+                Height = 10,
+                CornerRadius = new CornerRadius(3),
+                Background = new SolidColorBrush(sectionColor),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            headerRow.Children.Add(new TextBlock
+            {
+                Text = $"{label}  ({tasks.Count})",
+                FontSize = 10,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(sectionColor),
+                CharacterSpacing = 150,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            stack.Children.Add(headerRow);
+
+            foreach (var task in tasks.OrderBy(t => GetTaskKey(t)))
+            {
+                var tcs = coverageMap.GetValueOrDefault(GetTaskKey(task)) ?? [];
+                stack.Children.Add(BuildIssueRow(task, tcs, sectionColor));
+            }
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(16),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Child = stack
+            };
+        }
+
+        private static Border BuildIssueRow(ProjectTask task, List<TestCase> tcs, Windows.UI.Color coverageColor)
+        {
+            var grid = new Grid { Padding = new Thickness(8, 6, 8, 6) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var idBadge = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 30, 30, 50)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock
+                {
+                    Text = GetTaskKey(task),
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            };
+            Grid.SetColumn(idBadge, 0);
+            grid.Children.Add(idBadge);
+
+            var titleText = new TextBlock
+            {
+                Text = task.Title,
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Margin = new Thickness(8, 0, 8, 0)
+            };
+            Grid.SetColumn(titleText, 1);
+            grid.Children.Add(titleText);
+
+            var countBadge = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(40, coverageColor.R, coverageColor.G, coverageColor.B)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0),
+                Child = new TextBlock
+                {
+                    Text = $"{tcs.Count} TC",
+                    FontSize = 10,
+                    Foreground = new SolidColorBrush(coverageColor),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            };
+            Grid.SetColumn(countBadge, 2);
+            grid.Children.Add(countBadge);
+
+            var sourceBadge = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 30, 30, 50)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock
+                {
+                    Text = task.Source.ToString(),
+                    FontSize = 10,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+                }
+            };
+            Grid.SetColumn(sourceBadge, 3);
+            grid.Children.Add(sourceBadge);
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36)),
+                CornerRadius = new CornerRadius(8),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Child = grid
+            };
+        }
+
+        // ── SAP Module Coverage ───────────────────────────────────────────
+
+        private static readonly Dictionary<SapCommerceModule, string[]> SapModuleKeywords = new()
+        {
+            [SapCommerceModule.Cart] =
+                ["cart", "basket", "add to cart", "minicart", "mini cart", "cart item", "cart total", "cart page", "cart quantity", "cart entry"],
+            [SapCommerceModule.Checkout] =
+                ["checkout", "payment", "order", "shipping", "delivery", "address", "billing", "confirmation", "place order", "order summary", "purchase"],
+            [SapCommerceModule.Pricing] =
+                ["price", "pricing", "tax", "currency", "net price", "gross price", "base price", "unit price", "price calculation", "surcharge"],
+            [SapCommerceModule.Promotions] =
+                ["promotion", "promo", "coupon", "voucher", "campaign", "rule engine", "rebate", "discount code", "offer code", "free gift"],
+            [SapCommerceModule.CatalogSync] =
+                ["catalog", "product", "category", "sync", "import", "feed", "classification", "variant", "stock", "media", "impex", "solr"]
+        };
+
+        private static SapCommerceModule? DetectSapModuleForTestCase(TestCase tc)
+        {
+            if (tc.SapModule.HasValue) return tc.SapModule;
+
+            var searchText = $"{tc.Title} {tc.TestSteps} {tc.ExpectedResult}".ToLowerInvariant();
+
+            int bestScore = 0;
+            SapCommerceModule? bestModule = null;
+
+            foreach (var (module, keywords) in SapModuleKeywords)
+            {
+                int score = keywords.Count(kw => searchText.Contains(kw, StringComparison.OrdinalIgnoreCase));
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestModule = module;
+                }
+            }
+
+            return bestScore > 0 ? bestModule : null;
+        }
+
+        private void RenderSapModuleCoverage(Project project)
+        {
+            var testCases = project.TestCases;
+
+            var moduleMap = new Dictionary<SapCommerceModule, List<TestCase>>
+            {
+                [SapCommerceModule.Cart] = [],
+                [SapCommerceModule.Checkout] = [],
+                [SapCommerceModule.Pricing] = [],
+                [SapCommerceModule.Promotions] = [],
+                [SapCommerceModule.CatalogSync] = []
+            };
+
+            int unclassified = 0;
+            foreach (var tc in testCases)
+            {
+                var module = DetectSapModuleForTestCase(tc);
+                if (module.HasValue)
+                    moduleMap[module.Value].Add(tc);
+                else
+                    unclassified++;
+            }
+
+            int totalClassified = testCases.Count - unclassified;
+            CoverageStatusText.Text = NormalizeForDisplay($"SAP Commerce \u00B7 {totalClassified}/{testCases.Count} test case(s) classified");
+
+            var headerCard = new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(20),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Child = new StackPanel
+                {
+                    Spacing = 6,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = "SAP COMMERCE MODULE COVERAGE",
+                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                            FontSize = 10,
+                            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                            CharacterSpacing = 150
+                        },
+                        new TextBlock
+                        {
+                            Text = "Test cases are automatically classified by SAP Commerce module based on keywords in their title and test steps. Set SapModule on a test case to override.",
+                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 75, 85, 99)),
+                            FontSize = 11,
+                            TextWrapping = TextWrapping.Wrap
+                        }
+                    }
+                }
+            };
+            CoverageMatrixContainer.Children.Add(headerCard);
+
+            (SapCommerceModule Module, string Glyph, Windows.UI.Color Color, string DisplayName)[] modules =
+            [
+                (SapCommerceModule.Cart,        "\uE7BF", Windows.UI.Color.FromArgb(255,  56, 189, 248), "Cart"),
+                (SapCommerceModule.Checkout,    "\uE8D0", Windows.UI.Color.FromArgb(255,  52, 211, 153), "Checkout"),
+                (SapCommerceModule.Pricing,     "\uE7B8", Windows.UI.Color.FromArgb(255, 251, 191,  36), "Pricing"),
+                (SapCommerceModule.Promotions,  "\uE8D6", Windows.UI.Color.FromArgb(255, 251, 146,  60), "Promotions"),
+                (SapCommerceModule.CatalogSync, "\uE8CB", Windows.UI.Color.FromArgb(255, 167, 139, 250), "Catalog Sync")
+            ];
+
+            foreach (var (module, glyph, color, displayName) in modules)
+            {
+                var cases = moduleMap[module];
+                CoverageMatrixContainer.Children.Add(BuildSapModuleCard(displayName, glyph, color, cases));
+            }
+
+            if (unclassified > 0)
+            {
+                CoverageMatrixContainer.Children.Add(new Border
+                {
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                    CornerRadius = new CornerRadius(12),
+                    Padding = new Thickness(16),
+                    BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                    BorderThickness = new Thickness(1),
+                    Child = new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Spacing = 10,
+                        Children =
+                        {
+                            new FontIcon
+                            {
+                                Glyph = "\uE783",
+                                FontSize = 16,
+                                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                                VerticalAlignment = VerticalAlignment.Center
+                            },
+                            new TextBlock
+                            {
+                                Text = $"{unclassified} test case(s) could not be automatically classified into a SAP Commerce module.",
+                                FontSize = 12,
+                                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                                VerticalAlignment = VerticalAlignment.Center
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        private static Border BuildSapModuleCard(string name, string glyph, Windows.UI.Color color, List<TestCase> cases)
+        {
+            int total = cases.Count;
+            int passed = cases.Count(tc => tc.Status == TestCaseStatus.Passed);
+            int failed = cases.Count(tc => tc.Status == TestCaseStatus.Failed);
+            int blocked = cases.Count(tc => tc.Status == TestCaseStatus.Blocked);
+            int notRun = cases.Count(tc => tc.Status == TestCaseStatus.NotRun || tc.Status == TestCaseStatus.Skipped);
+            double passRate = total > 0 ? (double)passed / total * 100 : 0;
+
+            string coverageLabel;
+            Windows.UI.Color coverageColor;
+            Windows.UI.Color coverageBg;
+            if (total == 0)
+            {
+                coverageLabel = "Untested";
+                coverageColor = Windows.UI.Color.FromArgb(255, 248, 113, 113);
+                coverageBg = Windows.UI.Color.FromArgb(255, 127, 29, 29);
+            }
+            else if (total == 1)
+            {
+                coverageLabel = "Minimal";
+                coverageColor = Windows.UI.Color.FromArgb(255, 251, 191, 36);
+                coverageBg = Windows.UI.Color.FromArgb(255, 45, 32, 16);
+            }
+            else if (total <= 3)
+            {
+                coverageLabel = "Partial";
+                coverageColor = Windows.UI.Color.FromArgb(255, 251, 146, 60);
+                coverageBg = Windows.UI.Color.FromArgb(255, 67, 30, 10);
+            }
+            else
+            {
+                coverageLabel = "Good";
+                coverageColor = Windows.UI.Color.FromArgb(255, 52, 211, 153);
+                coverageBg = Windows.UI.Color.FromArgb(255, 6, 78, 59);
+            }
+
+            var outerGrid = new Grid();
+            outerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+            outerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            outerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+
+            // Left: icon + name + coverage badge
+            var leftStack = new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                Spacing = 4,
+                Margin = new Thickness(0, 0, 16, 0)
+            };
+            leftStack.Children.Add(new FontIcon
+            {
+                Glyph = glyph,
+                FontSize = 20,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                Foreground = new SolidColorBrush(color)
+            });
+            leftStack.Children.Add(new TextBlock
+            {
+                Text = name,
+                FontSize = 14,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240))
+            });
+            leftStack.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(coverageBg),
+                Child = new TextBlock
+                {
+                    Text = coverageLabel,
+                    FontSize = 10,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(coverageColor)
+                }
+            });
+            Grid.SetColumn(leftStack, 0);
+            outerGrid.Children.Add(leftStack);
+
+            // Middle: stats pills + pass-rate bar
+            var middleStack = new StackPanel { Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+
+            var statsRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            if (total > 0)
+            {
+                statsRow.Children.Add(MakeCoveragePill($"{passed} Passed", Windows.UI.Color.FromArgb(255, 52, 211, 153)));
+                if (failed > 0)
+                    statsRow.Children.Add(MakeCoveragePill($"{failed} Failed", Windows.UI.Color.FromArgb(255, 248, 113, 113)));
+                if (blocked > 0)
+                    statsRow.Children.Add(MakeCoveragePill($"{blocked} Blocked", Windows.UI.Color.FromArgb(255, 245, 158, 11)));
+                if (notRun > 0)
+                    statsRow.Children.Add(MakeCoveragePill($"{notRun} Not Run", Windows.UI.Color.FromArgb(255, 107, 114, 128)));
+            }
+            else
+            {
+                statsRow.Children.Add(new TextBlock
+                {
+                    Text = "No test cases detected for this module",
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 75, 85, 99)),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+            }
+            middleStack.Children.Add(statsRow);
+
+            if (total > 0)
+            {
+                var barGrid = new Grid();
+                barGrid.Children.Add(new Border
+                {
+                    Height = 6,
+                    CornerRadius = new CornerRadius(3),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53))
+                });
+
+                if (passRate > 0)
+                {
+                    var fillColor = passRate >= 70
+                        ? Windows.UI.Color.FromArgb(255, 52, 211, 153)
+                        : passRate >= 40
+                            ? Windows.UI.Color.FromArgb(255, 251, 191, 36)
+                            : Windows.UI.Color.FromArgb(255, 248, 113, 113);
+
+                    var barFill = new Border
+                    {
+                        Height = 6,
+                        CornerRadius = new CornerRadius(3),
+                        Background = new SolidColorBrush(fillColor),
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        Width = 0
+                    };
+                    barGrid.Children.Add(barFill);
+                    barGrid.SizeChanged += (s, e) => barFill.Width = e.NewSize.Width * passRate / 100;
+                }
+
+                middleStack.Children.Add(barGrid);
+
+                middleStack.Children.Add(new TextBlock
+                {
+                    Text = $"Pass rate: {passRate:F1}%",
+                    FontSize = 10,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128))
+                });
+            }
+
+            Grid.SetColumn(middleStack, 1);
+            outerGrid.Children.Add(middleStack);
+
+            // Right: total count
+            var rightStack = new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Spacing = 2,
+                Margin = new Thickness(12, 0, 0, 0)
+            };
+            rightStack.Children.Add(new TextBlock
+            {
+                Text = total.ToString(),
+                FontSize = 28,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                Foreground = new SolidColorBrush(color),
+                HorizontalTextAlignment = TextAlignment.Center
+            });
+            rightStack.Children.Add(new TextBlock
+            {
+                Text = total == 1 ? "test case" : "test cases",
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                HorizontalTextAlignment = TextAlignment.Center
+            });
+            Grid.SetColumn(rightStack, 2);
+            outerGrid.Children.Add(rightStack);
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(20),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Child = outerGrid
+            };
+        }
+
+        private static Border MakeCoveragePill(string text, Windows.UI.Color color)
+        {
+            return new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(40, color.R, color.G, color.B)),
+                Child = new TextBlock
+                {
+                    Text = text,
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(color),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            };
+        }
+
         // ── Bug Report ────────────────────────────────────────────────
 
         private async System.Threading.Tasks.Task ShowTestCaseBugReportDialogAsync(TestCase tc, TestPlan plan)
@@ -2915,6 +3936,709 @@ namespace QAssistant.Views
                 DialogHelper.ApplyDarkTheme(errDialog);
                 await errDialog.ShowAsync();
             }
+        }
+
+        // ── Regression Suite Builder ──────────────────────────────────────────
+
+        private void RenderRegressionBuilder()
+        {
+            RegressionBuilderContainer.Children.Clear();
+
+            var project = _vm?.SelectedProject;
+            if (project == null) return;
+
+            DateTimeOffset? from = RegressionFromDate.SelectedDate;
+            DateTimeOffset? to = RegressionToDate.SelectedDate;
+
+            var doneLinked = GetDoneLinkedTestCases(from, to);
+            var previouslyFailed = GetPreviouslyFailedTestCases(out var lastRunPlanId, out var lastRunDate);
+            var smokeSubset = GetSmokeSubsetTestCases();
+
+            var seenIds = new HashSet<Guid>(doneLinked.Select(tc => tc.Id));
+            seenIds.UnionWith(previouslyFailed.Select(tc => tc.Id));
+            seenIds.UnionWith(smokeSubset.Select(tc => tc.Id));
+            int totalUnique = seenIds.Count;
+
+            RegressionBuilderContainer.Children.Add(
+                BuildRegressionSummaryCard(doneLinked.Count, previouslyFailed.Count, smokeSubset.Count, totalUnique, from, to));
+
+            string doneDesc = from.HasValue || to.HasValue
+                ? "Test cases linked to Done tasks" +
+                  (from.HasValue ? $" from {from.Value:MMM d, yyyy}" : "") +
+                  (to.HasValue ? $" until {to.Value:MMM d, yyyy}" : "") +
+                  " · matched by SourceIssueId"
+                : "Test cases linked to all Done tasks (no date filter) · matched by SourceIssueId";
+            RegressionBuilderContainer.Children.Add(BuildRegressionSection(
+                "DONE-LINKED TEST CASES", "\uE73E",
+                Windows.UI.Color.FromArgb(255, 52, 211, 153),
+                doneLinked, doneDesc, project));
+
+            string failedDesc = lastRunPlanId != null
+                ? $"Test cases that failed in the most recent run: {lastRunPlanId}" +
+                  (lastRunDate.HasValue ? NormalizeForDisplay($" \u00B7 {lastRunDate.Value:MMM d, yyyy}") : "")
+                : "No execution history found in this project";
+            RegressionBuilderContainer.Children.Add(BuildRegressionSection(
+                "PREVIOUSLY FAILED", "\uE8A0",
+                Windows.UI.Color.FromArgb(255, 248, 113, 113),
+                previouslyFailed, failedDesc, project));
+
+            RegressionBuilderContainer.Children.Add(
+                BuildSmokeSubsetSection(project, doneLinked, previouslyFailed));
+
+            RegressionStatusText.Text = NormalizeForDisplay(
+                $"{totalUnique} unique test case(s) selected");
+        }
+
+        private List<TestCase> GetDoneLinkedTestCases(DateTimeOffset? from, DateTimeOffset? to)
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null) return [];
+
+            var doneTasks = project.Tasks
+                .Where(t => t.Status == TaskStatus.Done)
+                .ToList();
+
+            // Filter by date range using DueDate as a proxy for completion date.
+            // Tasks without a DueDate are included when a filter is active.
+            if (from.HasValue)
+                doneTasks = doneTasks
+                    .Where(t => !t.DueDate.HasValue || t.DueDate.Value >= from.Value.DateTime)
+                    .ToList();
+            if (to.HasValue)
+                doneTasks = doneTasks
+                    .Where(t => !t.DueDate.HasValue || t.DueDate.Value <= to.Value.DateTime)
+                    .ToList();
+
+            if (doneTasks.Count == 0) return [];
+
+            var doneKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var t in doneTasks)
+            {
+                if (!string.IsNullOrEmpty(t.IssueIdentifier)) doneKeys.Add(t.IssueIdentifier);
+                if (!string.IsNullOrEmpty(t.ExternalId)) doneKeys.Add(t.ExternalId);
+            }
+
+            return project.TestCases
+                .Where(tc => !string.IsNullOrEmpty(tc.SourceIssueId) && doneKeys.Contains(tc.SourceIssueId))
+                .ToList();
+        }
+
+        private List<TestCase> GetPreviouslyFailedTestCases(out string? lastRunPlanId, out DateTime? lastRunDate)
+        {
+            lastRunPlanId = null;
+            lastRunDate = null;
+
+            var project = _vm?.SelectedProject;
+            if (project == null || project.TestExecutions.Count == 0) return [];
+
+            var latestExec = project.TestExecutions.OrderByDescending(e => e.ExecutedAt).First();
+            var lastPlanGuid = latestExec.TestPlanId;
+            lastRunDate = latestExec.ExecutedAt;
+
+            var plan = project.TestPlans.FirstOrDefault(p => p.Id == lastPlanGuid);
+            lastRunPlanId = plan?.TestPlanId;
+
+            var failedCaseIds = project.TestExecutions
+                .Where(e => e.TestPlanId == lastPlanGuid && e.Result == TestCaseStatus.Failed)
+                .Select(e => e.TestCaseId)
+                .Distinct()
+                .ToHashSet();
+
+            return project.TestCases.Where(tc => failedCaseIds.Contains(tc.Id)).ToList();
+        }
+
+        private List<TestCase> GetSmokeSubsetTestCases()
+        {
+            var project = _vm?.SelectedProject;
+            if (project == null || _smokeSubsetCaseIds == null || _smokeSubsetCaseIds.Count == 0) return [];
+            var idSet = new HashSet<string>(_smokeSubsetCaseIds, StringComparer.OrdinalIgnoreCase);
+            return project.TestCases.Where(tc => idSet.Contains(tc.TestCaseId)).ToList();
+        }
+
+        private Border BuildRegressionSummaryCard(
+            int doneCount, int failedCount, int smokeCount, int totalUnique,
+            DateTimeOffset? from, DateTimeOffset? to)
+        {
+            var stack = new StackPanel { Spacing = 12 };
+
+            stack.Children.Add(new TextBlock
+            {
+                Text = "REGRESSION SUITE PREVIEW",
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                FontSize = 10,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                CharacterSpacing = 150
+            });
+
+            string dateInfo;
+            if (from.HasValue && to.HasValue)
+                dateInfo = NormalizeForDisplay($"Done tasks \u00B7 {from.Value:MMM d, yyyy} \u2013 {to.Value:MMM d, yyyy}");
+            else if (from.HasValue)
+                dateInfo = NormalizeForDisplay($"Done tasks from {from.Value:MMM d, yyyy} onwards");
+            else if (to.HasValue)
+                dateInfo = NormalizeForDisplay($"Done tasks until {to.Value:MMM d, yyyy}");
+            else
+                dateInfo = "All Done tasks \u00B7 no date filter applied";
+
+            stack.Children.Add(new TextBlock
+            {
+                Text = NormalizeForDisplay(dateInfo),
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175)),
+                FontSize = 12
+            });
+
+            var metricsGrid = new Grid { Margin = new Thickness(0, 4, 0, 0) };
+            metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            metricsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            metricsGrid.ColumnSpacing = 12;
+
+            AddMetricCard(metricsGrid, 0, "Done-Linked", doneCount.ToString(), "\uE73E", "#34D399");
+            AddMetricCard(metricsGrid, 1, "Previously Failed", failedCount.ToString(), "\uE8A0", "#F87171");
+            AddMetricCard(metricsGrid, 2, "AI Smoke Subset", smokeCount.ToString(), "\uE946", "#A78BFA");
+            AddMetricCard(metricsGrid, 3, "Total (unique)", totalUnique.ToString(), "\uE9D5", "#FBBF24");
+            stack.Children.Add(metricsGrid);
+
+            if (totalUnique == 0)
+            {
+                stack.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(12, 8, 12, 8),
+                    Margin = new Thickness(0, 4, 0, 0),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 30, 30, 50)),
+                    Child = new TextBlock
+                    {
+                        Text = "No test cases matched the current sources. Try adjusting the date range, or ensure test cases have SourceIssueId set and tasks are marked Done.",
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                        FontSize = 11,
+                        TextWrapping = TextWrapping.Wrap
+                    }
+                });
+            }
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(20),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Child = stack
+            };
+        }
+
+        private Border BuildRegressionSection(
+            string title, string glyph, Windows.UI.Color accentColor,
+            List<TestCase> cases, string description, Project project)
+        {
+            var outerStack = new StackPanel { Spacing = 0 };
+
+            var headerGrid = new Grid { Padding = new Thickness(0, 0, 0, 6) };
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var chevron = new FontIcon
+            {
+                Glyph = "\uE70D",
+                FontSize = 12,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                Foreground = new SolidColorBrush(accentColor),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            Grid.SetColumn(chevron, 0);
+            headerGrid.Children.Add(chevron);
+
+            var titleRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+            titleRow.Children.Add(new FontIcon
+            {
+                Glyph = glyph,
+                FontSize = 14,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                Foreground = new SolidColorBrush(accentColor),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            titleRow.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontSize = 13,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            titleRow.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(40, accentColor.R, accentColor.G, accentColor.B)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock
+                {
+                    Text = cases.Count.ToString(),
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(accentColor),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            });
+            Grid.SetColumn(titleRow, 1);
+            headerGrid.Children.Add(titleRow);
+
+            var headerBtn = new Button
+            {
+                Background = new SolidColorBrush(Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Content = headerGrid
+            };
+            outerStack.Children.Add(headerBtn);
+
+            var descText = new TextBlock
+            {
+                Text = description,
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(22, 0, 0, 8)
+            };
+            outerStack.Children.Add(descText);
+
+            var bodyStack = new StackPanel
+            {
+                Spacing = 6,
+                Visibility = Visibility.Visible,
+                Margin = new Thickness(22, 0, 0, 0)
+            };
+
+            if (cases.Count == 0)
+            {
+                bodyStack.Children.Add(new TextBlock
+                {
+                    Text = "No test cases found for this source.",
+                    FontSize = 12,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 75, 85, 99)),
+                    Margin = new Thickness(0, 4, 0, 4)
+                });
+            }
+            else
+            {
+                foreach (var tc in cases)
+                    bodyStack.Children.Add(BuildRegressionTestCaseRow(tc, accentColor));
+            }
+            outerStack.Children.Add(bodyStack);
+
+            headerBtn.Click += (s, _) =>
+            {
+                bool isVisible = bodyStack.Visibility == Visibility.Visible;
+                bodyStack.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+                descText.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+                chevron.Glyph = isVisible ? "\uE76C" : "\uE70D";
+            };
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(16),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(50, accentColor.R, accentColor.G, accentColor.B)),
+                BorderThickness = new Thickness(1),
+                Child = outerStack
+            };
+        }
+
+        private Border BuildSmokeSubsetSection(
+            Project project, List<TestCase> doneLinked, List<TestCase> previouslyFailed)
+        {
+            var accentColor = Windows.UI.Color.FromArgb(255, 167, 139, 250);
+            var outerStack = new StackPanel { Spacing = 0 };
+
+            var headerRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 10,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            headerRow.Children.Add(new FontIcon
+            {
+                Glyph = "\uE946",
+                FontSize = 14,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                Foreground = new SolidColorBrush(accentColor),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            headerRow.Children.Add(new TextBlock
+            {
+                Text = "AI SMOKE SUBSET",
+                FontSize = 13,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            if (_smokeSubsetCaseIds != null)
+            {
+                headerRow.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 2, 6, 2),
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(40, accentColor.R, accentColor.G, accentColor.B)),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Child = new TextBlock
+                    {
+                        Text = GetSmokeSubsetTestCases().Count.ToString(),
+                        FontSize = 11,
+                        Foreground = new SolidColorBrush(accentColor),
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                    }
+                });
+            }
+            outerStack.Children.Add(headerRow);
+
+            outerStack.Children.Add(new TextBlock
+            {
+                Text = "AI selects a minimal set of critical test cases for a quick smoke run, prioritising Blocker/Major cases and distinct functional areas.",
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 12)
+            });
+
+            var capturedDone = doneLinked;
+            var capturedFailed = previouslyFailed;
+            var capturedProject = project;
+
+            if (_smokeSubsetCaseIds == null)
+            {
+                var genBtn = new Button
+                {
+                    Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53)),
+                    Foreground = new SolidColorBrush(accentColor),
+                    BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(14, 8, 14, 8)
+                };
+                genBtn.Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 6,
+                    Children =
+                    {
+                        new FontIcon { Glyph = "\uE946", FontSize = 12, FontFamily = new FontFamily("Segoe Fluent Icons") },
+                        new TextBlock { Text = "Generate AI Smoke Subset", FontSize = 12 }
+                    }
+                };
+                genBtn.Click += async (s, _) =>
+                    await GenerateSmokeSubsetAsync(capturedDone, capturedFailed, capturedProject);
+                outerStack.Children.Add(genBtn);
+            }
+            else
+            {
+                var smokeTestCases = GetSmokeSubsetTestCases();
+                if (smokeTestCases.Count == 0)
+                {
+                    outerStack.Children.Add(new TextBlock
+                    {
+                        Text = _smokeSubsetCaseIds.Count == 0
+                            ? "The AI found no additional cases to recommend. All critical cases are already covered by the other sources."
+                            : $"The AI suggested {_smokeSubsetCaseIds.Count} case ID(s) but none matched existing test case IDs. Ensure test case IDs are up to date.",
+                        FontSize = 12,
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                }
+                else
+                {
+                    var bodyStack = new StackPanel { Spacing = 6 };
+                    foreach (var tc in smokeTestCases)
+                        bodyStack.Children.Add(BuildRegressionTestCaseRow(tc, accentColor));
+                    outerStack.Children.Add(bodyStack);
+                }
+
+                var regenBtn = new Button
+                {
+                    Background = new SolidColorBrush(Colors.Transparent),
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                    BorderThickness = new Thickness(0),
+                    Padding = new Thickness(0, 10, 0, 0),
+                    FontSize = 11
+                };
+                regenBtn.Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 4,
+                    Children =
+                    {
+                        new FontIcon { Glyph = "\uE72C", FontSize = 10, FontFamily = new FontFamily("Segoe Fluent Icons") },
+                        new TextBlock { Text = "Regenerate" }
+                    }
+                };
+                regenBtn.Click += async (s, _) =>
+                {
+                    _smokeSubsetCaseIds = null;
+                    await GenerateSmokeSubsetAsync(capturedDone, capturedFailed, capturedProject);
+                };
+                outerStack.Children.Add(regenBtn);
+            }
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 19, 19, 26)),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(16),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(50, accentColor.R, accentColor.G, accentColor.B)),
+                BorderThickness = new Thickness(1),
+                Child = outerStack
+            };
+        }
+
+        private static Border BuildRegressionTestCaseRow(TestCase tc, Windows.UI.Color accentColor)
+        {
+            var grid = new Grid { Padding = new Thickness(8, 6, 8, 6) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var idBadge = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 30, 30, 50)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock
+                {
+                    Text = tc.TestCaseId,
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            };
+            Grid.SetColumn(idBadge, 0);
+            grid.Children.Add(idBadge);
+
+            var titleText = new TextBlock
+            {
+                Text = tc.Title,
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Margin = new Thickness(8, 0, 8, 0)
+            };
+            Grid.SetColumn(titleText, 1);
+            grid.Children.Add(titleText);
+
+            var priorityBadge = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = GetPriorityBadgeBackground(tc.Priority),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Child = new TextBlock
+                {
+                    Text = tc.Priority.ToString(),
+                    FontSize = 10,
+                    Foreground = GetPriorityForeground(tc.Priority),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            };
+            Grid.SetColumn(priorityBadge, 2);
+            grid.Children.Add(priorityBadge);
+
+            var statusBadge = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = GetStatusBadgeBackground(tc.Status),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock
+                {
+                    Text = tc.Status.ToString(),
+                    FontSize = 10,
+                    Foreground = GetStatusForeground(tc.Status),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            };
+            Grid.SetColumn(statusBadge, 3);
+            grid.Children.Add(statusBadge);
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 26, 26, 36)),
+                CornerRadius = new CornerRadius(8),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
+                BorderThickness = new Thickness(1),
+                Child = grid
+            };
+        }
+
+        private async System.Threading.Tasks.Task GenerateSmokeSubsetAsync(
+            List<TestCase> doneLinked, List<TestCase> previouslyFailed, Project project)
+        {
+            var geminiKey = LoadProjectCred("GeminiApiKey");
+            if (string.IsNullOrEmpty(geminiKey))
+            {
+                var dlg = new ContentDialog
+                {
+                    Title = "API Key Missing",
+                    Content = "Please add your Google AI Studio API key in Settings.",
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                DialogHelper.ApplyDarkTheme(dlg);
+                await dlg.ShowAsync();
+                return;
+            }
+
+            RegressionBusyOverlay.Visibility = Visibility.Visible;
+            BuildRegressionSuiteBtn.IsEnabled = false;
+
+            try
+            {
+                var doneTasks = project.Tasks.Where(t => t.Status == TaskStatus.Done).ToList();
+                var prompt = GeminiService.BuildSmokeSubsetPrompt(project.TestCases, doneTasks, project);
+                var service = new GeminiService(geminiKey);
+                var response = await service.AnalyzeIssueAsync(prompt);
+                _smokeSubsetCaseIds = GeminiService.ParseSmokeSubsetIds(response);
+            }
+            catch (GeminiAllModelsRateLimitedException)
+            {
+                RegressionStatusText.Text = "Rate limit exceeded. Please try again later.";
+                _smokeSubsetCaseIds = [];
+            }
+            catch (AggregateException ae) when (ae.InnerException is GeminiAllModelsRateLimitedException)
+            {
+                RegressionStatusText.Text = "Rate limit exceeded. Please try again later.";
+                _smokeSubsetCaseIds = [];
+            }
+            catch (Exception ex)
+            {
+                RegressionStatusText.Text = $"AI error: {ex.Message}";
+                _smokeSubsetCaseIds = [];
+            }
+            finally
+            {
+                RegressionBusyOverlay.Visibility = Visibility.Collapsed;
+                BuildRegressionSuiteBtn.IsEnabled = true;
+            }
+
+            RenderRegressionBuilder();
+        }
+
+        private async void BuildRegressionSuite_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            DateTimeOffset? from = RegressionFromDate.SelectedDate;
+            DateTimeOffset? to = RegressionToDate.SelectedDate;
+
+            var doneLinked = GetDoneLinkedTestCases(from, to);
+            var previouslyFailed = GetPreviouslyFailedTestCases(out _, out _);
+            var smokeSubset = GetSmokeSubsetTestCases();
+
+            var included = new List<TestCase>();
+            var seenIds = new HashSet<Guid>();
+            foreach (var tc in doneLinked.Concat(previouslyFailed).Concat(smokeSubset))
+            {
+                if (seenIds.Add(tc.Id))
+                    included.Add(tc);
+            }
+
+            if (included.Count == 0)
+            {
+                var dlg = new ContentDialog
+                {
+                    Title = "Nothing to Include",
+                    Content = "No test cases were found for the selected sources and date range. Adjust your filters and try again.",
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                DialogHelper.ApplyDarkTheme(dlg);
+                await dlg.ShowAsync();
+                return;
+            }
+
+            var project = _vm.SelectedProject;
+
+            string dateLabel;
+            if (from.HasValue && to.HasValue)
+                dateLabel = NormalizeForDisplay($"{from.Value:MMM d} \u2013 {to.Value:MMM d, yyyy}");
+            else if (from.HasValue)
+                dateLabel = NormalizeForDisplay($"from {from.Value:MMM d, yyyy}");
+            else if (to.HasValue)
+                dateLabel = NormalizeForDisplay($"until {to.Value:MMM d, yyyy}");
+            else
+                dateLabel = DateTime.Now.ToString("MMM d, yyyy");
+
+            var plan = new TestPlan
+            {
+                TestPlanId = NextTestPlanId(),
+                Name = NormalizeForDisplay($"Regression Suite \u00B7 {dateLabel}"),
+                Description = BuildRegressionDescription(
+                    doneLinked.Count, previouslyFailed.Count, smokeSubset.Count, included.Count),
+                Source = TaskSource.Manual
+            };
+            project.TestPlans.Add(plan);
+
+            foreach (var tc in included)
+            {
+                var copy = new TestCase
+                {
+                    TestCaseId = NextTestCaseId(),
+                    Title = tc.Title,
+                    PreConditions = tc.PreConditions,
+                    TestSteps = tc.TestSteps,
+                    TestData = tc.TestData,
+                    ExpectedResult = tc.ExpectedResult,
+                    ActualResult = string.Empty,
+                    Status = TestCaseStatus.NotRun,
+                    Priority = tc.Priority,
+                    GeneratedAt = DateTime.Now,
+                    SourceIssueId = tc.SourceIssueId,
+                    Source = tc.Source,
+                    TestPlanId = plan.Id,
+                    SapModule = tc.SapModule
+                };
+                project.TestCases.Add(copy);
+            }
+
+            await _vm.SaveAsync();
+
+            RegressionStatusText.Text = NormalizeForDisplay(
+                $"Built {plan.TestPlanId} \u00B7 {included.Count} case(s)");
+
+            // Navigate to Test Case Generation tab to show the newly created plan
+            _activeSubTab = "TestCaseGeneration";
+            UpdateSubTabStyles();
+            ShowActivePanel();
+        }
+
+        private static string BuildRegressionDescription(
+            int doneCount, int failedCount, int smokeCount, int total)
+        {
+            var parts = new List<string>();
+            if (doneCount > 0) parts.Add($"{doneCount} done-linked");
+            if (failedCount > 0) parts.Add($"{failedCount} previously failed");
+            if (smokeCount > 0) parts.Add($"{smokeCount} AI smoke");
+            return $"Regression suite: {string.Join(", ", parts)} \u2192 {total} unique test case(s).";
+        }
+
+        private void RegressionDate_Changed(object sender, DatePickerSelectedValueChangedEventArgs e)
+        {
+            if (_activeSubTab == "RegressionBuilder")
+                RenderRegressionBuilder();
+        }
+
+        private void RegressionClearDates_Click(object sender, RoutedEventArgs e)
+        {
+            RegressionFromDate.SelectedDate = null;
+            RegressionToDate.SelectedDate = null;
+            if (_activeSubTab == "RegressionBuilder")
+                RenderRegressionBuilder();
         }
     }
 }
