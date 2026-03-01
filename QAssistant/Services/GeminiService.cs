@@ -878,10 +878,18 @@ namespace QAssistant.Services
                 var first = candidates[0];
                 if (first.TryGetProperty("content", out var contentEl)
                     && contentEl.TryGetProperty("parts", out var parts)
-                    && parts.GetArrayLength() > 0
-                    && parts[0].TryGetProperty("text", out var textEl))
+                    && parts.GetArrayLength() > 0)
                 {
-                    return textEl.GetString() ?? "No response received.";
+                    // Gemini 2.5+ may return a "thought" part (thinking tokens) before the
+                    // actual response part. Skip any part marked with "thought": true and
+                    // return the first real text part.
+                    foreach (var part in parts.EnumerateArray())
+                    {
+                        if (part.TryGetProperty("thought", out var isThought) && isThought.GetBoolean())
+                            continue;
+                        if (part.TryGetProperty("text", out var textEl))
+                            return textEl.GetString() ?? "No response received.";
+                    }
                 }
             }
 

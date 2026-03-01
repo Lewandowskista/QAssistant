@@ -76,6 +76,19 @@
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8"
                                     HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <TextBlock Text="VIEW"
+                                       Foreground="{ThemeResource TextSecondaryBrush}"
+                                       FontSize="10" FontWeight="SemiBold"
+                                       CharacterSpacing="150" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="TestCaseViewPicker"
+                                      SelectedIndex="0"
+                                      Background="#252535" Foreground="#E2E8F0"
+                                      BorderBrush="#2A2A3A" CornerRadius="8"
+                                      MinWidth="160"
+                                      SelectionChanged="TestCaseViewPicker_Changed">
+                                <ComboBoxItem Content="All Plans" Tag="AllPlans"/>
+                                <ComboBoxItem Content="Regression Suites" Tag="RegressionSuites"/>
+                            </ComboBox>
                             <ToggleButton x:Name="ShowArchivedToggle" Content="Show Archived"
                                           Click="ShowArchivedToggle_Click"
                                           Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"

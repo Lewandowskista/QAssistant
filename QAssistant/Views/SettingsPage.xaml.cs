@@ -103,10 +103,10 @@ namespace QAssistant.Views
                 ProjectContextText.Text = "No project selected — keys will be saved globally.";
 
             // ── Automation API (global, not per-project) ──
-            var apiEnabled = CredentialService.LoadCredential("AutomationApiEnabled");
+            var apiEnabled = StorageService.Instance.GetSetting("AutomationApiEnabled");
             AutomationApiToggle.IsOn = apiEnabled == "true";
 
-            var apiPort = CredentialService.LoadCredential("AutomationApiPort");
+            var apiPort = StorageService.Instance.GetSetting("AutomationApiPort");
             AutomationApiPortBox.Text = string.IsNullOrEmpty(apiPort) ? "5248" : apiPort;
 
             var apiKey = CredentialService.LoadCredential("AutomationApiKey");
@@ -130,14 +130,14 @@ namespace QAssistant.Views
                 Ccv2ApiTokenBox.Password = ccv2Token;
 
             // SAP Commerce Context (global, not per-project — default off)
-            var sapContextEnabled = CredentialService.LoadCredential("SapCommerceContextEnabled");
+            var sapContextEnabled = StorageService.Instance.GetSetting("SapCommerceContextEnabled");
             SapCommerceContextToggle.IsOn = sapContextEnabled == "true";
 
             // Load tray setting — default to true on first run (global, not per-project)
-            var trayEnabled = CredentialService.LoadCredential("MinimizeToTray");
+            var trayEnabled = StorageService.Instance.GetSetting("MinimizeToTray");
             if (string.IsNullOrEmpty(trayEnabled))
             {
-                CredentialService.SaveCredential("MinimizeToTray", "true");
+                StorageService.Instance.SaveSetting("MinimizeToTray", "true");
                 MinimizeToTrayToggle.IsOn = true;
             }
             else
@@ -177,7 +177,7 @@ namespace QAssistant.Views
         {
             if (_isLoading) return;
             var enabled = MinimizeToTrayToggle.IsOn;
-            CredentialService.SaveCredential("MinimizeToTray", enabled ? "true" : "false");
+            StorageService.Instance.SaveSetting("MinimizeToTray", enabled ? "true" : "false");
             App.MinimizeToTray = enabled;
         }
 
@@ -185,7 +185,7 @@ namespace QAssistant.Views
         {
             if (_isLoading) return;
             var enabled = SapCommerceContextToggle.IsOn;
-            CredentialService.SaveCredential("SapCommerceContextEnabled", enabled ? "true" : "false");
+            StorageService.Instance.SaveSetting("SapCommerceContextEnabled", enabled ? "true" : "false");
         }
 
         private void RefreshProjects_Click(object sender, RoutedEventArgs e)
@@ -240,14 +240,14 @@ namespace QAssistant.Views
         {
             if (_isLoading) return;
             var enabled = AutomationApiToggle.IsOn;
-            CredentialService.SaveCredential("AutomationApiEnabled", enabled ? "true" : "false");
+            StorageService.Instance.SaveSetting("AutomationApiEnabled", enabled ? "true" : "false");
 
             if (enabled)
             {
                 var apiKey = AutomationApiService.GetOrCreateApiKey();
                 AutomationApiKeyBox.Password = apiKey;
 
-                var portStr = CredentialService.LoadCredential("AutomationApiPort");
+                var portStr = StorageService.Instance.GetSetting("AutomationApiPort");
                 int port = int.TryParse(portStr, out var p) && p is >= 1024 and <= 65535 ? p : 5248;
                 App.AutomationApi.Start(port);
                 ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
@@ -271,7 +271,7 @@ namespace QAssistant.Views
                 return;
             }
 
-            CredentialService.SaveCredential("AutomationApiPort", port.ToString());
+            StorageService.Instance.SaveSetting("AutomationApiPort", port.ToString());
             ShowStatus(AutomationApiStatusBorder, AutomationApiStatusText,
                 $"Port saved ({port}). Toggle the API off and on to apply.", true);
         }

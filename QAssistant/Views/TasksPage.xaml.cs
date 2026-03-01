@@ -141,7 +141,7 @@ namespace QAssistant.Views
                 return;
             }
 
-            MigrateLegacyLinearCredentials(project);
+            await MigrateLegacyLinearCredentialsAsync(project);
 
             if (project.LinearConnections.Count == 0)
             {
@@ -233,7 +233,7 @@ namespace QAssistant.Views
             CloseDetailPanel();
 
             var project = _vm?.SelectedProject;
-            if (project != null) MigrateLegacyLinearCredentials(project);
+            if (project != null) await MigrateLegacyLinearCredentialsAsync(project);
             if (_vm?.SelectedProject?.LinearConnections.Count == 0)
             {
                 StatusText.Text = "No Linear connections found. Go to Settings to connect.";
@@ -377,17 +377,44 @@ namespace QAssistant.Views
             return null;
         }
 
-        private void MigrateLegacyLinearCredentials(Project project)
+        private async System.Threading.Tasks.Task MigrateLegacyLinearCredentialsAsync(Project project)
         {
             if (project.LinearConnections.Count > 0) return;
+
             var apiKey = LoadProjectCred("LinearApiKey");
             var teamId = LoadProjectCred("LinearTeamId");
-            if (!string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(teamId))
+
+            if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(teamId)) return;
+
+            var conn = new LinearConnection { Label = "Default", TeamId = teamId };
+            try
             {
-                var conn = new LinearConnection { Label = "Default", TeamId = teamId };
                 CredentialService.SaveProjectCredential(project.Id, $"LinearApiKey_{conn.Id}", apiKey);
-                project.LinearConnections.Add(conn);
-                _ = _vm?.SaveAsync();
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Migration] Linear credential save failed: {ex.Message}");
+                return;
+            }
+            project.LinearConnections.Add(conn);
+
+            try
+            {
+                if (_vm != null)
+                    await _vm.SaveAsync();
+
+                // Project persisted — safe to remove the legacy credentials
+                CredentialService.DeleteProjectCredential(project.Id, "LinearApiKey");
+                CredentialService.DeleteProjectCredential(project.Id, "LinearTeamId");
+            }
+            catch
+            {
+                // Save failed — roll back so the next launch starts from a clean state
+                // instead of accumulating another orphaned credential
+                project.LinearConnections.Remove(conn);
+                try { CredentialService.DeleteProjectCredential(project.Id, $"LinearApiKey_{conn.Id}"); }
+                catch (System.ComponentModel.Win32Exception) { }
+                throw;
             }
         }
 
@@ -402,7 +429,15 @@ namespace QAssistant.Views
                 !string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(projectKey))
             {
                 var conn = new JiraConnection { Label = "Default", Domain = domain, Email = email, ProjectKey = projectKey };
-                CredentialService.SaveProjectCredential(project.Id, $"JiraApiToken_{conn.Id}", token);
+                try
+                {
+                    CredentialService.SaveProjectCredential(project.Id, $"JiraApiToken_{conn.Id}", token);
+                }
+                catch (System.ComponentModel.Win32Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Migration] Jira credential save failed: {ex.Message}");
+                    return;
+                }
                 project.JiraConnections.Add(conn);
                 _ = _vm?.SaveAsync();
             }
@@ -1687,25 +1722,26 @@ namespace QAssistant.Views
         private async void PostComment_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedTask == null || string.IsNullOrWhiteSpace(DetailCommentBox.Text)) return;
+            var task = _selectedTask;
 
-            if (string.IsNullOrEmpty(_selectedTask.ExternalId))
+            if (string.IsNullOrEmpty(task.ExternalId))
             {
                 StatusText.Visibility = Visibility.Visible;
                 StatusText.Text = "Cannot post comment: task is not linked to Linear.";
                 return;
             }
 
-            var key = GetLinearApiKey(_selectedTask?.ConnectionId);
+            var key = GetLinearApiKey(task.ConnectionId);
             if (string.IsNullOrEmpty(key)) return;
 
             try
             {
                 var service = new LinearService(key);
-                await service.AddCommentAsync(_selectedTask.ExternalId, DetailCommentBox.Text.Trim());
+                await service.AddCommentAsync(task.ExternalId, DetailCommentBox.Text.Trim());
                 DetailCommentBox.Text = string.Empty;
                 StatusText.Visibility = Visibility.Visible;
                 StatusText.Text = "Comment posted successfully.";
-                await LoadLinearCommentsAsync(_selectedTask.ExternalId);
+                await LoadLinearCommentsAsync(task.ExternalId);
             }
             catch (Exception ex)
             {
@@ -1716,24 +1752,25 @@ namespace QAssistant.Views
         private async void PostJiraComment_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedTask == null || string.IsNullOrWhiteSpace(DetailCommentBox.Text)) return;
+            var task = _selectedTask;
 
-            if (string.IsNullOrEmpty(_selectedTask.ExternalId))
+            if (string.IsNullOrEmpty(task.ExternalId))
             {
                 StatusText.Visibility = Visibility.Visible;
                 StatusText.Text = "Cannot post comment: task is not linked to Jira.";
                 return;
             }
 
-            var service = CreateJiraService(_selectedTask?.ConnectionId);
+            var service = CreateJiraService(task.ConnectionId);
             if (service == null) return;
 
             try
             {
-                await service.AddCommentAsync(_selectedTask.ExternalId, DetailCommentBox.Text.Trim());
+                await service.AddCommentAsync(task.ExternalId, DetailCommentBox.Text.Trim());
                 DetailCommentBox.Text = string.Empty;
                 StatusText.Visibility = Visibility.Visible;
                 StatusText.Text = "Comment posted successfully.";
-                await LoadJiraCommentsAsync(_selectedTask.ExternalId);
+                await LoadJiraCommentsAsync(task.ExternalId);
             }
             catch (Exception ex)
             {

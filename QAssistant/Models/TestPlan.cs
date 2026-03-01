@@ -26,5 +26,6 @@ namespace QAssistant.Models
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public TaskSource Source { get; set; } = TaskSource.Manual;
         public bool IsArchived { get; set; }
+        public bool IsRegressionSuite { get; set; }
     }
 }

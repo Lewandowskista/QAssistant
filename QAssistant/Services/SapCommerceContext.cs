@@ -24,11 +24,11 @@ namespace QAssistant.Services
     {
         /// <summary>
         /// Returns whether the SAP Commerce context toggle is enabled in settings.
-        /// The toggle is stored as a global credential (not per-project).
+        /// The toggle is stored as a local app setting (not per-project).
         /// </summary>
         public static bool IsEnabled()
         {
-            var value = CredentialService.LoadCredential("SapCommerceContextEnabled");
+            var value = StorageService.Instance.GetSetting("SapCommerceContextEnabled");
             return value == "true";
         }
 

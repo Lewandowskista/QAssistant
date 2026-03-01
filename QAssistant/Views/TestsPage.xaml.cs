@@ -48,6 +48,7 @@ namespace QAssistant.Views
         private string? _designDocumentContent;
         private string? _designDocumentName;
         private string _coverageViewMode = "Issue";
+        private string _testCaseViewMode = "AllPlans";
         private List<string>? _smokeSubsetCaseIds;
 
         private Guid ProjectId => _vm?.SelectedProject?.Id ?? Guid.Empty;
@@ -108,6 +109,8 @@ namespace QAssistant.Views
             CoverageMatrixPanel.Visibility = _activeSubTab == "CoverageMatrix" ? Visibility.Visible : Visibility.Collapsed;
             RegressionBuilderPanel.Visibility = _activeSubTab == "RegressionBuilder" ? Visibility.Visible : Visibility.Collapsed;
 
+            if (_activeSubTab == "TestCaseGeneration")
+                RenderTestPlans();
             if (_activeSubTab == "TestRuns")
                 RenderExecutionHistory();
             if (_activeSubTab == "Reports")
@@ -121,6 +124,14 @@ namespace QAssistant.Views
         private void ShowArchivedToggle_Click(object sender, RoutedEventArgs e)
         {
             _showArchived = ShowArchivedToggle.IsChecked == true;
+            RenderTestPlans();
+        }
+
+        private void TestCaseViewPicker_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (TestCasesContainer == null) return;
+            var tag = (TestCaseViewPicker.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "AllPlans";
+            _testCaseViewMode = tag;
             RenderTestPlans();
         }
 
@@ -499,14 +510,30 @@ namespace QAssistant.Views
             TestCaseEmptyState.Visibility = Visibility.Collapsed;
             ClearAllBtn.Visibility = Visibility.Visible;
 
-            int archivedCount = plans.Count(p => p.IsArchived);
-            int activeCount = plans.Count - archivedCount;
+            bool regressionOnly = _testCaseViewMode == "RegressionSuites";
+            var scopedPlans = regressionOnly
+                ? plans.Where(p => p.IsRegressionSuite).ToList()
+                : plans.ToList();
+
+            int archivedCount = scopedPlans.Count(p => p.IsArchived);
+            int activeCount = scopedPlans.Count - archivedCount;
             var visiblePlans = _showArchived
-                ? plans.OrderByDescending(p => p.CreatedAt).ToList()
-                : plans.Where(p => !p.IsArchived).OrderByDescending(p => p.CreatedAt).ToList();
+                ? scopedPlans.OrderByDescending(p => p.CreatedAt).ToList()
+                : scopedPlans.Where(p => !p.IsArchived).OrderByDescending(p => p.CreatedAt).ToList();
+
+            int visibleCaseCount = regressionOnly
+                ? allCases.Count(tc => visiblePlans.Any(p => p.Id == tc.TestPlanId))
+                : allCases.Count;
 
             var archiveInfo = archivedCount > 0 ? $" \u00B7 {archivedCount} archived" : "";
-            TestCaseCountText.Text = NormalizeForDisplay($"{activeCount} plan(s) \u00B7 {allCases.Count} case(s){archiveInfo}");
+            TestCaseCountText.Text = NormalizeForDisplay($"{activeCount} plan(s) \u00B7 {visibleCaseCount} case(s){archiveInfo}");
+
+            if (visiblePlans.Count == 0)
+            {
+                TestCaseEmptyState.Visibility = Visibility.Visible;
+                TestCasesContainer.Children.Add(TestCaseEmptyState);
+                return;
+            }
 
             foreach (var plan in visiblePlans)
             {
@@ -4600,7 +4627,8 @@ namespace QAssistant.Views
                 Name = NormalizeForDisplay($"Regression Suite \u00B7 {dateLabel}"),
                 Description = BuildRegressionDescription(
                     doneLinked.Count, previouslyFailed.Count, smokeSubset.Count, included.Count),
-                Source = TaskSource.Manual
+                Source = TaskSource.Manual,
+                IsRegressionSuite = true
             };
             project.TestPlans.Add(plan);
 
@@ -4631,7 +4659,9 @@ namespace QAssistant.Views
             RegressionStatusText.Text = NormalizeForDisplay(
                 $"Built {plan.TestPlanId} \u00B7 {included.Count} case(s)");
 
-            // Navigate to Test Case Generation tab to show the newly created plan
+            // Navigate to Test Case Generation tab showing the Regression Suites view
+            _testCaseViewMode = "RegressionSuites";
+            TestCaseViewPicker.SelectedIndex = 1;
             _activeSubTab = "TestCaseGeneration";
             UpdateSubTabStyles();
             ShowActivePanel();

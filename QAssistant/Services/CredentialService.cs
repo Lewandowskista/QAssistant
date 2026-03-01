@@ -26,36 +26,19 @@ namespace QAssistant.Services
             ArgumentException.ThrowIfNullOrEmpty(key);
             ArgumentNullException.ThrowIfNull(value);
 
-            var byteArray = Encoding.UTF8.GetBytes(value);
-            var credentialBlob = Marshal.AllocHGlobal(byteArray.Length);
-            try
-            {
-                Marshal.Copy(byteArray, 0, credentialBlob, byteArray.Length);
-
-                var cred = new CREDENTIAL
-                {
-                    Type = 1,
-                    TargetName = "QAssistant_" + key,
-                    CredentialBlob = credentialBlob,
-                    CredentialBlobSize = (uint)byteArray.Length,
-                    Persist = 2,
-                    UserName = "QAssistant"
-                };
-
-                if (!CredWrite(ref cred, 0))
-                    throw new Win32Exception(Marshal.GetLastWin32Error());
-            }
-            finally
-            {
-                Array.Clear(byteArray);
-                Marshal.FreeHGlobal(credentialBlob);
-            }
+            StorageService.Instance.SaveSecret(key, value);
         }
 
         public static string? LoadCredential(string key)
         {
             ArgumentException.ThrowIfNullOrEmpty(key);
 
+            // Try the new DPAPI file store first
+            var result = StorageService.Instance.LoadSecret(key);
+            if (result != null)
+                return result;
+
+            // Fall back to Windows Credential Manager for entries saved before migration
             if (!CredRead("QAssistant_" + key, 1, 0, out IntPtr credPtr))
                 return null;
 
@@ -69,7 +52,7 @@ namespace QAssistant.Services
                 Marshal.Copy(cred.CredentialBlob, bytes, 0, bytes.Length);
                 try
                 {
-                    return Encoding.UTF8.GetString(bytes);
+                    result = Encoding.UTF8.GetString(bytes);
                 }
                 finally
                 {
@@ -80,17 +63,34 @@ namespace QAssistant.Services
             {
                 CredFree(credPtr);
             }
+
+            // Auto-migrate: copy to file store and remove from Credential Manager
+            if (result != null)
+            {
+                try
+                {
+                    StorageService.Instance.SaveSecret(key, result);
+                    CredDelete("QAssistant_" + key, 1, 0);
+                }
+                catch { /* best-effort migration */ }
+            }
+
+            return result;
         }
 
         public static void DeleteCredential(string key)
         {
             ArgumentException.ThrowIfNullOrEmpty(key);
 
+            // Remove from DPAPI file store
+            StorageService.Instance.DeleteSecret(key);
+
+            // Also remove from Credential Manager (legacy cleanup)
             if (!CredDelete("QAssistant_" + key, 1, 0))
             {
                 int error = Marshal.GetLastWin32Error();
                 if (error != 1168) // ERROR_NOT_FOUND — credential doesn't exist
-                    throw new Win32Exception(error);
+                    System.Diagnostics.Debug.WriteLine($"CredDelete failed for '{key}': error {error}");
             }
         }
 
@@ -120,9 +120,6 @@ namespace QAssistant.Services
         }
 
         [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern bool CredWrite([In] ref CREDENTIAL userCredential, uint flags);
-
-        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool CredRead(string target, uint type, uint reservedFlag, out IntPtr credentialPtr);
 
         [DllImport("advapi32.dll", SetLastError = true)]
@@ -131,21 +128,21 @@ namespace QAssistant.Services
         [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool CredDelete(string target, uint type, uint flags);
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        [StructLayout(LayoutKind.Sequential)]
         private struct CREDENTIAL
         {
             public uint Flags;
             public uint Type;
-            [MarshalAs(UnmanagedType.LPWStr)] public string? TargetName;
-            [MarshalAs(UnmanagedType.LPWStr)] public string? Comment;
+            public IntPtr TargetName;
+            public IntPtr Comment;
             public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
             public uint CredentialBlobSize;
             public IntPtr CredentialBlob;
             public uint Persist;
             public uint AttributeCount;
             public IntPtr Attributes;
-            [MarshalAs(UnmanagedType.LPWStr)] public string? TargetAlias;
-            [MarshalAs(UnmanagedType.LPWStr)] public string? UserName;
+            public IntPtr TargetAlias;
+            public IntPtr UserName;
         }
     }
 }

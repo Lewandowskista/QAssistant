@@ -82,9 +82,15 @@ namespace QAssistant.Services
 
         private readonly string _dataPath;
         private readonly string _logPath;
+        private readonly string _settingsPath;
         private readonly AppJsonContext _jsonContext;
         private const string EncryptedPrefix = "ENC1:";
         private static readonly SemaphoreSlim s_fileLock = new(1, 1);
+        private static readonly object s_settingsLock = new();
+        private Dictionary<string, string>? _settingsCache;
+        private static readonly object s_secretsLock = new();
+        private Dictionary<string, string>? _secretsCache;
+        private readonly string _secretsPath;
 
         private StorageService()
         {
@@ -112,8 +118,10 @@ namespace QAssistant.Services
                 _dataPath = Path.Combine(folder, "projects.json");
 
                 _logPath = Path.Combine(folder, "storage.log");
+                _settingsPath = Path.Combine(folder, "settings.json");
+                _secretsPath = Path.Combine(folder, "secrets.json");
 
-                var options = new JsonSerializerOptions 
+                var options = new JsonSerializerOptions
                 { 
                     WriteIndented = true,
                     PropertyNameCaseInsensitive = true,
@@ -262,10 +270,183 @@ namespace QAssistant.Services
         public string GetLogPath() => _logPath;
         public string GetDataPath() => _dataPath;
 
+        // ── Local Settings (non-secret configuration) ─────────────────
+
+        /// <summary>
+        /// Reads a non-secret setting from the local settings file.
+        /// Returns <c>null</c> when the key does not exist.
+        /// </summary>
+        public string? GetSetting(string key)
+        {
+            lock (s_settingsLock)
+            {
+                _settingsCache ??= LoadSettingsFromDisk();
+                return _settingsCache.TryGetValue(key, out var value) ? value : null;
+            }
+        }
+
+        /// <summary>
+        /// Writes a non-secret setting to the local settings file.
+        /// Use this instead of <see cref="CredentialService"/> for values
+        /// that are not secrets (toggles, port numbers, feature flags, etc.).
+        /// </summary>
+        public void SaveSetting(string key, string value)
+        {
+            lock (s_settingsLock)
+            {
+                _settingsCache ??= LoadSettingsFromDisk();
+                _settingsCache[key] = value;
+                SaveSettingsToDisk(_settingsCache);
+            }
+        }
+
+        private Dictionary<string, string> LoadSettingsFromDisk()
+        {
+            try
+            {
+                if (!File.Exists(_settingsPath))
+                    return new Dictionary<string, string>();
+
+                var json = File.ReadAllText(_settingsPath, Encoding.UTF8);
+                return JsonSerializer.Deserialize<Dictionary<string, string>>(json)
+                    ?? new Dictionary<string, string>();
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"LoadSettings error: {ex.Message}");
+                return new Dictionary<string, string>();
+            }
+        }
+
+        private void SaveSettingsToDisk(Dictionary<string, string> settings)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_settingsPath, json, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"SaveSettings error: {ex.Message}");
+            }
+        }
+
+        // ── Encrypted Secret Storage (DPAPI) ────────────────────────
+
+        /// <summary>
+        /// Saves a secret value encrypted with DPAPI to a local file.
+        /// This replaces Windows Credential Manager storage and has no
+        /// per-user size limit while providing equivalent security.
+        /// </summary>
+        public void SaveSecret(string key, string value)
+        {
+            var encrypted = DpapiEncrypt(value);
+            lock (s_secretsLock)
+            {
+                _secretsCache ??= LoadSecretsFromDisk();
+                _secretsCache[key] = encrypted;
+                SaveSecretsToDisk(_secretsCache);
+            }
+        }
+
+        /// <summary>
+        /// Loads and decrypts a secret value from the local encrypted store.
+        /// Returns <c>null</c> when the key does not exist.
+        /// </summary>
+        public string? LoadSecret(string key)
+        {
+            lock (s_secretsLock)
+            {
+                _secretsCache ??= LoadSecretsFromDisk();
+                if (!_secretsCache.TryGetValue(key, out var encrypted))
+                    return null;
+
+                try
+                {
+                    return DpapiDecrypt(encrypted);
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"LoadSecret decryption error for key '{key}': {ex.Message}");
+                    return null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Removes a secret from the local encrypted store.
+        /// </summary>
+        public void DeleteSecret(string key)
+        {
+            lock (s_secretsLock)
+            {
+                _secretsCache ??= LoadSecretsFromDisk();
+                if (_secretsCache.Remove(key))
+                    SaveSecretsToDisk(_secretsCache);
+            }
+        }
+
+        private Dictionary<string, string> LoadSecretsFromDisk()
+        {
+            try
+            {
+                if (!File.Exists(_secretsPath))
+                    return new Dictionary<string, string>();
+
+                var json = File.ReadAllText(_secretsPath, Encoding.UTF8);
+                return JsonSerializer.Deserialize<Dictionary<string, string>>(json)
+                    ?? new Dictionary<string, string>();
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"LoadSecrets error: {ex.Message}");
+                return new Dictionary<string, string>();
+            }
+        }
+
+        private void SaveSecretsToDisk(Dictionary<string, string> secrets)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(secrets, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_secretsPath, json, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"SaveSecrets error: {ex.Message}");
+            }
+        }
+
+        private static string DpapiEncrypt(string plainText)
+        {
+            return Task.Run(async () =>
+            {
+                var plainBytes = Encoding.UTF8.GetBytes(plainText);
+                var plainBuffer = CryptographicBuffer.CreateFromByteArray(plainBytes);
+                var provider = new DataProtectionProvider("LOCAL=user");
+                var encryptedBuffer = await provider.ProtectAsync(plainBuffer);
+                CryptographicBuffer.CopyToByteArray(encryptedBuffer, out var encryptedBytes);
+                return Convert.ToBase64String(encryptedBytes);
+            }).GetAwaiter().GetResult();
+        }
+
+        private static string DpapiDecrypt(string encryptedBase64)
+        {
+            return Task.Run(async () =>
+            {
+                var encryptedBytes = Convert.FromBase64String(encryptedBase64);
+                var protectedBuffer = CryptographicBuffer.CreateFromByteArray(encryptedBytes);
+                var provider = new DataProtectionProvider();
+                var decryptedBuffer = await provider.UnprotectAsync(protectedBuffer);
+                CryptographicBuffer.CopyToByteArray(decryptedBuffer, out var decryptedBytes);
+                return Encoding.UTF8.GetString(decryptedBytes);
+            }).GetAwaiter().GetResult();
+        }
+
         /// <summary>
         /// Serialises a single project to a plain (unencrypted) JSON file so it can
         /// be shared with teammates.  Credentials are never included — they live in
-        /// the Windows Credential Manager and must be re-entered on the receiving machine.
+        /// the local encrypted store and must be re-entered on the receiving machine.
         /// </summary>
         public async Task ExportProjectAsync(Project project, string filePath)
         {
