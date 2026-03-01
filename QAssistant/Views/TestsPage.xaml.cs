@@ -3419,7 +3419,19 @@ namespace QAssistant.Views
             [SapCommerceModule.Promotions] =
                 ["promotion", "promo", "coupon", "voucher", "campaign", "rule engine", "rebate", "discount code", "offer code", "free gift"],
             [SapCommerceModule.CatalogSync] =
-                ["catalog", "product", "category", "sync", "import", "feed", "classification", "variant", "stock", "media", "impex", "solr"]
+                ["catalog", "product", "category", "sync", "import", "feed", "classification", "variant", "stock", "media", "impex", "solr"],
+            [SapCommerceModule.B2B] =
+                ["b2b", "business to business", "company", "organisation", "organization", "b2b unit", "b2b user", "budget", "cost center",
+                 "approval", "purchase order", "account manager", "quick order", "account payment", "b2b customer", "b2b checkout"],
+            [SapCommerceModule.OMS] =
+                ["order management", "oms", "fulfillment", "fulfilment", "consignment", "warehouse", "pickup", "click and collect",
+                 "return", "refund", "cancellation", "cancel order", "backorder", "split order", "dispatch", "allocation", "shipment"],
+            [SapCommerceModule.Personalization] =
+                ["personalization", "personalisation", "targeting", "segment", "experience", "smartedit", "cms", "content slot",
+                 "component", "audience", "variation", "customization", "action definition", "cxcms", "cms page"],
+            [SapCommerceModule.CPQ] =
+                ["cpq", "configure", "configuration", "configurator", "quote", "guided selling", "bundle", "product configuration",
+                 "rule-based pricing", "complex pricing", "subscription", "attribute group", "product variant config"]
         };
 
         private static SapCommerceModule? DetectSapModuleForTestCase(TestCase tc)
@@ -3454,7 +3466,11 @@ namespace QAssistant.Views
                 [SapCommerceModule.Checkout] = [],
                 [SapCommerceModule.Pricing] = [],
                 [SapCommerceModule.Promotions] = [],
-                [SapCommerceModule.CatalogSync] = []
+                [SapCommerceModule.CatalogSync] = [],
+                [SapCommerceModule.B2B] = [],
+                [SapCommerceModule.OMS] = [],
+                [SapCommerceModule.Personalization] = [],
+                [SapCommerceModule.CPQ] = []
             };
 
             int unclassified = 0;
@@ -3504,11 +3520,15 @@ namespace QAssistant.Views
 
             (SapCommerceModule Module, string Glyph, Windows.UI.Color Color, string DisplayName)[] modules =
             [
-                (SapCommerceModule.Cart,        "\uE7BF", Windows.UI.Color.FromArgb(255,  56, 189, 248), "Cart"),
-                (SapCommerceModule.Checkout,    "\uE8D0", Windows.UI.Color.FromArgb(255,  52, 211, 153), "Checkout"),
-                (SapCommerceModule.Pricing,     "\uE7B8", Windows.UI.Color.FromArgb(255, 251, 191,  36), "Pricing"),
-                (SapCommerceModule.Promotions,  "\uE8D6", Windows.UI.Color.FromArgb(255, 251, 146,  60), "Promotions"),
-                (SapCommerceModule.CatalogSync, "\uE8CB", Windows.UI.Color.FromArgb(255, 167, 139, 250), "Catalog Sync")
+                (SapCommerceModule.Cart,            "\uE7BF", Windows.UI.Color.FromArgb(255,  56, 189, 248), "Cart"),
+                (SapCommerceModule.Checkout,        "\uE8D0", Windows.UI.Color.FromArgb(255,  52, 211, 153), "Checkout"),
+                (SapCommerceModule.Pricing,         "\uE7B8", Windows.UI.Color.FromArgb(255, 251, 191,  36), "Pricing"),
+                (SapCommerceModule.Promotions,      "\uE8D6", Windows.UI.Color.FromArgb(255, 251, 146,  60), "Promotions"),
+                (SapCommerceModule.CatalogSync,     "\uE8CB", Windows.UI.Color.FromArgb(255, 167, 139, 250), "Catalog Sync"),
+                (SapCommerceModule.B2B,             "\uE902", Windows.UI.Color.FromArgb(255, 139,  92, 246), "B2B Commerce"),
+                (SapCommerceModule.OMS,             "\uE8A9", Windows.UI.Color.FromArgb(255,  45, 212, 191), "Order Management"),
+                (SapCommerceModule.Personalization, "\uE77C", Windows.UI.Color.FromArgb(255, 244, 114, 182), "Personalization"),
+                (SapCommerceModule.CPQ,             "\uE70F", Windows.UI.Color.FromArgb(255, 251, 113, 133), "CPQ")
             ];
 
             foreach (var (module, glyph, color, displayName) in modules)

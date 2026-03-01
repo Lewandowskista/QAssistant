@@ -257,5 +257,47 @@ namespace QAssistant.Services
 
         public string GetLogPath() => _logPath;
         public string GetDataPath() => _dataPath;
+
+        /// <summary>
+        /// Serialises a single project to a plain (unencrypted) JSON file so it can
+        /// be shared with teammates.  Credentials are never included — they live in
+        /// the Windows Credential Manager and must be re-entered on the receiving machine.
+        /// </summary>
+        public async Task ExportProjectAsync(Project project, string filePath)
+        {
+            string json;
+            try
+            {
+                json = JsonSerializer.Serialize(project, _jsonContext.Project);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"ExportProjectAsync context serialization failed: {ex.Message}. Trying default serializer...");
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                json = JsonSerializer.Serialize(project, options);
+            }
+            await File.WriteAllTextAsync(filePath, json, Encoding.UTF8);
+            LogMessage($"Project '{project.Name}' exported to {filePath}");
+        }
+
+        /// <summary>
+        /// Deserialises a project from a plain JSON file previously created by
+        /// <see cref="ExportProjectAsync"/>.  Returns <c>null</c> if the file cannot
+        /// be parsed.
+        /// </summary>
+        public async Task<Project?> ImportProjectFromJsonAsync(string filePath)
+        {
+            var json = await File.ReadAllTextAsync(filePath, Encoding.UTF8);
+            try
+            {
+                return JsonSerializer.Deserialize<Project>(json, _jsonContext.Project);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"ImportProjectFromJsonAsync context deserialization failed: {ex.Message}. Trying default deserializer...");
+                var options = new JsonSerializerOptions { WriteIndented = true, PropertyNameCaseInsensitive = true };
+                return JsonSerializer.Deserialize<Project>(json, options);
+            }
+        }
     }
 }

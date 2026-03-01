@@ -116,7 +116,7 @@ namespace QAssistant.Views
             }
 
             _hacService?.Dispose();
-            _hacService = new SapHacService(_selectedEnv.HacUrl);
+            _hacService = new SapHacService(_selectedEnv.HacUrl, _selectedEnv.IgnoreSslErrors);
 
             SapConnStatus.Text = "Connecting...";
             SapConnectBtn.IsEnabled = false;

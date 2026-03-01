@@ -499,6 +499,16 @@ namespace QAssistant
                     ViewModel.Projects.Move(existing, i);
             }
             await ViewModel.SaveAsync();
+            RefreshProjectList();
+        }
+
+        private void ProjectList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+        {
+            if (args.Item is ProjectGroupHeader && args.ItemContainer is ListViewItem container)
+            {
+                container.IsHitTestVisible = false;
+                container.Padding = new Thickness(0);
+            }
         }
 
         private async void ProjectList_RightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)
@@ -516,6 +526,12 @@ namespace QAssistant
             {
                 Text = ViewModel.SelectedProject.Name,
                 PlaceholderText = "Project name..."
+            };
+
+            var clientBox = new TextBox
+            {
+                Text = ViewModel.SelectedProject.ClientName,
+                PlaceholderText = "e.g. ACME Corp (optional)"
             };
 
             var colors = new[]
@@ -579,6 +595,14 @@ namespace QAssistant
             panel.Children.Add(nameBox);
             panel.Children.Add(new TextBlock
             {
+                Text = "Client",
+                Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                FontSize = 12,
+                Margin = new Thickness(0, 8, 0, 0)
+            });
+            panel.Children.Add(clientBox);
+            panel.Children.Add(new TextBlock
+            {
                 Text = "Color",
                 Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
                 FontSize = 12,
@@ -604,6 +628,7 @@ namespace QAssistant
             {
                 ViewModel.SelectedProject.Name = nameBox.Text.Trim();
                 ViewModel.SelectedProject.Color = selectedColor;
+                ViewModel.SelectedProject.ClientName = clientBox.Text.Trim();
                 await ViewModel.SaveAsync();
                 RefreshProjectList();
             }
@@ -633,15 +658,30 @@ namespace QAssistant
 
         private async void AddProject_Click(object sender, RoutedEventArgs e)
         {
-            var nameBox = new TextBox
+            var nameBox = new TextBox { PlaceholderText = "Project name..." };
+            var clientBox = new TextBox { PlaceholderText = "Client name (optional)" };
+
+            var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(new TextBlock
             {
-                PlaceholderText = "Project name..."
-            };
+                Text = "Name",
+                Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                FontSize = 12
+            });
+            panel.Children.Add(nameBox);
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Client",
+                Foreground = (Brush)Application.Current.Resources["TextPrimaryBrush"],
+                FontSize = 12,
+                Margin = new Thickness(0, 4, 0, 0)
+            });
+            panel.Children.Add(clientBox);
 
             var dialog = new ContentDialog
             {
                 Title = "New Project",
-                Content = nameBox,
+                Content = panel,
                 PrimaryButtonText = "Create",
                 CloseButtonText = "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
@@ -652,7 +692,11 @@ namespace QAssistant
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(nameBox.Text))
             {
-                var p = new Project { Name = nameBox.Text.Trim() };
+                var p = new Project
+                {
+                    Name = nameBox.Text.Trim(),
+                    ClientName = clientBox.Text.Trim()
+                };
                 ViewModel.Projects.Add(p);
                 ViewModel.SelectedProject = p;
                 await ViewModel.SaveAsync();
@@ -698,25 +742,24 @@ namespace QAssistant
             }
         }
 
-        private async void SettingsBtn_Click(object sender, RoutedEventArgs e)
+        private void SettingsBtn_Click(object sender, RoutedEventArgs e)
         {
             var settingsPage = new SettingsPage();
             settingsPage.Initialize(ViewModel);
+            SettingsContent.Content = settingsPage;
+            SettingsOverlay.Visibility = Visibility.Visible;
+        }
 
-            var dialog = new ContentDialog
-            {
-                Title = "Settings",
-                Content = settingsPage,
-                CloseButtonText = "Close",
-                XamlRoot = Content.XamlRoot,
-                Resources =
-                {
-                    ["ContentDialogMaxWidth"] = 700.0,
-                    ["ContentDialogMaxHeight"] = 800.0
-                }
-            };
+        private void CloseSettings_Click(object sender, RoutedEventArgs e)
+        {
+            SettingsOverlay.Visibility = Visibility.Collapsed;
+            SettingsContent.Content = null;
+        }
 
-            await dialog.ShowAsync();
+        private void SettingsScrim_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        {
+            SettingsOverlay.Visibility = Visibility.Collapsed;
+            SettingsContent.Content = null;
         }
 
         private void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
@@ -824,6 +867,9 @@ namespace QAssistant
                 case "TestData":
                     ContentFrame.Navigate(typeof(TestDataPage), ViewModel);
                     break;
+                case "Checklists":
+                    ContentFrame.Navigate(typeof(ChecklistsPage), ViewModel);
+                    break;
                 case "Environments":
                     ContentFrame.Navigate(typeof(EnvironmentsPage), ViewModel);
                     break;
@@ -838,7 +884,7 @@ namespace QAssistant
 
         private void UpdateNavStyles()
         {
-            var navButtons = new[] { NavDashboard, NavLinks, NavNotes, NavFiles, NavTasks, NavTests, NavTestData, NavEnvironments, NavApi, NavSap };
+            var navButtons = new[] { NavDashboard, NavLinks, NavNotes, NavFiles, NavTasks, NavTests, NavTestData, NavChecklists, NavEnvironments, NavApi, NavSap };
             foreach (var btn in navButtons)
             {
                 bool active = btn.Tag.ToString() == ViewModel.ActiveTab;
@@ -859,7 +905,28 @@ namespace QAssistant
 
                 if (ViewModel.Projects?.Count > 0)
                 {
-                    ProjectList.ItemsSource = ViewModel.Projects;
+                    bool hasAnyClient = ViewModel.Projects.Any(p => !string.IsNullOrEmpty(p.ClientName));
+
+                    if (hasAnyClient)
+                    {
+                        var mixed = new List<object>();
+                        var groups = ViewModel.Projects
+                            .GroupBy(p => p.ClientName ?? string.Empty)
+                            .OrderBy(g => string.IsNullOrEmpty(g.Key) ? 1 : 0)
+                            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
+
+                        foreach (var group in groups)
+                        {
+                            mixed.Add(new ProjectGroupHeader(group.Key));
+                            mixed.AddRange(group);
+                        }
+
+                        ProjectList.ItemsSource = mixed;
+                    }
+                    else
+                    {
+                        ProjectList.ItemsSource = ViewModel.Projects;
+                    }
 
                     if (ViewModel.SelectedProject != null)
                         ProjectList.SelectedItem = ViewModel.SelectedProject;

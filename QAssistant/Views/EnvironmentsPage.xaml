@@ -199,6 +199,21 @@
                                          Foreground="{ThemeResource TextPrimaryBrush}"
                                          BorderBrush="{ThemeResource BorderBrush}" CornerRadius="8"/>
                             </StackPanel>
+                            <Border Height="1" Background="{ThemeResource BorderBrush}" Margin="0,4,0,4"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
+                                    <TextBlock Text="Ignore SSL Errors"
+                                               Foreground="{ThemeResource TextPrimaryBrush}" FontSize="13"/>
+                                    <TextBlock Text="Bypass certificate validation for self-signed certificates. Development environments only — never enable for production."
+                                               Foreground="#F59E0B" FontSize="11" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch x:Name="EnvIgnoreSslToggle" Grid.Column="1"
+                                             VerticalAlignment="Center" OnContent="" OffContent=""/>
+                            </Grid>
                         </StackPanel>
                     </Border>
 

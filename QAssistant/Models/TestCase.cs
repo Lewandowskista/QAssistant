@@ -19,7 +19,20 @@ namespace QAssistant.Models
 {
     public enum TestCaseStatus { NotRun, Passed, Failed, Blocked, Skipped }
     public enum TestCasePriority { Low, Medium, Major, Blocker }
-    public enum SapCommerceModule { Cart, Checkout, Pricing, Promotions, CatalogSync }
+    public enum SapCommerceModule
+    {
+        // Core commerce
+        Cart,
+        Checkout,
+        Pricing,
+        Promotions,
+        CatalogSync,
+        // Extended platform
+        B2B,
+        OMS,
+        Personalization,
+        CPQ
+    }
 
     public class TestCase
     {

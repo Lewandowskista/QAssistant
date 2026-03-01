@@ -25,6 +25,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using Windows.Storage.Pickers;
+using WinRT.Interop;
 
 namespace QAssistant.Views
 {
@@ -541,6 +543,80 @@ namespace QAssistant.Views
                 };
                 DialogHelper.ApplyDarkTheme(dialog);
                 await dialog.ShowAsync();
+            }
+        }
+
+        // ── Project Sharing ──────────────────────────────────────────
+        private async void ExportProject_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm?.SelectedProject == null)
+            {
+                ShowStatus(ShareStatusBorder, ShareStatusText, "No project selected to export.", false);
+                return;
+            }
+
+            var picker = new FileSavePicker();
+            picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            picker.FileTypeChoices.Add("JSON File", [".json"]);
+            picker.SuggestedFileName = $"{_vm.SelectedProject.Name.Replace(" ", "_")}_export";
+            InitializeWithWindow.Initialize(picker, App.MainWindowHandle);
+
+            var file = await picker.PickSaveFileAsync();
+            if (file == null) return;
+
+            try
+            {
+                await StorageService.Instance.ExportProjectAsync(_vm.SelectedProject, file.Path);
+                ShowStatus(ShareStatusBorder, ShareStatusText,
+                    $"Project exported to {file.Name}. Note: credentials are not included and must be re-entered on the target machine.",
+                    true);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus(ShareStatusBorder, ShareStatusText, $"Export failed: {ex.Message}", false);
+            }
+        }
+
+        private async void ImportProject_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm == null)
+            {
+                ShowStatus(ShareStatusBorder, ShareStatusText, "Application not ready.", false);
+                return;
+            }
+
+            var picker = new FileOpenPicker();
+            picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+            picker.FileTypeFilter.Add(".json");
+            InitializeWithWindow.Initialize(picker, App.MainWindowHandle);
+
+            var file = await picker.PickSingleFileAsync();
+            if (file == null) return;
+
+            try
+            {
+                var imported = await StorageService.Instance.ImportProjectFromJsonAsync(file.Path);
+                if (imported == null)
+                {
+                    ShowStatus(ShareStatusBorder, ShareStatusText, "Import failed: file could not be parsed.", false);
+                    return;
+                }
+
+                // Assign a fresh ID so the imported copy never collides with an existing project
+                imported.Id = Guid.NewGuid();
+                imported.Name = $"{imported.Name} (imported)";
+
+                _vm.Projects.Add(imported);
+                await _vm.SaveAsync();
+                App.MainWindowInstance?.ForceRefreshProjectList();
+
+                ShowStatus(ShareStatusBorder, ShareStatusText,
+                    $"Project '{imported.Name}' imported successfully. Remember to re-enter any credentials under Settings.",
+                    true);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus(ShareStatusBorder, ShareStatusText, $"Import failed: {ex.Message}", false);
             }
         }
     }

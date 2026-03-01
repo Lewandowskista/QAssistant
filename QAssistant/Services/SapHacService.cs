@@ -57,15 +57,16 @@ namespace QAssistant.Services
         private static readonly Regex s_htmlCellRegex = new(@"<t[dh][^>]*>(.*?)</t[dh]>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex s_htmlTagRegex = new(@"<[^>]+>", RegexOptions.Compiled);
 
-        public SapHacService(string hacBaseUrl)
+        public SapHacService(string hacBaseUrl, bool ignoreSslErrors = false)
         {
             _hacBaseUrl = hacBaseUrl.TrimEnd('/');
             var handler = new HttpClientHandler
             {
                 CookieContainer = new CookieContainer(),
                 UseCookies = true,
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
             };
+            if (ignoreSslErrors)
+                handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
             _client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
         }
 

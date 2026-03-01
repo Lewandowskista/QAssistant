@@ -400,6 +400,31 @@
                 </StackPanel>
             </Border>
 
+            <!-- Project Sharing Section -->
+            <Border Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="12"
+                    BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" Padding="24">
+                <StackPanel Spacing="16">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="PROJECT SHARING" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                        <TextBlock Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Text="Export the current project to a JSON file to share with teammates, or import a project from a shared file. Credentials are never exported — they must be re-entered on the receiving machine."/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Export Project…" Click="ExportProject_Click"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                CornerRadius="8" Padding="10,7"/>
+                        <Button Content="Import Project…" Click="ImportProject_Click"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                CornerRadius="8" Padding="10,7"/>
+                    </StackPanel>
+                    <Border x:Name="ShareStatusBorder" Visibility="Collapsed" CornerRadius="8" Padding="12,8">
+                        <TextBlock x:Name="ShareStatusText" FontSize="12" TextWrapping="Wrap"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
                     <!-- Diagnostics Section -->
                     <Border Background="#1A1A24" CornerRadius="12"
                             BorderBrush="#2A2A3A" BorderThickness="1" Padding="24">

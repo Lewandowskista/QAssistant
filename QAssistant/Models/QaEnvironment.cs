@@ -42,6 +42,9 @@ namespace QAssistant.Models
         public string SolrAdminUrl { get; set; } = string.Empty;
         public string OccBasePath { get; set; } = string.Empty;
 
+        // SSL: bypass certificate validation for self-signed / internal certs (development only — never use in production)
+        public bool IgnoreSslErrors { get; set; } = false;
+
         // Auth stored separately in CredentialService using key "Env_{Id}_Username" etc.
     }
 }

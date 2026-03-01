@@ -19,10 +19,11 @@
 10. [Tasks](#10-tasks)
 11. [Tests](#11-tests)
 12. [Test Data](#12-test-data)
-13. [Environments](#13-environments)
-14. [API Playground](#14-api-playground)
-15. [SAP HAC](#15-sap-hac)
-16. [Settings](#16-settings)
+13. [Checklists](#13-checklists)
+14. [Environments](#14-environments)
+15. [API Playground](#15-api-playground)
+16. [SAP HAC](#16-sap-hac)
+17. [Settings](#17-settings)
 
 ---
 
@@ -482,7 +483,56 @@ Placeholder tokens in the scripts (e.g. `{{productCode}}`, `{{customerEmail}}`) 
 
 ---
 
-## 13. Environments
+## 13. Checklists
+
+**Navigation:** Tools sidebar → **Checklists** (under **QA BASIC**)
+
+### Purpose
+Reusable, stateful QA checklists for pre-deployment gates, release sign-offs, SAP Commerce verifications, and any other repeatable procedure. Each checklist is per-project and tracks individual item completion with a live progress bar.
+
+### How to use
+
+| Action | How |
+|---|---|
+| **Create a checklist** | Click **+ New Checklist** in the sidebar — a blank checklist named "New Checklist" is created |
+| **Load built-in templates** | Click **Load SAP Built-ins** — inserts the five built-in SAP Commerce checklists if they don't already exist |
+| **Rename / recategorise** | Select a checklist → edit the **Name** and **Category** fields → **Save** |
+| **Add an item** | Click **+ Add Item** — a new item row appears; type the step text inline |
+| **Check / uncheck an item** | Click the checkbox on any item row — progress updates immediately and is auto-saved |
+| **Delete an item** | Click the trash icon on the item row |
+| **Reset all items** | Click **Reset All** — unchecks every item in the checklist |
+| **Delete a checklist** | Click **Delete** → confirm |
+
+### Categories
+
+| Category | Intended use |
+|---|---|
+| **Pre-Deployment** | Go/no-go gate checks before releasing to staging or production |
+| **Release Sign-off** | Final QA lead sign-off steps for a release candidate |
+| **SAP Commerce** | Platform-specific checks (catalog sync, ImpEx, CronJobs, Backoffice) |
+| **OCC Contract** | Verification that OCC API endpoints meet their expected contract |
+| **Smoke Test** | Minimal post-deployment verification steps |
+| **Custom** | Any user-defined purpose |
+
+### Built-in SAP Commerce templates
+
+Loaded via **Load SAP Built-ins**; existing built-ins are never duplicated:
+
+| Template | Category | Items |
+|---|---|---|
+| **Pre-Deployment QA** | Pre-Deployment | 7 items — critical bug status, regression suite, performance, security scan, smoke test, rollback plan, release notes |
+| **Catalog Sync Verification** | SAP Commerce | 7 items — staged/online item counts, sync job log, spot-check products, Solr re-index, search results, storefront PDP |
+| **OCC API Contract Validation** | OCC Contract | 8 items — product GET, cart POST, order POST, error codes, OAuth2, pagination |
+| **CronJob Health Check** | SAP Commerce | 6 items — Solr, CatalogSync, CleanUp, ProcessOrders, stuck-job check, trigger intervals |
+| **ImpEx Import Validation** | SAP Commerce | 6 items — data model validation, dev-env test import, error log, Backoffice visibility, rollback ImpEx, encoding |
+
+### Progress tracking
+
+A **progress bar** at the bottom of the editor shows `done / total (%)` in real time. The sidebar list also shows the current `x/y checked` count for each checklist at a glance.
+
+---
+
+## 14. Environments
 
 **Navigation:** Tools sidebar → **Environments** (under **QA ADVANCED**)
 
@@ -520,7 +570,7 @@ Store connection details for every environment in your project (Development, Sta
 
 ---
 
-## 14. API Playground
+## 15. API Playground
 
 **Navigation:** Tools sidebar → **API** (under **QA ADVANCED**)
 
@@ -529,7 +579,7 @@ A lightweight API client for sending HTTP requests and inspecting responses — 
 
 ---
 
-### 14.1 Managing Requests
+### 15.1 Managing Requests
 
 | Action | How |
 |---|---|
@@ -543,7 +593,7 @@ The left panel lists all saved requests, grouped and colour-coded by HTTP method
 
 ---
 
-### 14.2 Sending Requests
+### 15.2 Sending Requests
 
 1. Select or create a request.
 2. Fill in:
@@ -565,19 +615,19 @@ The response body can be copied using the **Copy** button.
 
 ---
 
-### 14.3 Request History
+### 15.3 Request History
 
 Each request stores the last **20 responses** automatically. The History tab within the response panel shows previous calls with their status codes, timestamps, and durations. Click any history entry to restore its response body.
 
 ---
 
-### 14.4 Response Comparison
+### 15.4 Response Comparison
 
 The Compare tab lets you select two history entries side-by-side to diff the response bodies — useful for detecting regressions between API versions.
 
 ---
 
-## 15. SAP HAC
+## 16. SAP HAC
 
 **Navigation:** Tools sidebar → **SAP HAC** (under **QA ADVANCED**)
 
@@ -594,7 +644,7 @@ The page has four tabs:
 
 ---
 
-### 15.1 Cronjobs
+### 16.1 Cronjobs
 
 - Click **Refresh** to fetch all cronjob entries from HAC.
 - The table shows: **Code**, **Status**, **Last Result**, **Next Activation Time**, **Trigger Active**.
@@ -605,7 +655,7 @@ The page has four tabs:
 
 ---
 
-### 15.2 Catalog Sync
+### 16.2 Catalog Sync
 
 - Select **Source** and **Target** catalog versions.
 - Click **Compare** — QAssistant reads both catalog version sync states and computes a diff showing items only in source, only in target, or differing between them.
@@ -613,7 +663,7 @@ The page has four tabs:
 
 ---
 
-### 15.3 FlexSearch
+### 16.3 FlexSearch
 
 - Type a FlexSearch query in the editor (e.g. `SELECT {pk} FROM {Product} WHERE {code} = 'myProduct'`).
 - Click **Execute** — results are displayed in a scrollable data table.
@@ -621,7 +671,7 @@ The page has four tabs:
 
 ---
 
-### 15.4 ImpEx
+### 16.4 ImpEx
 
 - Paste or type an ImpEx script in the editor.
 - Click **Execute** — QAssistant posts the script to HAC's ImpEx import endpoint.
@@ -630,7 +680,7 @@ The page has four tabs:
 
 ---
 
-## 16. Settings
+## 17. Settings
 
 **Opened by:** Gear icon (⚙) in the title bar.
 
@@ -638,7 +688,7 @@ Settings are organised in sections. Credentials are stored in **Windows Credenti
 
 ---
 
-### 16.1 General
+### 17.1 General
 
 | Setting | Description |
 |---|---|
@@ -646,7 +696,7 @@ Settings are organised in sections. Credentials are stored in **Windows Credenti
 
 ---
 
-### 16.2 Automation API
+### 17.2 Automation API
 
 An optional local HTTP API that lets automation frameworks (Playwright, Cypress, Selenium, etc.) communicate with QAssistant at runtime.
 
@@ -662,7 +712,7 @@ An optional local HTTP API that lets automation frameworks (Playwright, Cypress,
 
 ---
 
-### 16.3 Linear Integration
+### 17.3 Linear Integration
 
 | Field | Description |
 |---|---|
@@ -673,7 +723,7 @@ Buttons: **Save**, **Test Connection** (verifies credentials and shows the numbe
 
 ---
 
-### 16.4 Jira Integration
+### 17.4 Jira Integration
 
 | Field | Description |
 |---|---|
@@ -686,7 +736,7 @@ Buttons: **Save**, **Test Connection**, **Disconnect**.
 
 ---
 
-### 16.5 Google AI (Gemini)
+### 17.5 Google AI (Gemini)
 
 | Field | Description |
 |---|---|
@@ -696,7 +746,7 @@ Button: **Save API Key**.
 
 ---
 
-### 16.6 SAP Commerce Context
+### 17.6 SAP Commerce Context
 
 | Setting | Description |
 |---|---|
@@ -704,7 +754,7 @@ Button: **Save API Key**.
 
 ---
 
-### 16.7 Storage Diagnostics
+### 17.7 Storage Diagnostics
 
 Shows the absolute file paths where QAssistant stores its data:
 

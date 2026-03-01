@@ -25,6 +25,7 @@ namespace QAssistant.Models
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string ClientName { get; set; } = string.Empty;
 
         private string _color = "#A78BFA";
         public string Color

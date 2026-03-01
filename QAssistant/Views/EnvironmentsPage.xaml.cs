@@ -156,6 +156,7 @@ namespace QAssistant.Views
             EnvOccPathBox.Text = env.OccBasePath;
             EnvNotesBox.Text = env.Notes;
             EnvDefaultCheck.IsChecked = env.IsDefault;
+            EnvIgnoreSslToggle.IsOn = env.IgnoreSslErrors;
             EnvStatusText.Text = string.Empty;
 
             // Load credentials from Credential Manager
@@ -199,6 +200,7 @@ namespace QAssistant.Views
             _selected.SolrAdminUrl = EnvSolrUrlBox.Text.Trim();
             _selected.OccBasePath = EnvOccPathBox.Text.Trim();
             _selected.Notes = EnvNotesBox.Text.Trim();
+            _selected.IgnoreSslErrors = EnvIgnoreSslToggle.IsOn;
 
             if (EnvDefaultCheck.IsChecked == true)
             {
