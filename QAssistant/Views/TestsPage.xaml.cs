@@ -43,6 +43,7 @@ namespace QAssistant.Views
         private readonly HashSet<Guid> _collapsedExecutionPlans = [];
         private readonly HashSet<Guid> _collapsedExecutionTestCases = [];
         private readonly HashSet<Guid> _selectedPlanIds = [];
+        private readonly HashSet<Guid> _populatedPlanBodies = [];
         private bool _criticalityExpanded;
         private string? _criticalityAssessmentText;
         private int _suggestionsSnapshotExecutionCount = -1;
@@ -520,6 +521,7 @@ namespace QAssistant.Views
         private void RenderTestPlans()
         {
             TestCasesContainer.Children.Clear();
+            _populatedPlanBodies.Clear();
 
             var project = _vm?.SelectedProject;
             if (project == null) return;
@@ -564,15 +566,19 @@ namespace QAssistant.Views
                 return;
             }
 
+            var execCountMap = project.TestExecutions
+                .GroupBy(te => te.TestCaseId)
+                .ToDictionary(g => g.Key, g => g.Count());
+
             foreach (var plan in visiblePlans)
             {
                 var casesInPlan = allCases.Where(tc => tc.TestPlanId == plan.Id).ToList();
-                var planCard = BuildTestPlanCard(plan, casesInPlan);
+                var planCard = BuildTestPlanCard(plan, casesInPlan, execCountMap);
                 TestCasesContainer.Children.Add(planCard);
             }
         }
 
-        private Border BuildTestPlanCard(TestPlan plan, List<TestCase> cases)
+        private Border BuildTestPlanCard(TestPlan plan, List<TestCase> cases, Dictionary<Guid, int> execCountMap)
         {
             bool collapsed = _collapsedPlans.Contains(plan.Id);
 
@@ -724,10 +730,11 @@ namespace QAssistant.Views
                 Margin = new Thickness(22, 0, 0, 0)
             };
 
-            foreach (var tc in cases)
+            if (!collapsed)
             {
-                var card = BuildTestCaseCard(tc, plan);
-                bodyStack.Children.Add(card);
+                foreach (var tc in cases)
+                    bodyStack.Children.Add(BuildTestCaseCard(tc, plan, execCountMap.GetValueOrDefault(tc.Id)));
+                _populatedPlanBodies.Add(plan.Id);
             }
 
             outerStack.Children.Add(bodyStack);
@@ -737,6 +744,12 @@ namespace QAssistant.Views
             {
                 if (_collapsedPlans.Remove(plan.Id))
                 {
+                    if (!_populatedPlanBodies.Contains(plan.Id))
+                    {
+                        foreach (var tc in cases)
+                            bodyStack.Children.Add(BuildTestCaseCard(tc, plan, execCountMap.GetValueOrDefault(tc.Id)));
+                        _populatedPlanBodies.Add(plan.Id);
+                    }
                     bodyStack.Visibility = Visibility.Visible;
                     chevron.Glyph = "\uE70D";
                 }
@@ -803,7 +816,7 @@ namespace QAssistant.Views
 
         // â”€â”€ Render: single test case card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-        private Border BuildTestCaseCard(TestCase tc, TestPlan plan)
+        private Border BuildTestCaseCard(TestCase tc, TestPlan plan, int execCount)
         {
             var cardStack = new StackPanel { Spacing = 10 };
 
@@ -929,7 +942,6 @@ namespace QAssistant.Views
 
             // â”€â”€ Traceability label â”€â”€
             var traceText = $"{tc.TestCaseId} → {plan.TestPlanId}";
-            var execCount = _vm?.SelectedProject?.TestExecutions.Count(te => te.TestCaseId == tc.Id) ?? 0;
             if (execCount > 0)
                 traceText += $" · {execCount} execution(s)";
 
