@@ -179,12 +179,12 @@ namespace QAssistant.Views
         {
             _isLinearMode = false;
             _isJiraMode = false;
-            ManualModeBtn.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250));
-            ManualModeBtn.Foreground = new SolidColorBrush(Colors.White);
+            ManualModeBtn.Background = (Brush)Application.Current.Resources["ListAccentLowBrush"];
+            ManualModeBtn.Foreground = (Brush)Application.Current.Resources["AccentBrush"];
             LinearModeBtn.Background = new SolidColorBrush(Colors.Transparent);
-            LinearModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            LinearModeBtn.Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"];
             JiraModeBtn.Background = new SolidColorBrush(Colors.Transparent);
-            JiraModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            JiraModeBtn.Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"];
             AddTaskBtn.Visibility = Visibility.Visible;
             RefreshBtn.Visibility = Visibility.Collapsed;
             StatusText.Visibility = Visibility.Collapsed;
@@ -196,12 +196,12 @@ namespace QAssistant.Views
         {
             _isLinearMode = true;
             _isJiraMode = false;
-            LinearModeBtn.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250));
-            LinearModeBtn.Foreground = new SolidColorBrush(Colors.White);
+            LinearModeBtn.Background = (Brush)Application.Current.Resources["ListAccentLowBrush"];
+            LinearModeBtn.Foreground = (Brush)Application.Current.Resources["AccentBrush"];
             ManualModeBtn.Background = new SolidColorBrush(Colors.Transparent);
-            ManualModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            ManualModeBtn.Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"];
             JiraModeBtn.Background = new SolidColorBrush(Colors.Transparent);
-            JiraModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            JiraModeBtn.Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"];
             AddTaskBtn.Visibility = Visibility.Collapsed;
             RefreshBtn.Visibility = Visibility.Visible;
             StatusText.Visibility = Visibility.Visible;
@@ -229,12 +229,12 @@ namespace QAssistant.Views
         {
             _isJiraMode = true;
             _isLinearMode = false;
-            JiraModeBtn.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250));
-            JiraModeBtn.Foreground = new SolidColorBrush(Colors.White);
+            JiraModeBtn.Background = (Brush)Application.Current.Resources["ListAccentLowBrush"];
+            JiraModeBtn.Foreground = (Brush)Application.Current.Resources["AccentBrush"];
             ManualModeBtn.Background = new SolidColorBrush(Colors.Transparent);
-            ManualModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            ManualModeBtn.Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"];
             LinearModeBtn.Background = new SolidColorBrush(Colors.Transparent);
-            LinearModeBtn.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+            LinearModeBtn.Foreground = (Brush)Application.Current.Resources["TextSecondaryBrush"];
             AddTaskBtn.Visibility = Visibility.Collapsed;
             RefreshBtn.Visibility = Visibility.Visible;
             StatusText.Visibility = Visibility.Visible;

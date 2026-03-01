@@ -49,6 +49,17 @@ namespace QAssistant.Views
             }
         }
 
+        /// <summary>
+        /// Initialize the page with a ViewModel when hosted outside of Frame navigation.
+        /// </summary>
+        public void Initialize(MainViewModel vm)
+        {
+            _vm = vm;
+            _projectId = vm.SelectedProject?.Id ?? Guid.Empty;
+            LoadSavedKeys();
+            LoadStorageDiagnostics();
+        }
+
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);

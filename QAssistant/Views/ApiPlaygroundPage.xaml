@@ -23,7 +23,7 @@
 
                 <StackPanel Grid.Row="0" Spacing="4" Padding="16,16,16,8">
                     <TextBlock Text="API PLAYGROUND" Foreground="{ThemeResource TextSecondaryBrush}"
-                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                     <TextBlock Text="HTTP client for OCC, HAC, Jira, Linear"
                                Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap"/>
                 </StackPanel>
@@ -75,11 +75,11 @@
                             CornerRadius="8" Padding="12,8"/>
                     <Button Content="Load OCC Templates" Click="LoadOccTemplates_Click"
                             HorizontalAlignment="Stretch"
-                            Background="#252535" Foreground="#6B7280"
+                            Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
                             CornerRadius="8" Padding="12,6" FontSize="11"/>
                     <Button Content="Load HAC / Solr Templates" Click="LoadHacTemplates_Click"
                             HorizontalAlignment="Stretch"
-                            Background="#252535" Foreground="#6B7280"
+                            Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
                             CornerRadius="8" Padding="12,6" FontSize="11"/>
                 </StackPanel>
             </Grid>

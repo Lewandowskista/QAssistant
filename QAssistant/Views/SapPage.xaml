@@ -18,13 +18,13 @@
             <Grid>
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Button x:Name="SapTabCronjobs" Content="CronJobs" Click="SapTab_Click" Tag="Cronjobs"
-                            Background="#A78BFA" Foreground="White" CornerRadius="6" Padding="12,6"/>
+                            Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource AccentBrush}" CornerRadius="6" Padding="10,6"/>
                     <Button x:Name="SapTabCatalog" Content="Catalog Sync" Click="SapTab_Click" Tag="Catalog"
-                            Background="Transparent" Foreground="#6B7280" CornerRadius="6" Padding="12,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,6"/>
                     <Button x:Name="SapTabFlexSearch" Content="FlexSearch" Click="SapTab_Click" Tag="FlexSearch"
-                            Background="Transparent" Foreground="#6B7280" CornerRadius="6" Padding="12,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,6"/>
                     <Button x:Name="SapTabImpex" Content="ImpEx" Click="SapTab_Click" Tag="Impex"
-                            Background="Transparent" Foreground="#6B7280" CornerRadius="6" Padding="12,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}" CornerRadius="6" Padding="10,6"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <TextBlock Text="Environment:" Foreground="{ThemeResource TextSecondaryBrush}"
@@ -35,9 +35,9 @@
                               BorderBrush="{ThemeResource BorderBrush}"
                               SelectionChanged="SapEnvPicker_SelectionChanged"/>
                     <Button x:Name="SapConnectBtn" Content="Connect" Click="SapConnect_Click"
-                            Background="#252535" Foreground="#A78BFA"
+                            Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
                             CornerRadius="8" Padding="14,6"/>
-                    <TextBlock x:Name="SapConnStatus" Foreground="#6B7280"
+                    <TextBlock x:Name="SapConnStatus" Foreground="{ThemeResource TextSecondaryBrush}"
                                FontSize="11" VerticalAlignment="Center"/>
                 </StackPanel>
             </Grid>
@@ -57,7 +57,7 @@
                         Padding="16,8">
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="Refresh Jobs" Click="RefreshCronJobs_Click"
-                                Background="#252535" Foreground="#A78BFA"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
                                 CornerRadius="8" Padding="14,6"/>
                         <TextBlock x:Name="CronJobStatusText" Foreground="{ThemeResource TextSecondaryBrush}"
                                    FontSize="12" VerticalAlignment="Center"/>
@@ -84,7 +84,7 @@
                         Padding="16,8">
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="Refresh Versions" Click="RefreshCatalog_Click"
-                                Background="#252535" Foreground="#A78BFA"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
                                 CornerRadius="8" Padding="14,6"/>
                         <TextBlock x:Name="CatalogStatusText" Foreground="{ThemeResource TextSecondaryBrush}"
                                    FontSize="12" VerticalAlignment="Center"/>
@@ -141,7 +141,7 @@
                                  CornerRadius="8" Padding="10"/>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Content="Execute" Click="RunFlexSearch_Click"
-                                    Background="#A78BFA" Foreground="White"
+                                    Background="{ThemeResource AccentBrush}" Foreground="White"
                                     CornerRadius="8" Padding="16,6"/>
                             <TextBlock x:Name="FlexStatusText" Foreground="{ThemeResource TextSecondaryBrush}"
                                        FontSize="12" VerticalAlignment="Center"/>
@@ -179,10 +179,10 @@
                             <ComboBoxItem Content="Update Stock Level" Tag="INSERT_UPDATE StockLevel;productCode[unique=true];warehouse(code)[unique=true];available&#x0A;;testProduct001;default;100"/>
                         </ComboBox>
                         <Button Content="Validate Syntax" Click="ValidateImpex_Click"
-                                Background="#252535" Foreground="#A78BFA"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
                                 CornerRadius="8" Padding="14,6"/>
                         <Button Content="Import to HAC" Click="ImportImpex_Click"
-                                Background="#A78BFA" Foreground="White"
+                                Background="{ThemeResource AccentBrush}" Foreground="White"
                                 CornerRadius="8" Padding="14,6"/>
                     </StackPanel>
                 </Border>

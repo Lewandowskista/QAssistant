@@ -11,12 +11,13 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition x:Name="ToolsSidebarColumn" Width="200"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- TITLEBAR -->
-        <Border Grid.Row="0" Grid.ColumnSpan="2"
+        <Border Grid.Row="0" Grid.ColumnSpan="3"
         Background="{ThemeResource SurfaceBrush}"
         BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
             <Grid Padding="16,0" Height="48">
@@ -29,6 +30,8 @@
                 <!-- App name -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8"
                     VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE9D5;" FontSize="13" FontFamily="Segoe Fluent Icons"
+                              Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center"/>
                     <TextBlock Text="QAssistant" FontSize="14" FontWeight="SemiBold"
                        Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center"/>
                 </StackPanel>
@@ -39,6 +42,20 @@
                 <!-- Right controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal"
                     VerticalAlignment="Center" Spacing="0">
+
+                    <!-- Settings button -->
+                    <Button x:Name="SettingsBtn"
+                        Click="SettingsBtn_Click"
+                        Width="32" Height="32"
+                        CornerRadius="6"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="Settings">
+                        <FontIcon Glyph="&#xE713;" FontSize="14" FontFamily="Segoe Fluent Icons"
+                                  Foreground="{ThemeResource TextSecondaryBrush}"/>
+                    </Button>
 
                     <!-- Pin toggle -->
                     <ToggleButton x:Name="PinToggle"
@@ -130,7 +147,7 @@
             </Grid>
         </Border>
 
-        <!-- SIDEBAR -->
+        <!-- PROJECTS SIDEBAR -->
         <Border Grid.Row="1" Grid.Column="0"
                 Background="{ThemeResource SurfaceVariantBrush}"
                 BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,1,0">
@@ -142,8 +159,8 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Text="PROJECTS"
-                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="10" FontWeight="SemiBold"
-                           Margin="16,16,16,8" CharacterSpacing="150"/>
+                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="9" FontWeight="SemiBold"
+                           Margin="16,16,16,8" CharacterSpacing="180"/>
 
                 <ListView Grid.Row="1"
           x:Name="ProjectList"
@@ -203,81 +220,162 @@
             </Grid>
         </Border>
 
+        <!-- TOOLS SIDEBAR -->
+        <Border x:Name="ToolsSidebarBorder" Grid.Row="1" Grid.Column="1"
+                Background="{ThemeResource SurfaceBrush}"
+                BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,1,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Tools Header with collapse/expand button -->
+                <Border x:Name="ToolsHeaderBorder" Grid.Row="0" Padding="12,12,8,8"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
+                    <Grid>
+                        <TextBlock x:Name="ToolsHeaderText" Text="TOOLS" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"
+                                   VerticalAlignment="Center"/>
+                        <Button x:Name="CollapseToolsBtn" Click="CollapseTools_Click"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="6,4" CornerRadius="4"
+                                ToolTipService.ToolTip="Collapse sidebar">
+                            <FontIcon x:Name="CollapseToolsIcon" Glyph="&#xE76B;" FontSize="11"
+                                      FontFamily="Segoe Fluent Icons"
+                                      Foreground="{ThemeResource TextSecondaryBrush}"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- Navigation Items -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="ToolsNavPanel" Spacing="4" Padding="8,8">
+
+                        <!-- Search -->
+                        <AutoSuggestBox x:Name="SearchBox"
+                            PlaceholderText="Search..."
+                            VerticalAlignment="Center"
+                            Margin="4,0,4,4"
+                            TextChanged="SearchBox_TextChanged"
+                            SuggestionChosen="SearchBox_SuggestionChosen"/>
+
+                        <!-- Dashboard -->
+                        <Button x:Name="NavDashboard" Click="NavItem_Click" Tag="Dashboard"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE80F;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="Dashboard" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Organization Tools -->
+                        <TextBlock Text="ORGANIZATION" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"
+                                   Margin="8,8,0,4"/>
+                        <Button x:Name="NavLinks" Click="NavItem_Click" Tag="Links"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource TextPrimaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE71B;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="Links" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="NavNotes" Click="NavItem_Click" Tag="Notes"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE70B;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="Notes" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="NavFiles" Click="NavItem_Click" Tag="Files"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE8B7;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="Files" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- QA Basic -->
+                        <TextBlock Text="QA BASIC" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"
+                                   Margin="8,16,0,4"/>
+                        <Button x:Name="NavTasks" Click="NavItem_Click" Tag="Tasks"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE73A;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="Tasks" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="NavTests" Click="NavItem_Click" Tag="Tests"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE9D5;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="Tests" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="NavTestData" Click="NavItem_Click" Tag="TestData"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE7C3;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="Test Data" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- QA Advanced -->
+                        <TextBlock Text="QA ADVANCED" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"
+                                   Margin="8,16,0,4"/>
+                        <Button x:Name="NavEnvironments" Click="NavItem_Click" Tag="Environments"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE774;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="Environments" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="NavApi" Click="NavItem_Click" Tag="API"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                CornerRadius="6" Padding="10,7" BorderThickness="0">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE943;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="API" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
         <!-- MAIN CONTENT AREA -->
-        <Grid Grid.Row="1" Grid.Column="1">
+        <Grid Grid.Row="1" Grid.Column="2">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Tab bar -->
-            <Border Grid.Row="0" Background="{ThemeResource SurfaceBrush}"
-        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
-        Padding="12,0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Tabs -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
-                        <Button x:Name="TabLinks" Content="Links"
-                    Click="Tab_Click" Tag="Links"
-                    Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource TextPrimaryBrush}"
-                    CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                        <Button x:Name="TabNotes" Content="Notes"
-                    Click="Tab_Click" Tag="Notes"
-                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                    CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                        <Button x:Name="TabTasks" Content="Tasks"
-                    Click="Tab_Click" Tag="Tasks"
-                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                    CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                        <Button x:Name="TabFiles" Content="Files"
-                     Click="Tab_Click" Tag="Files"
-                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                        <Button x:Name="TabTests" Content="Tests"
-                     Click="Tab_Click" Tag="Tests"
-                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                        <Button x:Name="TabTestData" Content="Test Data"
-                     Click="Tab_Click" Tag="TestData"
-                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                        <Button x:Name="TabEnvironments" Content="Environments"
-                     Click="Tab_Click" Tag="Environments"
-                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                        <Button x:Name="TabApi" Content="API"
-                     Click="Tab_Click" Tag="API"
-                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                        <Button x:Name="TabSettings" Content="Settings"
-                    Click="Tab_Click" Tag="Settings"
-                    Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
-                    CornerRadius="8" Padding="14,8" Margin="0,6"/>
-                    </StackPanel>
-
-                    <!-- Search -->
-                    <AutoSuggestBox Grid.Column="1"
-                        x:Name="SearchBox"
-                        PlaceholderText="Search notes and tasks..."
-                        Width="220"
-                        VerticalAlignment="Center"
-                        Margin="0,6"
-                        TextChanged="SearchBox_TextChanged"
-                        SuggestionChosen="SearchBox_SuggestionChosen"/>
-                </Grid>
-            </Border>
-
             <!-- Notification Banners -->
-            <StackPanel x:Name="NotificationStack" Grid.Row="1"/>
+            <StackPanel x:Name="NotificationStack" Grid.Row="0"/>
 
             <!-- Content frame -->
-            <Frame Grid.Row="2" x:Name="ContentFrame" Background="{ThemeResource ApplicationBackgroundBrush}"/>
+            <Frame Grid.Row="1" x:Name="ContentFrame" Background="{ThemeResource ApplicationBackgroundBrush}"/>
         </Grid>
     </Grid>
 </Window>

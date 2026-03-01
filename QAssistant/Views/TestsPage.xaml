@@ -18,14 +18,14 @@
             <Grid>
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Button x:Name="TestCaseGenBtn" Content="Test Case Generation" Click="SubTab_Click" Tag="TestCaseGeneration"
-                            Background="#A78BFA" Foreground="White"
-                            CornerRadius="6" Padding="12,6"/>
+                            Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource AccentBrush}"
+                            CornerRadius="6" Padding="10,6"/>
                     <Button x:Name="TestRunsBtn" Content="Test Runs" Click="SubTab_Click" Tag="TestRuns"
-                            Background="Transparent" Foreground="#6B7280"
-                            CornerRadius="6" Padding="12,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                            CornerRadius="6" Padding="10,6"/>
                     <Button x:Name="ReportsBtn" Content="Reports" Click="SubTab_Click" Tag="Reports"
-                            Background="Transparent" Foreground="#6B7280"
-                            CornerRadius="6" Padding="12,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                            CornerRadius="6" Padding="10,6"/>
                 </StackPanel>
             </Grid>
         </Border>

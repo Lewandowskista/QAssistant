@@ -167,7 +167,7 @@ namespace QAssistant
 
             _appWindow.TitleBar.SetDragRectangles(new[]
             {
-                new Windows.Graphics.RectInt32(220, 0,
+                new Windows.Graphics.RectInt32(200, 0,
                     (int)(_appWindow.Size.Width - 300), 48)
             });
         }
@@ -373,7 +373,7 @@ namespace QAssistant
             RefreshProjectList();
 
             ViewModel.ActiveTab = "Tasks";
-            UpdateTabStyles();
+            UpdateNavStyles();
             ContentFrame.Navigate(typeof(TasksPage), ViewModel);
         }
 
@@ -661,14 +661,62 @@ namespace QAssistant
             }
         }
 
-        private void Tab_Click(object sender, RoutedEventArgs e)
+        private void NavItem_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn)
             {
                 ViewModel.ActiveTab = btn.Tag.ToString()!;
-                UpdateTabStyles();
+                UpdateNavStyles();
                 NavigateToCurrentTab();
             }
+        }
+
+        private bool _toolsSidebarCollapsed;
+
+        private void CollapseTools_Click(object sender, RoutedEventArgs e)
+        {
+            _toolsSidebarCollapsed = !_toolsSidebarCollapsed;
+            if (_toolsSidebarCollapsed)
+            {
+                ToolsSidebarColumn.Width = new GridLength(40);
+                ToolsHeaderText.Visibility = Visibility.Collapsed;
+                ToolsNavPanel.Visibility = Visibility.Collapsed;
+                ToolsHeaderBorder.Padding = new Thickness(4, 12, 4, 8);
+                CollapseToolsBtn.HorizontalAlignment = HorizontalAlignment.Center;
+                CollapseToolsIcon.Glyph = "\uE76C";
+                CollapseToolsBtn.SetValue(ToolTipService.ToolTipProperty, "Expand sidebar");
+            }
+            else
+            {
+                ToolsSidebarColumn.Width = new GridLength(200);
+                ToolsHeaderText.Visibility = Visibility.Visible;
+                ToolsNavPanel.Visibility = Visibility.Visible;
+                ToolsHeaderBorder.Padding = new Thickness(12, 12, 8, 8);
+                CollapseToolsBtn.HorizontalAlignment = HorizontalAlignment.Right;
+                CollapseToolsIcon.Glyph = "\uE76B";
+                CollapseToolsBtn.SetValue(ToolTipService.ToolTipProperty, "Collapse sidebar");
+            }
+        }
+
+        private async void SettingsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var settingsPage = new SettingsPage();
+            settingsPage.Initialize(ViewModel);
+
+            var dialog = new ContentDialog
+            {
+                Title = "Settings",
+                Content = settingsPage,
+                CloseButtonText = "Close",
+                XamlRoot = Content.XamlRoot,
+                Resources =
+                {
+                    ["ContentDialogMaxWidth"] = 700.0,
+                    ["ContentDialogMaxHeight"] = 800.0
+                }
+            };
+
+            await dialog.ShowAsync();
         }
 
         private void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
@@ -737,13 +785,13 @@ namespace QAssistant
             if (result.Type == SearchResultType.Note)
             {
                 ViewModel.ActiveTab = "Notes";
-                UpdateTabStyles();
+                UpdateNavStyles();
                 ContentFrame.Navigate(typeof(NotesPage), ViewModel);
             }
             else if (result.Type == SearchResultType.Task)
             {
                 ViewModel.ActiveTab = "Tasks";
-                UpdateTabStyles();
+                UpdateNavStyles();
                 ContentFrame.Navigate(typeof(TasksPage), ViewModel);
             }
         }
@@ -755,6 +803,9 @@ namespace QAssistant
 
             switch (ViewModel.ActiveTab)
             {
+                case "Dashboard":
+                    ContentFrame.Navigate(typeof(DashboardPage), ViewModel);
+                    break;
                 case "Links":
                     ContentFrame.Navigate(typeof(LinksPage), ViewModel);
                     break;
@@ -779,22 +830,19 @@ namespace QAssistant
                 case "API":
                     ContentFrame.Navigate(typeof(ApiPlaygroundPage), ViewModel);
                     break;
-                case "Settings":
-                    ContentFrame.Navigate(typeof(SettingsPage), ViewModel);
-                    break;
             }
         }
 
-        private void UpdateTabStyles()
+        private void UpdateNavStyles()
         {
-            var tabs = new[] { TabLinks, TabNotes, TabTasks, TabFiles, TabTests, TabTestData, TabEnvironments, TabApi, TabSettings };
-            foreach (var tab in tabs)
+            var navButtons = new[] { NavDashboard, NavLinks, NavNotes, NavFiles, NavTasks, NavTests, NavTestData, NavEnvironments, NavApi };
+            foreach (var btn in navButtons)
             {
-                bool active = tab.Tag.ToString() == ViewModel.ActiveTab;
-                tab.Background = active
+                bool active = btn.Tag.ToString() == ViewModel.ActiveTab;
+                btn.Background = active
                     ? (Brush)Application.Current.Resources["ListAccentLowBrush"]
                     : new SolidColorBrush(Colors.Transparent);
-                tab.Foreground = active
+                btn.Foreground = active
                     ? (Brush)Application.Current.Resources["TextPrimaryBrush"]
                     : (Brush)Application.Current.Resources["TextSecondaryBrush"];
             }

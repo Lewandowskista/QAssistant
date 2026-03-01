@@ -39,6 +39,7 @@ namespace QAssistant.Views
         private string _activeSubTab = "TestCaseGeneration";
         private readonly HashSet<Guid> _collapsedPlans = [];
         private readonly HashSet<Guid> _collapsedExecutionPlans = [];
+        private readonly HashSet<Guid> _collapsedExecutionTestCases = [];
         private readonly HashSet<Guid> _selectedPlanIds = [];
         private bool _criticalityExpanded;
         private string? _criticalityAssessmentText;
@@ -88,11 +89,11 @@ namespace QAssistant.Views
             {
                 bool active = tab.Tag.ToString() == _activeSubTab;
                 tab.Background = active
-                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
+                    ? (Brush)Application.Current.Resources["ListAccentLowBrush"]
                     : new SolidColorBrush(Colors.Transparent);
                 tab.Foreground = active
-                    ? new SolidColorBrush(Colors.White)
-                    : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+                    ? (Brush)Application.Current.Resources["AccentBrush"]
+                    : (Brush)Application.Current.Resources["TextSecondaryBrush"];
             }
         }
 
@@ -1138,7 +1139,7 @@ namespace QAssistant.Views
             };
             outerStack.Children.Add(headerButton);
 
-            // Collapsible body: individual execution cards
+            // Collapsible body: group executions by test case as expandable dropdowns
             var bodyStack = new StackPanel
             {
                 Spacing = 8,
@@ -1146,10 +1147,15 @@ namespace QAssistant.Views
                 Margin = new Thickness(22, 0, 0, 0)
             };
 
-            foreach (var exec in planExecs)
+            var groupedByTestCase = planExecs
+                .GroupBy(e => e.TestCaseId)
+                .OrderByDescending(g => g.Max(e => e.ExecutedAt))
+                .ToList();
+
+            foreach (var tcGroup in groupedByTestCase)
             {
-                var card = BuildExecutionCard(exec);
-                bodyStack.Children.Add(card);
+                var tcDropdown = BuildExecutionTestCaseDropdown(tcGroup.Key, tcGroup.OrderByDescending(e => e.ExecutedAt).ToList());
+                bodyStack.Children.Add(tcDropdown);
             }
             outerStack.Children.Add(bodyStack);
 
@@ -1178,6 +1184,150 @@ namespace QAssistant.Views
                 BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
                 BorderThickness = new Thickness(1),
                 Margin = new Thickness(0, 0, 0, 8),
+                Child = outerStack
+            };
+        }
+
+        private Border BuildExecutionTestCaseDropdown(Guid testCaseId, List<TestExecution> executions)
+        {
+            var project = _vm!.SelectedProject!;
+            var tc = project.TestCases.FirstOrDefault(c => c.Id == testCaseId);
+            bool collapsed = _collapsedExecutionTestCases.Contains(testCaseId);
+
+            var outerStack = new StackPanel { Spacing = 0 };
+
+            // Header row
+            var headerGrid = new Grid { Padding = new Thickness(0, 0, 0, 4) };
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var chevron = new FontIcon
+            {
+                Glyph = collapsed ? "\uE76C" : "\uE70D",
+                FontSize = 11,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            Grid.SetColumn(chevron, 0);
+            headerGrid.Children.Add(chevron);
+
+            var titleStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            var titleRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            titleRow.Children.Add(new TextBlock
+            {
+                Text = tc?.TestCaseId ?? "?",
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            titleRow.Children.Add(new TextBlock
+            {
+                Text = tc?.Title ?? "Unknown Test Case",
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 226, 232, 240)),
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            titleStack.Children.Add(titleRow);
+
+            // Status summary for this test case's executions
+            var statusRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 2, 0, 0) };
+            var latestResult = executions.First().Result;
+            statusRow.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = GetStatusBadgeBackground(latestResult),
+                Child = new TextBlock
+                {
+                    Text = latestResult.ToString(),
+                    FontSize = 10,
+                    Foreground = GetStatusForeground(latestResult),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                }
+            });
+            statusRow.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 30, 30, 50)),
+                Child = new TextBlock
+                {
+                    Text = $"{executions.Count} run(s)",
+                    FontSize = 10,
+                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 156, 163, 175))
+                }
+            });
+            titleStack.Children.Add(statusRow);
+
+            Grid.SetColumn(titleStack, 1);
+            headerGrid.Children.Add(titleStack);
+
+            var timestampText = new TextBlock
+            {
+                Text = executions.First().ExecutedAt.ToString("MMM d, yyyy"),
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128)),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(timestampText, 2);
+            headerGrid.Children.Add(timestampText);
+
+            var headerButton = new Button
+            {
+                Background = new SolidColorBrush(Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Content = headerGrid
+            };
+            outerStack.Children.Add(headerButton);
+
+            // Collapsible body: individual execution cards
+            var bodyStack = new StackPanel
+            {
+                Spacing = 6,
+                Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible,
+                Margin = new Thickness(20, 4, 0, 0)
+            };
+
+            foreach (var exec in executions)
+            {
+                var card = BuildExecutionCard(exec);
+                bodyStack.Children.Add(card);
+            }
+            outerStack.Children.Add(bodyStack);
+
+            // Wire collapse/expand
+            headerButton.Click += (s, _) =>
+            {
+                if (_collapsedExecutionTestCases.Contains(testCaseId))
+                {
+                    _collapsedExecutionTestCases.Remove(testCaseId);
+                    bodyStack.Visibility = Visibility.Visible;
+                    chevron.Glyph = "\uE70D";
+                }
+                else
+                {
+                    _collapsedExecutionTestCases.Add(testCaseId);
+                    bodyStack.Visibility = Visibility.Collapsed;
+                    chevron.Glyph = "\uE76C";
+                }
+            };
+
+            return new Border
+            {
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 22, 22, 32)),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12),
+                BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 38, 38, 54)),
+                BorderThickness = new Thickness(1),
                 Child = outerStack
             };
         }

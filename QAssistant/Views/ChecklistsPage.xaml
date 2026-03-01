@@ -23,7 +23,7 @@
 
                 <StackPanel Grid.Row="0" Spacing="4" Padding="16,16,16,8">
                     <TextBlock Text="CHECKLISTS" Foreground="{ThemeResource TextSecondaryBrush}"
-                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                     <TextBlock Text="QA verification checklists" Foreground="{ThemeResource TextSecondaryBrush}"
                                FontSize="11"/>
                 </StackPanel>

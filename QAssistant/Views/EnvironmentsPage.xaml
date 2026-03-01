@@ -23,7 +23,7 @@
 
                 <StackPanel Grid.Row="0" Spacing="4" Padding="16,16,16,8">
                     <TextBlock Text="ENVIRONMENTS" Foreground="{ThemeResource TextSecondaryBrush}"
-                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                     <TextBlock Text="Per-project endpoint registry" Foreground="{ThemeResource TextSecondaryBrush}"
                                FontSize="11" TextWrapping="Wrap"/>
                 </StackPanel>

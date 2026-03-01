@@ -90,11 +90,11 @@ namespace QAssistant.Views
             {
                 bool active = tags[i] == tab;
                 tabBtns[i].Background = active
-                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250))
+                    ? (Brush)Application.Current.Resources["ListAccentLowBrush"]
                     : new SolidColorBrush(Colors.Transparent);
                 tabBtns[i].Foreground = active
-                    ? new SolidColorBrush(Colors.White)
-                    : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 107, 114, 128));
+                    ? (Brush)Application.Current.Resources["AccentBrush"]
+                    : (Brush)Application.Current.Resources["TextSecondaryBrush"];
             }
 
             CronjobsPanel.Visibility = tab == "Cronjobs" ? Visibility.Visible : Visibility.Collapsed;

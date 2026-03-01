@@ -23,19 +23,19 @@
             <Grid>
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Button x:Name="ManualModeBtn" Content="Manual" Click="ManualMode_Click"
-                            Background="#A78BFA" Foreground="White"
-                            CornerRadius="6" Padding="12,6"/>
+                            Background="{ThemeResource ListAccentLowBrush}" Foreground="{ThemeResource AccentBrush}"
+                            CornerRadius="6" Padding="10,6"/>
                     <Button x:Name="LinearModeBtn" Content="Linear" Click="LinearMode_Click"
-                            Background="Transparent" Foreground="#6B7280"
-                            CornerRadius="6" Padding="12,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                            CornerRadius="6" Padding="10,6"/>
                     <Button x:Name="JiraModeBtn" Content="Jira" Click="JiraMode_Click"
-                            Background="Transparent" Foreground="#6B7280"
-                            CornerRadius="6" Padding="12,6"/>
+                            Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                            CornerRadius="6" Padding="10,6"/>
                     <Button x:Name="RefreshBtn" Content="Refresh" Click="Refresh_Click"
                             Visibility="Collapsed"
-                            Background="#252535" Foreground="#6B7280"
-                            CornerRadius="8" Padding="12,6"/>
-                    <TextBlock x:Name="StatusText" Foreground="#6B7280"
+                            Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
+                            CornerRadius="6" Padding="10,6"/>
+                    <TextBlock x:Name="StatusText" Foreground="{ThemeResource TextSecondaryBrush}"
                                FontSize="12" VerticalAlignment="Center"
                                Visibility="Collapsed"/>
                 </StackPanel>
@@ -410,7 +410,7 @@
                                         <TextBlock x:Name="DetailStatus" FontSize="11" FontWeight="SemiBold"/>
                                     </Border>
                                     <Border CornerRadius="4" Padding="8,3" Background="#2D2010">
-                                        <TextBlock x:Name="DetailPriority" Foreground="#F59E0B" FontSize="11"/>
+                                        <TextBlock x:Name="DetailPriority" Foreground="{ThemeResource AccentSecondaryBrush}" FontSize="11"/>
                                     </Border>
                                 </StackPanel>
                             </StackPanel>
@@ -464,95 +464,95 @@
                                 <StackPanel Spacing="8">
                                     <StackPanel x:Name="DetailAssigneePanel" Orientation="Horizontal"
                                                 Spacing="8" Visibility="Collapsed">
-                                        <TextBlock Text="Assignee" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="DetailAssignee" Foreground="#E2E8F0" FontSize="12"/>
+                                        <TextBlock Text="Assignee" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="DetailAssignee" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                     <StackPanel x:Name="DetailDueDatePanel" Orientation="Horizontal"
                                                 Spacing="8" Visibility="Collapsed">
-                                        <TextBlock Text="Due Date" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="DetailDueDate" Foreground="#E2E8F0" FontSize="12"/>
+                                        <TextBlock Text="Due Date" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="DetailDueDate" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                     <StackPanel x:Name="DetailLabelsPanel" Orientation="Horizontal"
                                                 Spacing="8" Visibility="Collapsed">
-                                        <TextBlock Text="Labels" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="DetailLabels" Foreground="#A78BFA" FontSize="12" TextWrapping="Wrap"/>
+                                        <TextBlock Text="Labels" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="DetailLabels" Foreground="{ThemeResource AccentBrush}" FontSize="12" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </StackPanel>
 
                                 <!-- Linear task info -->
                                 <StackPanel x:Name="LinearTaskInfo" Spacing="12" Visibility="Collapsed">
-                                    <Border Height="1" Background="#2A2A3A"/>
-                                    <TextBlock Text="ISSUE DETAILS" Foreground="#6B7280"
-                                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                                    <Border Height="1" Background="{ThemeResource BorderBrush}"/>
+                                    <TextBlock Text="ISSUE DETAILS" Foreground="{ThemeResource TextSecondaryBrush}"
+                                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Source" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock Text="Linear" Foreground="#E2E8F0" FontSize="12"/>
+                                        <TextBlock Text="Source" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock Text="Linear" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Identifier" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="LinearDetailIdentifier" Foreground="#E2E8F0" FontSize="12"/>
+                                        <TextBlock Text="Identifier" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="LinearDetailIdentifier" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Status" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="LinearDetailStatus" Foreground="#E2E8F0" FontSize="12"/>
+                                        <TextBlock Text="Status" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="LinearDetailStatus" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Priority" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="LinearDetailPriority" Foreground="#F59E0B" FontSize="12"/>
+                                        <TextBlock Text="Priority" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="LinearDetailPriority" Foreground="{ThemeResource AccentSecondaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                 </StackPanel>
 
                                 <!-- Jira task info -->
                                 <StackPanel x:Name="JiraTaskInfo" Spacing="12" Visibility="Collapsed">
-                                    <Border Height="1" Background="#2A2A3A"/>
-                                    <TextBlock Text="ISSUE DETAILS" Foreground="#6B7280"
-                                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                                    <Border Height="1" Background="{ThemeResource BorderBrush}"/>
+                                    <TextBlock Text="ISSUE DETAILS" Foreground="{ThemeResource TextSecondaryBrush}"
+                                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Source" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock Text="Jira" Foreground="#E2E8F0" FontSize="12"/>
+                                        <TextBlock Text="Source" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock Text="Jira" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Identifier" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="JiraDetailIdentifier" Foreground="#E2E8F0" FontSize="12"/>
+                                        <TextBlock Text="Identifier" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="JiraDetailIdentifier" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Status" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="JiraDetailStatus" Foreground="#E2E8F0" FontSize="12"/>
+                                        <TextBlock Text="Status" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="JiraDetailStatus" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Priority" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="JiraDetailPriority" Foreground="#F59E0B" FontSize="12"/>
+                                        <TextBlock Text="Priority" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="JiraDetailPriority" Foreground="{ThemeResource AccentSecondaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                     <StackPanel x:Name="JiraIssueTypePanel" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
-                                        <TextBlock Text="Type" Foreground="#6B7280" FontSize="12" Width="80"/>
-                                        <TextBlock x:Name="JiraDetailIssueType" Foreground="#E2E8F0" FontSize="12"/>
+                                        <TextBlock Text="Type" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Width="80"/>
+                                        <TextBlock x:Name="JiraDetailIssueType" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="12"/>
                                     </StackPanel>
                                 </StackPanel>
 
                                 <!-- Manual task fields -->
                                 <StackPanel x:Name="ManualTaskFields" Spacing="12" Visibility="Collapsed">
-                                    <Border Height="1" Background="#2A2A3A"/>
-                                    <TextBlock Text="EDIT TASK" Foreground="#6B7280"
-                                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                                    <Border Height="1" Background="{ThemeResource BorderBrush}"/>
+                                    <TextBlock Text="EDIT TASK" Foreground="{ThemeResource TextSecondaryBrush}"
+                                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                                     <StackPanel Spacing="6">
-                                        <TextBlock Text="Status" Foreground="#9CA3AF" FontSize="12"/>
+                                        <TextBlock Text="Status" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
                                         <ComboBox x:Name="DetailStatusPicker"
                                                   HorizontalAlignment="Stretch"
-                                                  Background="#0F0F13"
-                                                  Foreground="#E2E8F0"
-                                                  BorderBrush="#2A2A3A"/>
+                                                  Background="{ThemeResource ApplicationBackgroundBrush}"
+                                                  Foreground="{ThemeResource TextPrimaryBrush}"
+                                                  BorderBrush="{ThemeResource BorderBrush}"/>
                                     </StackPanel>
                                     <StackPanel Spacing="6">
-                                        <TextBlock Text="Priority" Foreground="#9CA3AF" FontSize="12"/>
+                                        <TextBlock Text="Priority" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
                                         <ComboBox x:Name="DetailPriorityPicker"
                                                   HorizontalAlignment="Stretch"
-                                                  Background="#0F0F13"
-                                                  Foreground="#E2E8F0"
-                                                  BorderBrush="#2A2A3A"/>
+                                                  Background="{ThemeResource ApplicationBackgroundBrush}"
+                                                  Foreground="{ThemeResource TextPrimaryBrush}"
+                                                  BorderBrush="{ThemeResource BorderBrush}"/>
                                     </StackPanel>
                                     <StackPanel Spacing="6">
                                         <CheckBox x:Name="DetailSetDueDate" Content="Set due date"
-                                                  Foreground="#E2E8F0"
+                                                  Foreground="{ThemeResource TextPrimaryBrush}"
                                                   Checked="DetailSetDueDate_Checked"
                                                   Unchecked="DetailSetDueDate_Unchecked"/>
                                         <StackPanel x:Name="DetailDateTimePicker" Spacing="8" Visibility="Collapsed">
@@ -569,12 +569,12 @@
                             <StackPanel x:Name="DescriptionTab" Spacing="16"
                                         Padding="20,16">
                                 <RichTextBlock x:Name="DetailDescription"
-                                               Foreground="#E2E8F0" FontSize="13"
+                                               Foreground="{ThemeResource TextPrimaryBrush}" FontSize="13"
                                                TextWrapping="Wrap" LineHeight="22"/>
                                 <StackPanel x:Name="MediaSection" Spacing="8" Visibility="Collapsed">
-                                    <Border Height="1" Background="#2A2A3A"/>
-                                    <TextBlock Text="MEDIA" Foreground="#6B7280"
-                                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                                    <Border Height="1" Background="{ThemeResource BorderBrush}"/>
+                                    <TextBlock Text="MEDIA" Foreground="{ThemeResource TextSecondaryBrush}"
+                                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                                     <StackPanel x:Name="MediaContainer" Spacing="8"/>
                                 </StackPanel>
                             </StackPanel>
@@ -584,16 +584,16 @@
                                         Padding="20,16" Visibility="Collapsed">
                                 <StackPanel x:Name="CommentsContainer" Spacing="12"/>
                                 <StackPanel x:Name="LinearCommentFields" Spacing="8" Visibility="Collapsed">
-                                    <Border Height="1" Background="#2A2A3A"/>
-                                    <TextBlock Text="ADD COMMENT" Foreground="#6B7280"
-                                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                                    <Border Height="1" Background="{ThemeResource BorderBrush}"/>
+                                    <TextBlock Text="ADD COMMENT" Foreground="{ThemeResource TextSecondaryBrush}"
+                                               FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                                     <TextBox x:Name="DetailCommentBox"
                                              PlaceholderText="Write a comment..."
                                              AcceptsReturn="True" Height="80"
                                              TextWrapping="Wrap"
-                                             Background="#0F0F13"
-                                             Foreground="#E2E8F0"
-                                             BorderBrush="#2A2A3A"
+                                             Background="{ThemeResource ApplicationBackgroundBrush}"
+                                             Foreground="{ThemeResource TextPrimaryBrush}"
+                                             BorderBrush="{ThemeResource BorderBrush}"
                                              CornerRadius="8"
                                              Padding="12"/>
                                 </StackPanel>
@@ -639,7 +639,7 @@
                             <StackPanel x:Name="ManualActions" Orientation="Horizontal"
                                         Spacing="8" Visibility="Collapsed">
                                 <Button Content="Save Changes" Click="SaveTaskChanges_Click"
-                                        Background="#A78BFA" Foreground="White"
+                                        Background="{ThemeResource AccentBrush}" Foreground="White"
                                         CornerRadius="8" Padding="14,8"/>
                                 <Button Content="Delete" Click="DeleteTask_Click"
                                         Background="#3F1A1A" Foreground="#F87171"
@@ -654,11 +654,11 @@
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0" Content="Post Comment" Click="PostComment_Click"
                                         HorizontalAlignment="Stretch"
-                                        Background="#A78BFA" Foreground="White"
+                                        Background="{ThemeResource AccentBrush}" Foreground="White"
                                         CornerRadius="8" Padding="14,8" Margin="0,0,4,0"/>
                                 <Button Grid.Column="2" Content="Open in Linear" Click="OpenInLinear_Click"
                                         HorizontalAlignment="Stretch"
-                                        Background="#252535" Foreground="#6B7280"
+                                        Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
                                         CornerRadius="8" Padding="14,8" Margin="4,0,0,0"/>
                             </Grid>
                             <!-- Jira actions -->
@@ -670,11 +670,11 @@
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0" Content="Post Comment" Click="PostJiraComment_Click"
                                         HorizontalAlignment="Stretch"
-                                        Background="#A78BFA" Foreground="White"
+                                        Background="{ThemeResource AccentBrush}" Foreground="White"
                                         CornerRadius="8" Padding="14,8" Margin="0,0,4,0"/>
                                 <Button Grid.Column="2" Content="Open in Jira" Click="OpenInJira_Click"
                                         HorizontalAlignment="Stretch"
-                                        Background="#252535" Foreground="#6B7280"
+                                        Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
                                         CornerRadius="8" Padding="14,8" Margin="4,0,0,0"/>
                             </Grid>
                         </StackPanel>
@@ -688,10 +688,10 @@
               Background="#80000000">
             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                 <StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center"
-                            Background="#13131A" Padding="20" CornerRadius="8">
+                            Background="{ThemeResource SurfaceBrush}" Padding="20" CornerRadius="12">
                     <ProgressRing IsActive="True" Width="48" Height="48"/>
                     <TextBlock Text="Gemini is analyzing the issue..."
-                               Foreground="#6B7280" FontSize="13" HorizontalAlignment="Center"/>
+                               Foreground="{ThemeResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Grid>
         </Grid>
@@ -702,7 +702,7 @@
             <Grid HorizontalAlignment="Stretch"
                   VerticalAlignment="Stretch"
                   Margin="40"
-                  Background="#13131A">
+                  Background="{ThemeResource SurfaceBrush}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -711,15 +711,15 @@
 
                 <!-- Lightbox Header -->
                 <Border Grid.Row="0" Padding="16,12"
-                        BorderBrush="#2A2A3A" BorderThickness="0,0,0,1">
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
                     <Grid>
-                        <TextBlock Text="Media Viewer" Foreground="#E2E8F0"
+                        <TextBlock Text="Media Viewer" Foreground="{ThemeResource TextPrimaryBrush}"
                                    FontSize="14" FontWeight="SemiBold"
                                    VerticalAlignment="Center"/>
                         <Button Click="CloseLightbox_Click"
                                 HorizontalAlignment="Right"
                                 Background="Transparent" BorderThickness="0"
-                                Foreground="#6B7280" Padding="8,4">
+                                Foreground="{ThemeResource TextSecondaryBrush}" Padding="8,4">
                             <FontIcon Glyph="&#xE711;" FontSize="12" FontFamily="Segoe Fluent Icons"/>
                         </Button>
                     </Grid>
@@ -743,11 +743,11 @@
 
                 <!-- Lightbox Footer -->
                 <Border Grid.Row="2" Padding="16,10"
-                        BorderBrush="#2A2A3A" BorderThickness="0,1,0,0"
-                        Background="#0F0F13">
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,1,0,0"
+                        Background="{ThemeResource ApplicationBackgroundBrush}">
                     <Button Content="Open in Browser" Click="LightboxOpenBrowser_Click"
                             HorizontalAlignment="Right"
-                            Background="#252535" Foreground="#A78BFA"
+                            Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
                             CornerRadius="8" Padding="14,8"/>
                 </Border>
             </Grid>
@@ -758,11 +758,11 @@
                 Grid.Row="0" Grid.RowSpan="2"
                 VerticalAlignment="Bottom" HorizontalAlignment="Center"
                 Margin="0,0,0,16"
-                Background="#3C1414" BorderBrush="#F87171" BorderThickness="1"
+                Background="#3C1414" BorderBrush="{ThemeResource ErrorBrush}" BorderThickness="1"
                 CornerRadius="8" Padding="16,10">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <FontIcon Glyph="&#xE7BA;" FontSize="14"
-                          Foreground="#F87171" VerticalAlignment="Center"/>
+                          Foreground="{ThemeResource ErrorBrush}" VerticalAlignment="Center"/>
                 <TextBlock x:Name="RateLimitText"
                            Text="All AI models are currently rate-limited. Please try again later."
                            Foreground="#FCA5A5" FontSize="12" VerticalAlignment="Center"/>
@@ -784,8 +784,8 @@
             </Grid.RowDefinitions>
 
             <Border Grid.Column="1" Grid.Row="1"
-                    Background="#13131A" CornerRadius="16"
-                    BorderBrush="#2A2A3A" BorderThickness="1"
+                    Background="{ThemeResource SurfaceBrush}" CornerRadius="16"
+                    BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1"
                     Padding="0" MinWidth="420" MaxWidth="500">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -796,23 +796,23 @@
 
                     <!-- Overlay Header -->
                     <Border Grid.Row="0" Padding="24,20,24,12"
-                            BorderBrush="#2A2A3A" BorderThickness="0,0,0,1">
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1">
                         <Grid>
                             <StackPanel Spacing="4">
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <FontIcon Glyph="&#xE765;" FontSize="18" FontFamily="Segoe Fluent Icons"
-                                              Foreground="#A78BFA"/>
-                                    <TextBlock Text="Keyboard Shortcuts" Foreground="#E2E8F0"
+                                              Foreground="{ThemeResource AccentBrush}"/>
+                                    <TextBlock Text="Keyboard Shortcuts" Foreground="{ThemeResource TextPrimaryBrush}"
                                                FontSize="16" FontWeight="SemiBold"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock Text="Speed up your workflow with these shortcuts"
-                                           Foreground="#6B7280" FontSize="12" Margin="28,0,0,0"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Margin="28,0,0,0"/>
                             </StackPanel>
                             <Button Click="CloseShortcutOverlay_Click"
                                     HorizontalAlignment="Right" VerticalAlignment="Top"
                                     Background="Transparent" BorderThickness="0"
-                                    Foreground="#6B7280" Padding="6,4" CornerRadius="6">
+                                    Foreground="{ThemeResource TextSecondaryBrush}" Padding="6,4" CornerRadius="6">
                                 <FontIcon Glyph="&#xE711;" FontSize="11" FontFamily="Segoe Fluent Icons"/>
                             </Button>
                         </Grid>
@@ -823,8 +823,8 @@
 
                         <!-- Board Navigation -->
                         <StackPanel Spacing="10">
-                            <TextBlock Text="BOARD" Foreground="#A78BFA"
-                                       FontSize="10" FontWeight="SemiBold" CharacterSpacing="180"/>
+                            <TextBlock Text="BOARD" Foreground="{ThemeResource AccentBrush}"
+                                       FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -837,46 +837,46 @@
                                     <RowDefinition/>
                                 </Grid.RowDefinitions>
 
-                                <Border Grid.Row="0" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,8" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Ctrl + 1" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + 1" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Switch to Manual mode"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
 
-                                <Border Grid.Row="1" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,8" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Ctrl + 2" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + 2" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Switch to Linear mode"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
 
-                                <Border Grid.Row="2" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="2" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,8" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Ctrl + 3" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + 3" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="2" Grid.Column="1" Text="Switch to Jira mode"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
 
-                                <Border Grid.Row="3" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="3" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,0" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Ctrl + R" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + R" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="3" Grid.Column="1" Text="Refresh issues"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
                             </Grid>
                         </StackPanel>
 
-                        <Border Height="1" Background="#2A2A3A"/>
+                        <Border Height="1" Background="{ThemeResource BorderBrush}"/>
 
                         <!-- Task Actions -->
                         <StackPanel Spacing="10">
-                            <TextBlock Text="TASKS" Foreground="#A78BFA"
-                                       FontSize="10" FontWeight="SemiBold" CharacterSpacing="180"/>
+                            <TextBlock Text="TASKS" Foreground="{ThemeResource AccentBrush}"
+                                       FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -889,46 +889,46 @@
                                     <RowDefinition/>
                                 </Grid.RowDefinitions>
 
-                                <Border Grid.Row="0" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,8" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Ctrl + N" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + N" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Create new task"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
 
-                                <Border Grid.Row="1" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,8" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Ctrl + S" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + S" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Save task changes"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
 
-                                <Border Grid.Row="2" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="2" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,8" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Ctrl + D" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + D" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="2" Grid.Column="1" Text="Delete selected task"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
 
-                                <Border Grid.Row="3" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="3" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,0" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Ctrl + O" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + O" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="3" Grid.Column="1" Text="Open task in Linear"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
                             </Grid>
                         </StackPanel>
 
-                        <Border Height="1" Background="#2A2A3A"/>
+                        <Border Height="1" Background="{ThemeResource BorderBrush}"/>
 
                         <!-- General -->
                         <StackPanel Spacing="10">
-                            <TextBlock Text="GENERAL" Foreground="#A78BFA"
-                                       FontSize="10" FontWeight="SemiBold" CharacterSpacing="180"/>
+                            <TextBlock Text="GENERAL" Foreground="{ThemeResource AccentBrush}"
+                                       FontSize="9" FontWeight="SemiBold" CharacterSpacing="180"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -939,21 +939,21 @@
                                     <RowDefinition/>
                                 </Grid.RowDefinitions>
 
-                                <Border Grid.Row="0" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,8" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Esc" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Esc" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Close panel / overlay / lightbox"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,0,8"/>
 
-                                <Border Grid.Row="1" Grid.Column="0" Background="#1A1A24" CornerRadius="5"
+                                <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="5"
                                         Padding="8,4" Margin="0,0,16,0" HorizontalAlignment="Left"
-                                        BorderBrush="#2A2A3A" BorderThickness="1">
-                                    <TextBlock Text="Ctrl + /" FontFamily="Consolas" FontSize="12" Foreground="#E2E8F0"/>
+                                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock Text="Ctrl + /" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                 </Border>
                                 <TextBlock Grid.Row="1" Grid.Column="1" Text="Toggle this shortcuts panel"
-                                           Foreground="#9CA3AF" FontSize="12" VerticalAlignment="Center"/>
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
                             </Grid>
                         </StackPanel>
 
@@ -961,15 +961,15 @@
 
                     <!-- Overlay Footer -->
                     <Border Grid.Row="2" Padding="24,14"
-                            BorderBrush="#2A2A3A" BorderThickness="0,1,0,0"
-                            Background="#0F0F13" CornerRadius="0,0,16,16">
+                            BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,1,0,0"
+                            Background="{ThemeResource ApplicationBackgroundBrush}" CornerRadius="0,0,16,16">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
-                            <TextBlock Text="Press" Foreground="#4B5563" FontSize="11"/>
-                            <Border Background="#1A1A24" CornerRadius="4" Padding="6,2"
-                                    BorderBrush="#2A2A3A" BorderThickness="1">
-                                <TextBlock Text="Esc" FontFamily="Consolas" FontSize="10" Foreground="#6B7280"/>
+                            <TextBlock Text="Press" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
+                            <Border Background="{ThemeResource SurfaceVariantBrush}" CornerRadius="4" Padding="6,2"
+                                    BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                                <TextBlock Text="Esc" FontFamily="Consolas" FontSize="10" Foreground="{ThemeResource TextSecondaryBrush}"/>
                             </Border>
-                            <TextBlock Text="to close" Foreground="#4B5563" FontSize="11"/>
+                            <TextBlock Text="to close" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
                         </StackPanel>
                     </Border>
 
