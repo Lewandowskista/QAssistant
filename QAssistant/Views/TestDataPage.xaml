@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="QAssistant.Views.TestDataPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource ApplicationBackgroundBrush}">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar: groups -->
+        <Border Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}"
+                BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,1,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Spacing="4" Padding="16,16,16,8">
+                    <TextBlock Text="TEST DATA" Foreground="{ThemeResource TextSecondaryBrush}"
+                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                    <TextBlock Text="Reusable data sets per project" Foreground="{ThemeResource TextSecondaryBrush}"
+                               FontSize="11" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <ListView Grid.Row="1" x:Name="GroupList" Background="Transparent"
+                          SelectionMode="Single" SelectionChanged="GroupList_SelectionChanged">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Padding" Value="12,8"/>
+                            <Setter Property="Margin" Value="6,2"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <ListViewItemPresenter
+                                            SelectedBackground="{ThemeResource ListAccentLowBrush}"
+                                            PointerOverBackground="{ThemeResource HoverBrush}"
+                                            CornerRadius="8" ContentMargin="12,8"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding Name}" Foreground="{ThemeResource TextPrimaryBrush}" FontSize="13"/>
+                                <TextBlock Text="{Binding CategoryLabel}" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <Button Grid.Row="2" Content="+ New Group" Click="AddGroup_Click"
+                        HorizontalAlignment="Stretch" Margin="12,8,12,16"
+                        Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                        CornerRadius="8" Padding="12,8"/>
+            </Grid>
+        </Border>
+
+        <!-- Main panel -->
+        <Grid Grid.Column="1">
+
+            <StackPanel x:Name="DataEmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <FontIcon Glyph="&#xE8EC;" FontSize="40" FontFamily="Segoe Fluent Icons"
+                          Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                <TextBlock Text="Select or create a test data group" Foreground="{ThemeResource TextSecondaryBrush}"
+                           FontSize="14" HorizontalAlignment="Center"/>
+                <TextBlock Text="Store reusable test data: accounts, product codes, promo rules, and more"
+                           Foreground="#4B5563" FontSize="12" HorizontalAlignment="Center"
+                           TextWrapping="Wrap" MaxWidth="360" TextAlignment="Center"/>
+            </StackPanel>
+
+            <Grid x:Name="DataEditorPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Group header bar -->
+                <Border Grid.Row="0" Background="{ThemeResource SurfaceBrush}"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
+                        Padding="16,10">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <TextBox x:Name="GroupNameBox" PlaceholderText="Group name"
+                                     MinWidth="200"
+                                     Background="{ThemeResource SurfaceBrush}"
+                                     Foreground="{ThemeResource TextPrimaryBrush}"
+                                     BorderBrush="{ThemeResource BorderBrush}"
+                                     CornerRadius="8"/>
+                            <ComboBox x:Name="GroupCategoryPicker" MinWidth="150"
+                                      Background="{ThemeResource SurfaceBrush}"
+                                      Foreground="{ThemeResource TextPrimaryBrush}"
+                                      BorderBrush="{ThemeResource BorderBrush}">
+                                <ComboBoxItem Content="Users"/>
+                                <ComboBoxItem Content="Products"/>
+                                <ComboBoxItem Content="Promotions"/>
+                                <ComboBoxItem Content="Cart"/>
+                                <ComboBoxItem Content="Orders"/>
+                                <ComboBoxItem Content="Credentials"/>
+                                <ComboBoxItem Content="URLs"/>
+                                <ComboBoxItem Content="Other"/>
+                            </ComboBox>
+                            <Button Content="Save Group" Click="SaveGroup_Click"
+                                    Background="#A78BFA" Foreground="White"
+                                    CornerRadius="8" Padding="14,6"/>
+                            <Button Content="Delete Group" Click="DeleteGroup_Click"
+                                    Background="#3F1A1A" Foreground="#F87171"
+                                    CornerRadius="8" Padding="14,6"/>
+                        </StackPanel>
+                        <Button Content="+ Add Entry" Click="AddEntry_Click"
+                                HorizontalAlignment="Right"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                CornerRadius="8" Padding="14,6"/>
+                    </Grid>
+                </Border>
+
+                <!-- Entries list -->
+                <ScrollViewer Grid.Row="1" Padding="16">
+                    <StackPanel x:Name="EntriesContainer" Spacing="8">
+                        <TextBlock x:Name="EntriesEmptyText" Text="No entries yet — click + Add Entry"
+                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="13"
+                                   Visibility="Collapsed" Margin="0,40,0,0"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Status bar -->
+                <Border Grid.Row="2" Padding="16,8"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,1,0,0"
+                        Background="{ThemeResource SurfaceBrush}">
+                    <TextBlock x:Name="DataStatusText" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

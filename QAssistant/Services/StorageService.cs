@@ -47,6 +47,20 @@ namespace QAssistant.Services
     [JsonSerializable(typeof(List<TestPlan>))]
     [JsonSerializable(typeof(TestExecution))]
     [JsonSerializable(typeof(List<TestExecution>))]
+    [JsonSerializable(typeof(SavedApiRequest))]
+    [JsonSerializable(typeof(List<SavedApiRequest>))]
+    [JsonSerializable(typeof(ApiRequestHistoryEntry))]
+    [JsonSerializable(typeof(List<ApiRequestHistoryEntry>))]
+    [JsonSerializable(typeof(ChecklistTemplate))]
+    [JsonSerializable(typeof(List<ChecklistTemplate>))]
+    [JsonSerializable(typeof(ChecklistItem))]
+    [JsonSerializable(typeof(ChecklistItemPriority))]
+    [JsonSerializable(typeof(QaEnvironment))]
+    [JsonSerializable(typeof(List<QaEnvironment>))]
+    [JsonSerializable(typeof(EnvironmentType))]
+    [JsonSerializable(typeof(TestDataGroup))]
+    [JsonSerializable(typeof(List<TestDataGroup>))]
+    [JsonSerializable(typeof(TestDataEntry))]
     [JsonSourceGenerationOptions(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNameCaseInsensitive = true,

@@ -125,6 +125,10 @@ namespace QAssistant.Views
             if (!string.IsNullOrEmpty(geminiKey))
                 GeminiApiKeyBox.Password = geminiKey;
 
+            // SAP Commerce Context (global, not per-project — default off)
+            var sapContextEnabled = CredentialService.LoadCredential("SapCommerceContextEnabled");
+            SapCommerceContextToggle.IsOn = sapContextEnabled == "true";
+
             // Load tray setting — default to true on first run (global, not per-project)
             var trayEnabled = CredentialService.LoadCredential("MinimizeToTray");
             if (string.IsNullOrEmpty(trayEnabled))
@@ -171,6 +175,13 @@ namespace QAssistant.Views
             var enabled = MinimizeToTrayToggle.IsOn;
             CredentialService.SaveCredential("MinimizeToTray", enabled ? "true" : "false");
             App.MinimizeToTray = enabled;
+        }
+
+        private void SapCommerceContextToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isLoading) return;
+            var enabled = SapCommerceContextToggle.IsOn;
+            CredentialService.SaveCredential("SapCommerceContextEnabled", enabled ? "true" : "false");
         }
 
         private void RefreshProjects_Click(object sender, RoutedEventArgs e)

@@ -54,6 +54,27 @@
                     HorizontalAlignment="Left"/>
                     <TextBlock Text="If projects don't appear, click this button to manually refresh the sidebar."
                            Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
+
+                    <!-- SAP Commerce Context toggle -->
+                    <Border Height="1" Background="{ThemeResource BorderBrush}" Margin="0,4,0,4"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,16,0">
+                            <TextBlock Text="SAP Commerce Context"
+                           Foreground="{ThemeResource TextPrimaryBrush}" FontSize="14"/>
+                            <TextBlock Text="When enabled, SAP Commerce Cloud (Hybris) domain knowledge is included in AI prompts for platform-aware test case generation and analysis"
+                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                           TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Name="SapCommerceContextToggle"
+                          Grid.Column="1"
+                          VerticalAlignment="Center"
+                          Toggled="SapCommerceContextToggle_Toggled"
+                          OnContent="" OffContent=""/>
+                    </Grid>
                 </StackPanel>
             </Border>
 

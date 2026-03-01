@@ -243,6 +243,14 @@
                      Click="Tab_Click" Tag="Tests"
                      Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
                      CornerRadius="8" Padding="14,8" Margin="0,6"/>
+                        <Button x:Name="TabEnvironments" Content="Environments"
+                     Click="Tab_Click" Tag="Environments"
+                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
+                        <Button x:Name="TabApi" Content="API"
+                     Click="Tab_Click" Tag="API"
+                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                     CornerRadius="8" Padding="14,8" Margin="0,6"/>
                         <Button x:Name="TabSettings" Content="Settings"
                     Click="Tab_Click" Tag="Settings"
                     Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"

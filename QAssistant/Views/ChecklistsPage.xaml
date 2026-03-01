@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="QAssistant.Views.ChecklistsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource ApplicationBackgroundBrush}">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar -->
+        <Border Grid.Column="0" Background="{ThemeResource SurfaceVariantBrush}"
+                BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,1,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Spacing="4" Padding="16,16,16,8">
+                    <TextBlock Text="CHECKLISTS" Foreground="{ThemeResource TextSecondaryBrush}"
+                               FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                    <TextBlock Text="QA verification checklists" Foreground="{ThemeResource TextSecondaryBrush}"
+                               FontSize="11"/>
+                </StackPanel>
+
+                <ListView Grid.Row="1" x:Name="ChecklistList" Background="Transparent"
+                          SelectionMode="Single" SelectionChanged="ChecklistList_SelectionChanged">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Padding" Value="12,8"/>
+                            <Setter Property="Margin" Value="6,2"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <ListViewItemPresenter
+                                            SelectedBackground="{ThemeResource ListAccentLowBrush}"
+                                            PointerOverBackground="{ThemeResource HoverBrush}"
+                                            CornerRadius="8" ContentMargin="12,8"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Spacing="2">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="{Binding Name}"
+                                               Foreground="{ThemeResource TextPrimaryBrush}" FontSize="13"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding CategoryLabel}"
+                                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="11"/>
+                                <TextBlock Text="{Binding ProgressLabel}"
+                                           Foreground="#10B981" FontSize="11"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <StackPanel Grid.Row="2" Spacing="8" Padding="12,8,12,16">
+                    <Button Content="+ New Checklist" Click="AddChecklist_Click"
+                            HorizontalAlignment="Stretch"
+                            Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                            CornerRadius="8" Padding="12,8"/>
+                    <Button Content="Load SAP Built-ins" Click="LoadBuiltins_Click"
+                            HorizontalAlignment="Stretch"
+                            Background="#252535" Foreground="#6B7280"
+                            CornerRadius="8" Padding="12,6" FontSize="11"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Checklist editor -->
+        <Grid Grid.Column="1">
+
+            <StackPanel x:Name="CLEmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <FontIcon Glyph="&#xE762;" FontSize="40" FontFamily="Segoe Fluent Icons"
+                          Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                <TextBlock Text="Select a checklist or create a new one"
+                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="14" HorizontalAlignment="Center"/>
+                <TextBlock Text="Use built-in SAP Commerce templates or create your own"
+                           Foreground="#4B5563" FontSize="12" HorizontalAlignment="Center"
+                           TextWrapping="Wrap" MaxWidth="360" TextAlignment="Center"/>
+            </StackPanel>
+
+            <Grid x:Name="CLEditorPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Toolbar -->
+                <Border Grid.Row="0" Background="{ThemeResource SurfaceBrush}"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
+                        Padding="16,10">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <TextBox x:Name="CLNameBox" PlaceholderText="Checklist name" MinWidth="220"
+                                     Background="{ThemeResource SurfaceBrush}"
+                                     Foreground="{ThemeResource TextPrimaryBrush}"
+                                     BorderBrush="{ThemeResource BorderBrush}" CornerRadius="8"/>
+                            <ComboBox x:Name="CLCategoryPicker" MinWidth="160"
+                                      Background="{ThemeResource SurfaceBrush}"
+                                      Foreground="{ThemeResource TextPrimaryBrush}"
+                                      BorderBrush="{ThemeResource BorderBrush}">
+                                <ComboBoxItem Content="Pre-Deployment"/>
+                                <ComboBoxItem Content="Release Sign-off"/>
+                                <ComboBoxItem Content="SAP Commerce"/>
+                                <ComboBoxItem Content="OCC Contract"/>
+                                <ComboBoxItem Content="Smoke Test"/>
+                                <ComboBoxItem Content="Custom"/>
+                            </ComboBox>
+                            <Button Content="Save" Click="SaveChecklist_Click"
+                                    Background="#A78BFA" Foreground="White" CornerRadius="8" Padding="14,6"/>
+                            <Button Content="Reset All" Click="ResetChecklist_Click"
+                                    Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                    CornerRadius="8" Padding="12,6"/>
+                            <Button x:Name="CLDeleteBtn" Content="Delete" Click="DeleteChecklist_Click"
+                                    Background="#3F1A1A" Foreground="#F87171" CornerRadius="8" Padding="12,6"/>
+                        </StackPanel>
+                        <Button Content="+ Add Item" Click="AddItem_Click"
+                                HorizontalAlignment="Right"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource AccentBrush}"
+                                CornerRadius="8" Padding="14,6"/>
+                    </Grid>
+                </Border>
+
+                <!-- Items -->
+                <ScrollViewer Grid.Row="1" Padding="16">
+                    <StackPanel x:Name="ItemsContainer" Spacing="6">
+                        <TextBlock x:Name="CLEmptyItemsText" Text="No items — click + Add Item to start"
+                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="13"
+                                   Margin="0,40,0,0" HorizontalAlignment="Center"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Progress bar footer -->
+                <Border Grid.Row="2" Padding="16,10"
+                        BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,1,0,0"
+                        Background="{ThemeResource SurfaceBrush}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ProgressBar x:Name="CLProgressBar" Grid.Column="0"
+                                     Minimum="0" Maximum="100" Value="0"
+                                     Foreground="#10B981" Background="#1A2A1A"
+                                     CornerRadius="4" Height="6" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="CLProgressText" Grid.Column="1"
+                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="12" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

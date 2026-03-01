@@ -1804,7 +1804,7 @@ namespace QAssistant.Views
             }
 
             // Build a compact TOON-formatted prompt to reduce token consumption
-            var toonPrompt = GeminiService.BuildToonPrompt(_selectedTask, linearComments, imageData.Count);
+            var toonPrompt = GeminiService.BuildToonPrompt(_selectedTask, linearComments, imageData.Count, _vm?.SelectedProject);
 
             string analysisResult = string.Empty;
             var images = imageData.Count > 0 ? imageData : null;

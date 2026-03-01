@@ -45,6 +45,10 @@ namespace QAssistant.Models
         public List<TestCase> TestCases { get; set; } = new();
         public List<TestPlan> TestPlans { get; set; } = new();
         public List<TestExecution> TestExecutions { get; set; } = new();
+        public List<SavedApiRequest> ApiRequests { get; set; } = new();
+        public List<ChecklistTemplate> Checklists { get; set; } = new();
+        public List<QaEnvironment> Environments { get; set; } = new();
+        public List<TestDataGroup> TestDataGroups { get; set; } = new();
 
         /// <summary>
         /// Persisted analysis history for Linear tasks, keyed by ExternalId.

@@ -101,21 +101,105 @@ namespace QAssistant.Services
         }
 
         /// <summary>
+        /// Appends a compact QA context block to the prompt so Gemini understands
+        /// the project landscape from a QA Engineer perspective: active environment,
+        /// test coverage snapshot, checklist categories, and test data domains.
+        /// </summary>
+        private static void AppendQaContext(StringBuilder sb, Project? project)
+        {
+            if (project == null) return;
+
+            sb.AppendLine("qa_context{");
+            sb.AppendLine($" project:{SanitizeToonValue(project.Name, 200)}");
+
+            if (!string.IsNullOrWhiteSpace(project.Description))
+                sb.AppendLine($" project_desc:{SanitizeToonValue(project.Description, 300)}");
+
+            // Active environment
+            var activeEnv = project.Environments.Find(e => e.IsDefault)
+                         ?? (project.Environments.Count > 0 ? project.Environments[0] : null);
+            if (activeEnv != null)
+            {
+                sb.AppendLine($" active_env:{SanitizeToonValue(activeEnv.Name, 100)}");
+                sb.AppendLine($" env_type:{activeEnv.Type}");
+                if (!string.IsNullOrWhiteSpace(activeEnv.BaseUrl))
+                    sb.AppendLine($" env_url:{SanitizeToonValue(activeEnv.BaseUrl, 200)}");
+            }
+
+            // Environment landscape
+            if (project.Environments.Count > 0)
+            {
+                var envTypes = string.Join(",", project.Environments
+                    .Select(e => $"{SanitizeToonValue(e.Name, 60)}({e.Type})"));
+                sb.AppendLine($" environments:{envTypes}");
+            }
+
+            // Test coverage snapshot
+            if (project.TestCases.Count > 0)
+            {
+                var passed = project.TestCases.Count(tc => tc.Status == TestCaseStatus.Passed);
+                var failed = project.TestCases.Count(tc => tc.Status == TestCaseStatus.Failed);
+                var blocked = project.TestCases.Count(tc => tc.Status == TestCaseStatus.Blocked);
+                var notRun = project.TestCases.Count(tc => tc.Status == TestCaseStatus.NotRun);
+                sb.AppendLine($" test_coverage:total={project.TestCases.Count},passed={passed},failed={failed},blocked={blocked},not_run={notRun}");
+            }
+
+            // Checklist categories being tracked
+            if (project.Checklists.Count > 0)
+            {
+                var categories = project.Checklists
+                    .Where(c => !string.IsNullOrWhiteSpace(c.Category))
+                    .Select(c => SanitizeToonValue(c.Category, 80))
+                    .Distinct()
+                    .ToList();
+                if (categories.Count > 0)
+                    sb.AppendLine($" checklist_areas:{string.Join(",", categories)}");
+            }
+
+            // Test data domains
+            if (project.TestDataGroups.Count > 0)
+            {
+                var dataDomains = project.TestDataGroups
+                    .Where(g => !string.IsNullOrWhiteSpace(g.Category))
+                    .Select(g => SanitizeToonValue(g.Category, 60))
+                    .Distinct()
+                    .ToList();
+                if (dataDomains.Count > 0)
+                    sb.AppendLine($" test_data_domains:{string.Join(",", dataDomains)}");
+            }
+
+            sb.AppendLine("}");
+            sb.AppendLine("---");
+
+            // SAP Commerce domain context (appended only when enabled in Settings)
+            var sapContext = SapCommerceContext.GetContextBlock();
+            if (sapContext != null)
+            {
+                sb.AppendLine(sapContext);
+                sb.AppendLine("---");
+            }
+        }
+
+        /// <summary>
         /// Builds a Token-Oriented Object Notation (TOON) prompt for issue analysis.
 
         /// TOON uses compact key-value pairs and directive-style instructions to
         /// significantly reduce token consumption while preserving semantic quality.
         /// </summary>
-        public static string BuildToonPrompt(ProjectTask task, IReadOnlyList<LinearComment>? comments = null, int attachedImageCount = 0)
+        public static string BuildToonPrompt(ProjectTask task, IReadOnlyList<LinearComment>? comments = null, int attachedImageCount = 0, Project? project = null)
         {
             var sb = new StringBuilder();
 
             // Directives block — compact instruction set
             sb.AppendLine("@role:sr_qa_engineer");
             sb.AppendLine("@task:deep_issue_analysis");
+            sb.AppendLine("@perspective:qa_engineer—focus on testability,reproducibility,regression_risk,environment_impact");
             sb.AppendLine("@out_fmt:md_sections[## Root Cause Analysis,## Impact Assessment,## Suggested Fix,## Prevention Recommendations]");
-            sb.AppendLine("@rules:all_sections_required|multi_sentence|specific_actionable|infer_if_brief|no_skip|no_merge");
+            sb.AppendLine("@rules:all_sections_required|multi_sentence|specific_actionable|infer_if_brief|no_skip|no_merge|consider_env_context|reference_test_coverage");
             sb.AppendLine("---");
+
+            // QA project context
+            AppendQaContext(sb, project);
 
             // Issue data in TOON object notation
             sb.AppendLine("issue{");
@@ -218,17 +302,22 @@ namespace QAssistant.Services
         /// <summary>
         /// Builds a TOON prompt for generating test cases from project documentation.
         /// </summary>
-        public static string BuildTestCaseGenerationPrompt(IReadOnlyList<ProjectTask> tasks, string sourceName)
+        public static string BuildTestCaseGenerationPrompt(IReadOnlyList<ProjectTask> tasks, string sourceName, Project? project = null)
         {
             var sb = new StringBuilder();
 
             sb.AppendLine("@role:sr_qa_engineer");
             sb.AppendLine("@task:generate_test_cases");
+            sb.AppendLine("@perspective:qa_engineer—generate tests a QA engineer would write for regression,smoke,functional,integration suites");
             sb.AppendLine("@source:" + sourceName);
             sb.AppendLine("@out_fmt:json_array[{testCaseId,title,preConditions,testSteps,testData,expectedResult,priority}]");
             sb.AppendLine("@out_rules:raw_json_only|no_markdown_wrap|no_code_block");
-            sb.AppendLine("@rules:comprehensive|all_fields_required|specific_actionable|realistic_test_data|cover_positive_negative_edge|no_generic");
+            sb.AppendLine("@rules:comprehensive|all_fields_required|specific_actionable|realistic_test_data|cover_positive_negative_edge|no_generic|env_aware|use_known_test_data_when_applicable");
             sb.AppendLine("---");
+
+            // QA project context
+            AppendQaContext(sb, project);
+
             sb.AppendLine("field_spec{");
             sb.AppendLine(" testCaseId:sequential(TC-001,TC-002,...)");
             sb.AppendLine(" title:clear_descriptive");
@@ -410,15 +499,20 @@ namespace QAssistant.Services
             IReadOnlyList<ProjectTask> tasks,
             IReadOnlyList<TestCase> testCases,
             IReadOnlyList<TestExecution> executions,
-            IReadOnlyList<TestPlan> testPlans)
+            IReadOnlyList<TestPlan> testPlans,
+            Project? project = null)
         {
             var sb = new StringBuilder();
 
             sb.AppendLine("@role:sr_qa_engineer");
             sb.AppendLine("@task:criticality_assessment");
+            sb.AppendLine("@perspective:qa_engineer—assess release risk from QA standpoint considering environment health,test coverage gaps,checklist completion,blocker density");
             sb.AppendLine("@out_fmt:md_sections[## Failure Summary by Priority,## Overall Risk Level,## Key Areas of Concern,## Recommended Actions,## Release Readiness]");
-            sb.AppendLine("@rules:concise|actionable|data_driven|risk_focused|all_sections_required|include_counts_per_priority(Blocker,Major,Medium,Low)|risk_level_one_of(Critical,High,Moderate,Low)|actions_ordered_by_severity|no_skip|no_merge");
+            sb.AppendLine("@rules:concise|actionable|data_driven|risk_focused|all_sections_required|include_counts_per_priority(Blocker,Major,Medium,Low)|risk_level_one_of(Critical,High,Moderate,Low)|actions_ordered_by_severity|no_skip|no_merge|factor_env_coverage|factor_checklist_gaps");
             sb.AppendLine("---");
+
+            // QA project context
+            AppendQaContext(sb, project);
 
             // Failed test cases grouped by priority
             var failedCases = testCases.Where(tc => tc.Status == TestCaseStatus.Failed).ToList();

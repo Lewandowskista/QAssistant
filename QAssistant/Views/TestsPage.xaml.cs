@@ -208,7 +208,7 @@ namespace QAssistant.Views
             GenerationStatusText.Text = $"Fetched {tasks.Count} issues. Generating test cases...";
 
             var source = selectedSource == "Jira" ? TaskSource.Jira : TaskSource.Linear;
-            var prompt = GeminiService.BuildTestCaseGenerationPrompt(tasks, selectedSource);
+            var prompt = GeminiService.BuildTestCaseGenerationPrompt(tasks, selectedSource, _vm?.SelectedProject);
 
             string response = string.Empty;
             var generateTask = System.Threading.Tasks.Task.Run(async () =>
@@ -1076,7 +1076,8 @@ namespace QAssistant.Views
                 project.Tasks,
                 project.TestCases,
                 project.TestExecutions,
-                project.TestPlans);
+                project.TestPlans,
+                project);
 
             try
             {

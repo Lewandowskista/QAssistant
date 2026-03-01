@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="QAssistant.Views.DashboardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource ApplicationBackgroundBrush}">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="24" Padding="24">
+
+            <!-- Header -->
+            <StackPanel Spacing="4">
+                <TextBlock x:Name="ProjectNameText"
+                           Foreground="{ThemeResource TextPrimaryBrush}"
+                           FontSize="22" FontWeight="SemiBold"/>
+                <TextBlock x:Name="ProjectSubtitleText"
+                           Foreground="{ThemeResource TextSecondaryBrush}"
+                           FontSize="13"/>
+            </StackPanel>
+
+            <!-- Metric Cards Row -->
+            <StackPanel Orientation="Horizontal" Spacing="12" x:Name="MetricCardsRow">
+
+                <!-- Tasks Open -->
+                <Border x:Name="OpenTasksCard" Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20,16" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" MinWidth="160">
+                    <StackPanel Spacing="4">
+                        <FontIcon Glyph="&#xE9D5;" FontSize="20" FontFamily="Segoe Fluent Icons"
+                                  Foreground="#3B82F6" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="OpenTasksCount" Foreground="{ThemeResource TextPrimaryBrush}"
+                                   FontSize="28" FontWeight="Bold" Margin="0,4,0,0"/>
+                        <TextBlock Text="Open Tasks" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Blockers -->
+                <Border Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20,16" BorderBrush="#3F1A1A" BorderThickness="1" MinWidth="160">
+                    <StackPanel Spacing="4">
+                        <FontIcon Glyph="&#xEA39;" FontSize="20" FontFamily="Segoe Fluent Icons"
+                                  Foreground="#EF4444" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="BlockersCount" Foreground="{ThemeResource TextPrimaryBrush}"
+                                   FontSize="28" FontWeight="Bold" Margin="0,4,0,0"/>
+                        <TextBlock Text="Critical / Blockers" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Pass Rate -->
+                <Border Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20,16" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" MinWidth="160">
+                    <StackPanel Spacing="4">
+                        <FontIcon Glyph="&#xE930;" FontSize="20" FontFamily="Segoe Fluent Icons"
+                                  Foreground="#10B981" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="PassRateText" Foreground="{ThemeResource TextPrimaryBrush}"
+                                   FontSize="28" FontWeight="Bold" Margin="0,4,0,0"/>
+                        <TextBlock Text="Test Pass Rate" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Test Cases -->
+                <Border Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20,16" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1" MinWidth="160">
+                    <StackPanel Spacing="4">
+                        <FontIcon Glyph="&#xE762;" FontSize="20" FontFamily="Segoe Fluent Icons"
+                                  Foreground="#A78BFA" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="TestCasesCount" Foreground="{ThemeResource TextPrimaryBrush}"
+                                   FontSize="28" FontWeight="Bold" Margin="0,4,0,0"/>
+                        <TextBlock Text="Test Cases" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Overdue -->
+                <Border Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20,16" BorderBrush="#3C2A10" BorderThickness="1" MinWidth="160">
+                    <StackPanel Spacing="4">
+                        <FontIcon Glyph="&#xE787;" FontSize="20" FontFamily="Segoe Fluent Icons"
+                                  Foreground="#F59E0B" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="OverdueCount" Foreground="{ThemeResource TextPrimaryBrush}"
+                                   FontSize="28" FontWeight="Bold" Margin="0,4,0,0"/>
+                        <TextBlock Text="Overdue Tasks" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Two-column layout: Task Breakdown + Upcoming -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16" MaxWidth="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Task Status Breakdown -->
+                <Border Grid.Column="0" Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="TASK BREAKDOWN" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                        <StackPanel x:Name="TaskBreakdownContainer" Spacing="8"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Upcoming Due Dates -->
+                <Border Grid.Column="2" Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="UPCOMING DUE DATES" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                        <StackPanel x:Name="UpcomingContainer" Spacing="8"/>
+                        <TextBlock x:Name="UpcomingEmptyText" Text="No upcoming due dates"
+                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Two-column layout: Test Plans + Recent Activity -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16" MaxWidth="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Test Plan Summary -->
+                <Border Grid.Column="0" Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="TEST PLANS" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                        <StackPanel x:Name="TestPlansContainer" Spacing="10"/>
+                        <TextBlock x:Name="TestPlansEmptyText" Text="No test plans yet"
+                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Recent Notes -->
+                <Border Grid.Column="2" Background="{ThemeResource SurfaceBrush}" CornerRadius="12"
+                        Padding="20" BorderBrush="{ThemeResource BorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="RECENT NOTES" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"/>
+                        <StackPanel x:Name="RecentNotesContainer" Spacing="8"/>
+                        <TextBlock x:Name="NotesEmptyText" Text="No notes yet"
+                                   Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>
