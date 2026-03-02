@@ -55,6 +55,7 @@ namespace QAssistant.Views
         private string _coverageViewMode = "Issue";
         private string _testCaseViewMode = "AllPlans";
         private List<string>? _smokeSubsetCaseIds;
+        private string _sourceFilter = "All";
 
         private Guid ProjectId => _vm?.SelectedProject?.Id ?? Guid.Empty;
 
@@ -140,6 +141,31 @@ namespace QAssistant.Views
             RenderTestPlans();
         }
 
+        private void SourceFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn)
+            {
+                _sourceFilter = btn.Tag.ToString()!;
+                UpdateSourceFilterStyles();
+                RenderTestPlans();
+            }
+        }
+
+        private void UpdateSourceFilterStyles()
+        {
+            var btns = new[] { SourceFilterAllBtn, SourceFilterJiraBtn, SourceFilterLinearBtn, SourceFilterManualBtn };
+            foreach (var btn in btns)
+            {
+                bool active = btn.Tag.ToString() == _sourceFilter;
+                btn.Background = active
+                    ? (Brush)Application.Current.Resources["ListAccentLowBrush"]
+                    : new SolidColorBrush(Colors.Transparent);
+                btn.Foreground = active
+                    ? (Brush)Application.Current.Resources["AccentBrush"]
+                    : (Brush)Application.Current.Resources["TextSecondaryBrush"];
+            }
+        }
+
         private void ShowArchivedRunsToggle_Click(object sender, RoutedEventArgs e)
         {
             _showArchivedRuns = ShowArchivedRunsToggle.IsChecked == true;
@@ -193,6 +219,186 @@ namespace QAssistant.Views
             DesignDocStatus.Visibility = Visibility.Collapsed;
             ClearDesignDocBtn.Visibility = Visibility.Collapsed;
             GenerationStatusText.Text = "Design document cleared.";
+        }
+
+        private async void NewPlan_Click(object sender, RoutedEventArgs e)
+            => await CreateTestPlanAsync();
+
+        private async System.Threading.Tasks.Task CreateTestPlanAsync()
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var nameBox = new TextBox
+            {
+                PlaceholderText = "Plan name",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var descBox = new TextBox
+            {
+                PlaceholderText = "Description (optional)",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 48
+            };
+
+            var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(new TextBlock { Text = "Name", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(nameBox);
+            panel.Children.Add(new TextBlock { Text = "Description", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(descBox);
+
+            var dialog = new ContentDialog
+            {
+                Title = "New Test Plan",
+                Content = panel,
+                PrimaryButtonText = "Create",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            var name = nameBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            const int MaxNameLength = 200;
+            if (name.Length > MaxNameLength)
+                name = name[..MaxNameLength];
+
+            var plan = new TestPlan
+            {
+                TestPlanId = NextTestPlanId(),
+                Name = name,
+                Description = descBox.Text.Trim(),
+                Source = TaskSource.Manual
+            };
+            _vm.SelectedProject.TestPlans.Add(plan);
+            await _vm.SaveAsync();
+            GenerationStatusText.Text = $"Created {plan.TestPlanId}.";
+            RenderTestPlans();
+        }
+
+        private async System.Threading.Tasks.Task AddTestCaseToPlanAsync(TestPlan plan)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var titleBox = new TextBox
+            {
+                PlaceholderText = "Test case title",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var priorityPicker = new ComboBox
+            {
+                ItemsSource = Enum.GetValues(typeof(TestCasePriority)),
+                SelectedItem = TestCasePriority.Medium,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var preCondBox = new TextBox
+            {
+                PlaceholderText = "Pre-conditions (optional)",
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 40,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var stepsBox = new TextBox
+            {
+                PlaceholderText = "Test steps",
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 60,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var dataBox = new TextBox
+            {
+                PlaceholderText = "Test data (optional)",
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 40,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var expectedBox = new TextBox
+            {
+                PlaceholderText = "Expected result",
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 60
+            };
+
+            var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(new TextBlock
+            {
+                Text = $"{plan.TestPlanId} \u00B7 {plan.Name}",
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                Margin = new Thickness(0, 0, 0, 4)
+            });
+            panel.Children.Add(new TextBlock { Text = "Title", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(titleBox);
+            panel.Children.Add(new TextBlock { Text = "Priority", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(priorityPicker);
+            panel.Children.Add(new TextBlock { Text = "Pre-Conditions", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(preCondBox);
+            panel.Children.Add(new TextBlock { Text = "Test Steps", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(stepsBox);
+            panel.Children.Add(new TextBlock { Text = "Test Data", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(dataBox);
+            panel.Children.Add(new TextBlock { Text = "Expected Result", Foreground = new SolidColorBrush(Colors.White) });
+            panel.Children.Add(expectedBox);
+
+            var dialog = new ContentDialog
+            {
+                Title = "Add Test Case",
+                Content = new ScrollViewer
+                {
+                    Content = panel,
+                    MaxHeight = 500,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                },
+                PrimaryButtonText = "Add",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            var title = titleBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(title)) return;
+
+            const int MaxLen = 10_000;
+            static string Cap(string s) => s.Length > MaxLen ? s[..MaxLen] : s;
+
+            var tc = new TestCase
+            {
+                TestCaseId = NextTestCaseId(),
+                Title = Cap(title),
+                Priority = (TestCasePriority)priorityPicker.SelectedItem!,
+                PreConditions = Cap(preCondBox.Text.Trim()),
+                TestSteps = Cap(stepsBox.Text.Trim()),
+                TestData = Cap(dataBox.Text.Trim()),
+                ExpectedResult = Cap(expectedBox.Text.Trim()),
+                ActualResult = string.Empty,
+                Status = TestCaseStatus.NotRun,
+                Source = TaskSource.Manual,
+                GeneratedAt = DateTime.Now,
+                TestPlanId = plan.Id
+            };
+
+            _vm.SelectedProject.TestCases.Add(tc);
+            await _vm.SaveAsync();
+            GenerationStatusText.Text = $"Added {tc.TestCaseId} to {plan.TestPlanId}.";
+            RenderTestPlans();
         }
 
         // â”€â”€ Backward compatibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -552,12 +758,25 @@ namespace QAssistant.Views
                 ? scopedPlans.OrderByDescending(p => p.CreatedAt).ToList()
                 : scopedPlans.Where(p => !p.IsArchived).OrderByDescending(p => p.CreatedAt).ToList();
 
-            int visibleCaseCount = regressionOnly
-                ? allCases.Count(tc => visiblePlans.Any(p => p.Id == tc.TestPlanId))
-                : allCases.Count;
+            // Apply source filter
+            if (_sourceFilter != "All")
+            {
+                var filterSource = _sourceFilter switch
+                {
+                    "Jira" => TaskSource.Jira,
+                    "Linear" => TaskSource.Linear,
+                    "Manual" => TaskSource.Manual,
+                    _ => (TaskSource?)null
+                };
+                if (filterSource.HasValue)
+                    visiblePlans = visiblePlans.Where(p => p.Source == filterSource.Value).ToList();
+            }
+
+            int visibleCaseCount = allCases.Count(tc => visiblePlans.Any(p => p.Id == tc.TestPlanId));
 
             var archiveInfo = archivedCount > 0 ? $" \u00B7 {archivedCount} archived" : "";
-            TestCaseCountText.Text = NormalizeForDisplay($"{activeCount} plan(s) \u00B7 {visibleCaseCount} case(s){archiveInfo}");
+            var filterSuffix = _sourceFilter != "All" ? $" \u00B7 {_sourceFilter}" : "";
+            TestCaseCountText.Text = NormalizeForDisplay($"{visiblePlans.Count} plan(s) \u00B7 {visibleCaseCount} case(s){archiveInfo}{filterSuffix}");
 
             if (visiblePlans.Count == 0)
             {
@@ -685,6 +904,11 @@ namespace QAssistant.Views
             duplicateBtn.Click += async (s, _) => await DuplicateTestPlanAsync(capturedPlan);
             actionPanel.Children.Add(duplicateBtn);
 
+            // Rename button
+            var renameBtn = BuildPlanActionButton("\uE70F", "Rename plan");
+            renameBtn.Click += async (s, _) => await RenameTestPlanAsync(capturedPlan);
+            actionPanel.Children.Add(renameBtn);
+
             // Archive/Unarchive button
             var archiveBtn = BuildPlanActionButton(plan.IsArchived ? "\uE7A7" : "\uE7B8",
                 plan.IsArchived ? "Unarchive plan" : "Archive plan");
@@ -739,6 +963,42 @@ namespace QAssistant.Views
 
             outerStack.Children.Add(bodyStack);
 
+            // "Add Test Case" button – visible whenever the plan body is expanded
+            var capturedPlanForAdd = plan;
+            var addTcRow = new Button
+            {
+                Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible,
+                Background = new SolidColorBrush(Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Padding = new Thickness(22, 4, 0, 0),
+                Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 6,
+                    Children =
+                    {
+                        new FontIcon
+                        {
+                            Glyph = "\uE710",
+                            FontSize = 11,
+                            FontFamily = new FontFamily("Segoe Fluent Icons"),
+                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                            VerticalAlignment = VerticalAlignment.Center
+                        },
+                        new TextBlock
+                        {
+                            Text = "Add Test Case",
+                            FontSize = 11,
+                            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 167, 139, 250)),
+                            VerticalAlignment = VerticalAlignment.Center
+                        }
+                    }
+                }
+            };
+            addTcRow.Click += async (s, _) => await AddTestCaseToPlanAsync(capturedPlanForAdd);
+            outerStack.Children.Add(addTcRow);
+
             // Wire collapse/expand
             headerButton.Click += (s, _) =>
             {
@@ -751,12 +1011,14 @@ namespace QAssistant.Views
                         _populatedPlanBodies.Add(plan.Id);
                     }
                     bodyStack.Visibility = Visibility.Visible;
+                    addTcRow.Visibility = Visibility.Visible;
                     chevron.Glyph = "\uE70D";
                 }
                 else
                 {
                     _collapsedPlans.Add(plan.Id);
                     bodyStack.Visibility = Visibility.Collapsed;
+                    addTcRow.Visibility = Visibility.Collapsed;
                     chevron.Glyph = "\uE76C";
                 }
             };
@@ -853,9 +1115,11 @@ namespace QAssistant.Views
             // Execute button
             var capturedTc = tc;
             var capturedPlan = plan;
+            bool hasExistingExecution = _vm?.SelectedProject?.TestExecutions
+                .Any(e => e.TestCaseId == tc.Id && e.TestPlanId == plan.Id) ?? false;
             var runBtn = new Button
             {
-                Content = "Execute",
+                Content = hasExistingExecution ? "Update Result" : "Execute",
                 Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 37, 37, 53)),
                 Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 52, 211, 153)),
                 BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 42, 42, 58)),
@@ -1046,10 +1310,17 @@ namespace QAssistant.Views
 
         private async System.Threading.Tasks.Task ExecuteTestCaseAsync(TestCase tc, TestPlan plan)
         {
+            if (_vm?.SelectedProject == null) return;
+
+            // Reuse the existing execution for this test case within the same plan (TestRail-style).
+            var existingExec = _vm.SelectedProject.TestExecutions
+                .FirstOrDefault(e => e.TestCaseId == tc.Id && e.TestPlanId == plan.Id);
+            bool isUpdate = existingExec != null;
+
             var statusPicker = new ComboBox
             {
                 ItemsSource = Enum.GetValues(typeof(TestCaseStatus)),
-                SelectedItem = TestCaseStatus.Passed,
+                SelectedItem = existingExec?.Result ?? TestCaseStatus.Passed,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 Margin = new Thickness(0, 0, 0, 8)
             };
@@ -1057,6 +1328,7 @@ namespace QAssistant.Views
             var actualBox = new TextBox
             {
                 PlaceholderText = "Enter the actual result...",
+                Text = existingExec?.ActualResult ?? string.Empty,
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.Wrap,
                 MinHeight = 60,
@@ -1066,6 +1338,7 @@ namespace QAssistant.Views
             var notesBox = new TextBox
             {
                 PlaceholderText = "Notes (optional)",
+                Text = existingExec?.Notes ?? string.Empty,
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.Wrap,
                 MinHeight = 40
@@ -1096,9 +1369,9 @@ namespace QAssistant.Views
 
             var dialog = new ContentDialog
             {
-                Title = "Execute Test Case",
+                Title = isUpdate ? "Update Test Case Result" : "Execute Test Case",
                 Content = panel,
-                PrimaryButtonText = "Record Execution",
+                PrimaryButtonText = isUpdate ? "Update Result" : "Record Execution",
                 CloseButtonText = "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = this.XamlRoot
@@ -1107,7 +1380,6 @@ namespace QAssistant.Views
 
             var result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary) return;
-            if (_vm?.SelectedProject == null) return;
 
             var selectedStatus = (TestCaseStatus)statusPicker.SelectedItem!;
 
@@ -1121,18 +1393,29 @@ namespace QAssistant.Views
             if (notesText.Length > MaxFieldLength)
                 notesText = notesText[..MaxFieldLength];
 
-            // Create execution record
-            var execution = new TestExecution
+            if (isUpdate)
             {
-                ExecutionId = NextExecutionId(),
-                TestCaseId = tc.Id,
-                TestPlanId = plan.Id,
-                Result = selectedStatus,
-                ActualResult = actualText,
-                Notes = notesText,
-                ExecutedAt = DateTime.Now
-            };
-            _vm.SelectedProject.TestExecutions.Add(execution);
+                // Update the existing execution record in place
+                existingExec!.Result = selectedStatus;
+                existingExec.ActualResult = actualText;
+                existingExec.Notes = notesText;
+                existingExec.ExecutedAt = DateTime.Now;
+            }
+            else
+            {
+                // Create a new execution record
+                var execution = new TestExecution
+                {
+                    ExecutionId = NextExecutionId(),
+                    TestCaseId = tc.Id,
+                    TestPlanId = plan.Id,
+                    Result = selectedStatus,
+                    ActualResult = actualText,
+                    Notes = notesText,
+                    ExecutedAt = DateTime.Now
+                };
+                _vm.SelectedProject.TestExecutions.Add(execution);
+            }
 
             // Update the test case to reflect latest execution
             tc.Status = selectedStatus;
@@ -2086,6 +2369,47 @@ namespace QAssistant.Views
             RenderTestPlans();
         }
 
+        private async System.Threading.Tasks.Task RenameTestPlanAsync(TestPlan plan)
+        {
+            if (_vm?.SelectedProject == null) return;
+
+            var nameBox = new TextBox
+            {
+                Text = plan.Name,
+                PlaceholderText = "Plan name",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                SelectionStart = plan.Name.Length
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = $"Rename {plan.TestPlanId}",
+                Content = nameBox,
+                PrimaryButtonText = "Rename",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = this.XamlRoot
+            };
+            DialogHelper.ApplyDarkTheme(dialog);
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            var newName = nameBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(newName) || newName == plan.Name) return;
+
+            const int MaxNameLength = 200;
+            if (newName.Length > MaxNameLength)
+                newName = newName[..MaxNameLength];
+
+            plan.Name = newName;
+            await _vm.SaveAsync();
+            GenerationStatusText.Text = $"Renamed {plan.TestPlanId}.";
+            RenderTestPlans();
+            if (_activeSubTab == "TestRuns")
+                RenderExecutionHistory();
+        }
+
         private async System.Threading.Tasks.Task ResetTestPlanStatusesAsync(TestPlan plan)
         {
             if (_vm?.SelectedProject == null) return;
@@ -2182,17 +2506,30 @@ namespace QAssistant.Views
 
             foreach (var tc in cases)
             {
-                var execution = new TestExecution
+                var existingExec = _vm.SelectedProject.TestExecutions
+                    .FirstOrDefault(e => e.TestCaseId == tc.Id && e.TestPlanId == plan.Id);
+
+                if (existingExec != null)
                 {
-                    ExecutionId = NextExecutionId(),
-                    TestCaseId = tc.Id,
-                    TestPlanId = plan.Id,
-                    Result = selectedStatus,
-                    ActualResult = string.Empty,
-                    Notes = notesText,
-                    ExecutedAt = DateTime.Now
-                };
-                _vm.SelectedProject.TestExecutions.Add(execution);
+                    existingExec.Result = selectedStatus;
+                    existingExec.ActualResult = string.Empty;
+                    existingExec.Notes = notesText;
+                    existingExec.ExecutedAt = DateTime.Now;
+                }
+                else
+                {
+                    var execution = new TestExecution
+                    {
+                        ExecutionId = NextExecutionId(),
+                        TestCaseId = tc.Id,
+                        TestPlanId = plan.Id,
+                        Result = selectedStatus,
+                        ActualResult = string.Empty,
+                        Notes = notesText,
+                        ExecutedAt = DateTime.Now
+                    };
+                    _vm.SelectedProject.TestExecutions.Add(execution);
+                }
 
                 tc.Status = selectedStatus;
             }

@@ -106,6 +106,28 @@
                         BorderBrush="{ThemeResource BorderBrush}" BorderThickness="0,0,0,1"
                         Padding="16,6">
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="SOURCE" Foreground="{ThemeResource TextSecondaryBrush}"
+                                   FontSize="10" FontWeight="SemiBold" CharacterSpacing="150"
+                                   VerticalAlignment="Center"/>
+                        <Button x:Name="SourceFilterAllBtn" Content="All" Tag="All"
+                                Click="SourceFilter_Click"
+                                Background="{ThemeResource ListAccentLowBrush}"
+                                Foreground="{ThemeResource AccentBrush}"
+                                BorderThickness="0" CornerRadius="6" Padding="8,5" FontSize="11"/>
+                        <Button x:Name="SourceFilterJiraBtn" Content="Jira" Tag="Jira"
+                                Click="SourceFilter_Click"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                BorderThickness="0" CornerRadius="6" Padding="8,5" FontSize="11"/>
+                        <Button x:Name="SourceFilterLinearBtn" Content="Linear" Tag="Linear"
+                                Click="SourceFilter_Click"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                BorderThickness="0" CornerRadius="6" Padding="8,5" FontSize="11"/>
+                        <Button x:Name="SourceFilterManualBtn" Content="Manual" Tag="Manual"
+                                Click="SourceFilter_Click"
+                                Background="Transparent" Foreground="{ThemeResource TextSecondaryBrush}"
+                                BorderThickness="0" CornerRadius="6" Padding="8,5" FontSize="11"/>
+                        <Border Width="1" Height="16" Background="{ThemeResource BorderBrush}"
+                                VerticalAlignment="Center" Margin="4,0"/>
                         <Button x:Name="ImportCsvBtn" Click="ImportCsv_Click"
                                 Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
                                 BorderThickness="0"
@@ -114,6 +136,16 @@
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE8B7;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
                                 <TextBlock Text="Import CSV" FontSize="11"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="NewPlanBtn" Click="NewPlan_Click"
+                                Background="{ThemeResource HoverBrush}" Foreground="{ThemeResource TextSecondaryBrush}"
+                                BorderThickness="0"
+                                CornerRadius="8" Padding="10,7"
+                                ToolTipService.ToolTip="Create a new empty test plan manually">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE710;" FontSize="13" FontFamily="Segoe Fluent Icons"/>
+                                <TextBlock Text="New Plan" FontSize="11"/>
                             </StackPanel>
                         </Button>
                         <Button Click="UploadDesignDoc_Click"
